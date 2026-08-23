@@ -1,0 +1,7 @@
+[ 2026-08-22T23:16:16.394Z ] System initialization started
+[ 2026-08-22T23:16:16.394Z ] HR system initialized
+[ 2026-08-22T23:16:24.348Z ] Test log entry
+[2026-08-22T23:21:56.505Z] CEO initiated new project: test-project
+[2026-08-22T23:24:01.154Z] CEO initiated new project: project-beta
+[2026-08-22T23:24:01.181Z] Message from frontend to agent ceo-warlock: Hello, please analyze this system...
+[2026-08-22T23:30:05.446Z] Stuck processes detected: ceo-warlock, hr-mind-flayer

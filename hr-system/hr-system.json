@@ -1,0 +1,18 @@
+{
+  "ceo-warlock": {
+    "name": "CEO Warlock",
+    "role": "ceo-warlock",
+    "project": "global",
+    "status": "active",
+    "context_len": 10000,
+    "created_at": "2026-08-22T23:16:03.588Z"
+  },
+  "hr-mind-flayer": {
+    "name": "HR Mind Flayer",
+    "role": "hr-mind-flayer",
+    "project": "global",
+    "status": "active",
+    "context_len": 10000,
+    "created_at": "2026-08-22T23:16:03.589Z"
+  }
+}

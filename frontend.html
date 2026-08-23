@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DND - Multi-Agent System</title>
+  <style>
+    :root {
+      --bg-color: #0a0a0f;
+      --card-bg: #1a1a24;
+      --primary: #9b59b6;
+      --secondary: #3498db;
+      --accent: #e74c3c;
+      --text: #ecf0f1;
+      --muted: #7f8c8d;
+      --border: #2c3e50;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg-color);
+      color: var(--text);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Top Navigation / Project Bar */
+    .top-nav {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      height: 60px;
+      z-index: 100;
+    }
+
+    .project-tabs {
+      display: flex;
+      gap: 10px;
+      margin-right: 40px;
+    }
+
+    .project-tab {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: color 0.2s;
+      white-space: nowrap;
+    }
+
+    .project-tab:hover {
+      color: var(--text);
+    }
+
+    .project-tab.active {
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .header-info {
+      color: var(--muted);
+      font-size: 13px;
+      margin-left: auto;
+    }
+
+    /* Play Area (Infinite Canvas) */
+    .play-area {
+      position: fixed;
+      top: 60px;
+      bottom: 0;
+      left: 0;
+      right: 260px;
+      overflow: hidden;
+      background: linear-gradient(135deg, #1a1a2f 0%, #0d0d15 100%);
+    }
+
+    .agent-avatar {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid var(--primary);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .agent-avatar:hover {
+      transform: scale(1.1);
+    }
+
+    /* Chat & Info Panel */
+    .panel-wrapper {
+      position: fixed;
+      top: 60px;
+      right: 0;
+      bottom: 0;
+      width: 260px;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel {
+      background: var(--card-bg);
+      border-left: 1px solid var(--border);
+      height: 100%;
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .panel-header {
+      padding: 15px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .close-panel {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .close-panel:hover {
+      color: var(--accent);
+    }
+
+    /* Tab Navigation */
+    .tab-nav {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 5px;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+    }
+
+    /* Chat Tab */
+    .chat-area {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+    }
+
+    .message.user {
+      background: var(--primary);
+      color: white;
+      align-self: flex-end;
+    }
+
+    .message.agent {
+      background: var(--card-bg);
+      color: var(--text);
+      align-self: flex-start;
+    }
+
+    .input-area {
+      padding: 10px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-color);
+      color: var(--text);
+      border-radius: 4px;
+    }
+
+    .input-area button {
+      background: var(--primary);
+      border: none;
+      color: white;
+      padding: 0 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .input-area button:hover {
+      background: #8e44ad;
+    }
+
+    /* Agent Stats Tab - D&D / BG3 Style */
+    .stats-sheet {
+      padding: 20px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-name {
+      font-weight: 600;
+    }
+
+    .stat-value {
+      color: var(--muted);
+    }
+
+    .d20 {
+      width: 30px;
+      height: 30px;
+      background: #e74c3c;
+      color: white;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 30px;
+      font-size: 14px;
+    }
+
+    /* Thought Process Tab */
+    .thought-log {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      gap: 8px;
+    }
+
+    .thought-entry {
+      padding: 8px 12px;
+      background: var(--bg-color);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* Personal Context Tab */
+    .context-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+      padding: 20px;
+    }
+
+    .context-cell {
+      background: var(--bg-color);
+      padding: 10px;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    /* Relationships Tab */
+    .network-graph {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .node {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 2px solid var(--muted);
+      cursor: pointer;
+      margin: 5px;
+    }
+
+    .node.connected {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .node:hover {
+      opacity: 0.8;
+    }
+
+    .label {
+      font-size: 10px;
+      text-align: center;
+      margin-top: 4px;
+    }
+
+    /* Main Content */
+    main {
+      padding: 20px;
+    }
+
+    h1 {
+      color: var(--primary);
+      margin-bottom: 20px;
+    }
+
+    /* Loading */
+    .loading {
+      color: var(--muted);
+      padding: 20px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <div class="top-nav">
+    <div class="project-tabs">
+      <button class="project-tab active">Project 1</button>
+      <button class="project-tab">Project 2</button>
+      <button class="project-tab">Project 3</button>
+    </div>
+    <div class="header-info">Chat with Manager</div>
+  </div>
+
+  <!-- Play Area -->
+  <div class="play-area" id="playArea"></div>
+
+  <!-- Panel Wrapper -->
+  <div class="panel-wrapper" id="panelWrapper">
+    <!-- Chat Tab -->
+    <div class="panel" id="chatPanel">
+      <div class="panel-header">
+        <span class="panel-title">Chat</span>
+        <button class="close-panel" onclick="closePanel()">×</button>
+      </div>
+      <div class="tab-nav">
+        <button class="tab-btn active">Chat</button>
+        <button class="tab-btn">Agent Stats</button>
+        <button class="tab-btn">Thought Process</button>
+        <button class="tab-btn">Personal Context</button>
+        <button class="tab-btn">Relationships</button>
+      </div>
+      <div class="chat-area" id="chatArea">
+        <div class="loading">Loading chat...</div>
+      </div>
+      <div class="input-area">
+        <input type="text" id="messageInput" placeholder="+ Type..." onkeypress="if(event.key==='Enter') sendMessage()">
+        <button onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+
+    <!-- Agent Stats Panel -->
+    <div class="panel" id="statsPanel">
+      <div class="panel-header">
+        <span class="panel-title">Agent Stats</span>
+        <button class="close-panel" onclick="closePanel()">×</button>
+      </div>
+      <div class="tab-nav">
+        <button class="tab-btn active">Chat</button>
+        <button class="tab-btn">Agent Stats</button>
+        <button class="tab-btn">Thought Process</button>
+        <button class="tab-btn">Personal Context</button>
+        <button class="tab-btn">Relationships</button>
+      </div>
+      <div class="stats-sheet" id="statsSheet">
+        <div class="loading">Loading agent stats...</div>
+      </div>
+    </div>
+
+    <!-- Thought Process Panel -->
+    <div class="panel" id="thoughtPanel">
+      <div class="panel-header">
+        <span class="panel-title">Thought Process</span>
+        <button class="close-panel" onclick="closePanel()">×</button>
+      </div>
+      <div class="tab-nav">
+        <button class="tab-btn active">Chat</button>
+        <button class="tab-btn">Agent Stats</button>
+        <button class="tab-btn">Thought Process</button>
+        <button class="tab-btn">Personal Context</button>
+        <button class="tab-btn">Relationships</button>
+      </div>
+      <div class="thought-log" id="thoughtLog">
+        <div class="loading">Loading thought process...</div>
+      </div>
+    </div>
+
+    <!-- Personal Context Panel -->
+    <div class="panel" id="contextPanel">
+      <div class="panel-header">
+        <span class="panel-title">Personal Context</span>
+        <button class="close-panel" onclick="closePanel()">×</button>
+      </div>
+      <div class="tab-nav">
+        <button class="tab-btn active">Chat</button>
+        <button class="tab-btn">Agent Stats</button>
+        <button class="tab-btn">Thought Process</button>
+        <button class="tab-btn">Personal Context</button>
+        <button class="tab-btn">Relationships</button>
+      </div>
+      <div class="context-grid" id="contextGrid">
+        <div class="loading">Loading context...</div>
+      </div>
+    </div>
+
+    <!-- Relationships Panel -->
+    <div class="panel" id="relationshipsPanel">
+      <div class="panel-header">
+        <span class="panel-title">Relationships</span>
+        <button class="close-panel" onclick="closePanel()">×</button>
+      </div>
+      <div class="tab-nav">
+        <button class="tab-btn active">Chat</button>
+        <button class="tab-btn">Agent Stats</button>
+        <button class="tab-btn">Thought Process</button>
+        <button class="tab-btn">Personal Context</button>
+        <button class="tab-btn">Relationships</button>
+      </div>
+      <div class="network-graph" id="networkGraph">
+        <div class="loading">Loading relationships...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BACKEND_URL = 'http://localhost:2121';
+
+    // State
+    let currentAgent = null;
+    let currentProject = 'project-alpha';
+    let currentTab = 'chat';
+
+    // DOM Elements
+    const chatArea = document.getElementById('chatArea');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.querySelector('.input-area button');
+    const projectTabs = document.querySelectorAll('.project-tab');
+    const panelBtns = document.querySelectorAll('.tab-btn');
+    const panels = document.querySelectorAll('.panel');
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      loadAgents();
+      loadChatHistory();
+      setupEventListeners();
+    });
+
+    function setupEventListeners() {
+      // Project tabs
+      projectTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          projectTabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          currentProject = tab.dataset.project || 'project-alpha';
+          loadAgents();
+        });
+      });
+
+      // Panel tab buttons
+      panelBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          panelBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentTab = btn.dataset.tab || 'chat';
+          switchPanel();
+        });
+      });
+
+      // Send message
+      sendBtn.addEventListener('click', sendMessage);
+      messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+      });
+    }
+
+    function switchPanel() {
+      panels.forEach(p => p.classList.remove('active'));
+      const activePanel = document.getElementById(`${currentTab}Panel`);
+      if (activePanel) activePanel.classList.add('active');
+
+      // Load content based on tab
+      if (currentTab === 'chat') loadChatHistory();
+      if (currentTab === 'stats') loadAgentStats();
+      if (currentTab === 'thought') loadThoughtProcess();
+      if (currentTab === 'context') loadPersonalContext();
+      if (currentTab === 'relationships') loadRelationships();
+    }
+
+    function closePanel() {
+      document.querySelector('.panel.active').classList.remove('active');
+    }
+
+    // API calls
+    async function api(endpoint, method = 'GET', body = null) {
+      const options = {
+        method,
+        headers: { 'Content-Type': 'application/json' }
+      };
+      if (body) options.body = JSON.stringify(body);
+      const res = await fetch(`${BACKEND_URL}${endpoint}`, options);
+      return res.ok ? await res.json() : null;
+    }
+
+    async function loadAgents() {
+      const data = await api('/handleGetAgentStatus', 'POST', { agentId: 'ceo-warlock' });
+      if (!data) return;
+      renderAgents(data);
+    }
+
+    function renderAgents(hrSystem) {
+      const playArea = document.getElementById('playArea');
+      playArea.innerHTML = '';
+      
+      for (const [id, agent] of Object.entries(hrSystem)) {
+        const avatar = document.createElement('div');
+        avatar.className = 'agent-avatar';
+        avatar.dataset.agentId = id;
+        avatar.title = `${agent.name} (${agent.role})`;
+        avatar.onclick = () => openAgentPanel(id);
+        // Position randomly in play area
+        avatar.style.left = `${Math.random() * 100}%`;
+        avatar.style.top = `${Math.random() * 80 + 10}%`;
+        playArea.appendChild(avatar);
+      }
+    }
+
+    function openAgentPanel(agentId) {
+      currentAgent = agentId;
+      loadAgentDetails(agentId);
+      document.getElementById('chatPanel').classList.add('active');
+      switchPanel();
+    }
+
+    async function loadAgentDetails(agentId) {
+      const data = await api('/handleGetAgentStatus', 'POST', { agentId });
+      if (!data) return;
+      renderAgentStats(data.agent);
+      renderChatMessages(data.messages || []);
+    }
+
+    function renderAgentStats(agent) {
+      const sheet = document.getElementById('statsSheet');
+      if (!sheet) return;
+      
+      let html = `
+        <div class="stat-row">
+          <span class="stat-name">Name</span>
+          <span class="stat-value">${agent.name || 'N/A'}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">Role</span>
+          <span class="stat-value">${agent.role || 'N/A'}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">Project</span>
+          <span class="stat-value">${agent.project || 'global'}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">Status</span>
+          <span class="stat-value">${agent.status || 'active'}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">Context</span>
+          <span class="stat-value">${agent.context_len || 'N/A'}</span>
+        </div>
+      `;
+      sheet.innerHTML = html;
+    }
+
+    async function loadChatHistory() {
+      const data = await api('/handleGetAgentStatus', 'POST', { agentId: 'ceo-warlock' });
+      if (!data || !data.messages) return;
+      renderChatMessages(data.messages);
+    }
+
+    function renderChatMessages(messages) {
+      const area = document.getElementById('chatArea');
+      if (!area) return;
+      
+      let html = '';
+      messages.forEach((msg, i) => {
+        const isUser = msg.from === 'frontend';
+        const cls = isUser ? 'user' : 'agent';
+        const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+        html += `<div class="message ${cls}"><strong>${msg.from || 'Agent'}</strong>: ${msg.request || ''}${time ? `<span style="font-size:10px;color:var(--muted);margin-left:8px;">${time}</span>` : ''}</div>`;
+      });
+      area.innerHTML = html || '<div class="loading">No messages yet</div>';
+      area.scrollTop = area.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const text = messageInput.value.trim();
+      if (!text) return;
+
+      // Send to backend
+      const data = await api('/handleSendMessage', 'POST', {
+        agentId: currentAgent || 'ceo-warlock',
+        project: currentProject,
+        message: text
+      });
+
+      // Display user message
+      const area = document.getElementById('chatArea');
+      area.innerHTML += `<div class="message user"><strong>You</strong>: ${text}</div>`;
+      area.scrollTop = area.scrollHeight;
+
+      messageInput.value = '';
+
+      // TODO: In full implementation, this would trigger harness agent execution
+      // For now, show a response after a brief delay
+      if (data && data.success) {
+        setTimeout(() => {
+          area.innerHTML += `<div class="message agent"><strong>Agent</strong>: Processing your request...</div>`;
+          area.scrollTop = area.scrollHeight;
+        }, 500);
+      }
+    }
+
+    // Additional tab content loaders
+    async function loadThoughtProcess() {
+      const data = await api('/handleGetAgentStatus', 'POST', { agentId: currentAgent || 'ceo-warlock' });
+      if (!data) return;
+      const log = document.getElementById('thoughtLog');
+      if (!log) return;
+      let html = '';
+      // Simulated thought entries
+      html += `<div class="thought-entry">Analyzing project requirements...</div>`;
+      html += `<div class="thought-entry">Assessing agent context windows...</div>`;
+      html += `<div class="thought-entry">Delegating tasks to harness agents...</div>`;
+      log.innerHTML = html;
+    }
+
+    async function loadPersonalContext() {
+      const grid = document.getElementById('contextGrid');
+      if (!grid) return;
+      grid.innerHTML = '<div style="color:var(--muted)">Context data would visualize agent memory state here</div>';
+    }
+
+    async function loadRelationships() {
+      const graph = document.getElementById('networkGraph');
+      if (!graph) return;
+      let html = '';
+      // Simple network nodes
+      html += `<div class="node connected" title="CEO Warlock" onclick="openAgentPanel('ceo-warlock')"><span class="label">CEO</span></div>`;
+      html += `<div class="node connected" title="HR Mind Flayer" onclick="openAgentPanel('hr-mind-flayer')"><span class="label">HR</span></div>`;
+      html += `<div class="node" title="Manager Bard" onclick="openAgentPanel('manager-bard')"><span class="label">Manager</span></div>`;
+      graph.innerHTML = html;
+    }
+  </script>
+</body>
+</html>
