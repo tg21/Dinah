@@ -14,5 +14,233 @@
     "status": "active",
     "context_len": 10000,
     "created_at": "2026-08-22T23:16:03.589Z"
+  },
+  "project-alpha-manager-bard": {
+    "name": "Manager Bard (Alpha)",
+    "role": "manager-bard",
+    "project": "project-alpha",
+    "status": "active",
+    "context_len": 128000,
+    "context_used": 1500,
+    "created_at": "2026-08-23T13:33:32.323Z",
+    "last_activity_ms": 1787492012323,
+    "stats": {
+      "name": "Manager Bard",
+      "role": "manager-bard",
+      "class": "Bard (College of Agile)",
+      "level": 15,
+      "hp": 105,
+      "maxHp": 105,
+      "ac": 15,
+      "avatarColor": 15105570,
+      "stats": {
+        "STR": 10,
+        "DEX": 16,
+        "CON": 14,
+        "INT": 14,
+        "WIS": 12,
+        "CHA": 19
+      },
+      "spells": [
+        {
+          "name": "Vicious Mockery",
+          "dice": "3d4",
+          "desc": "Deals psychic damage to blockers during standup."
+        },
+        {
+          "name": "Bardic Sprint Inspiration",
+          "dice": "1d10",
+          "desc": "Grants +1d10 to engineer prompt execution rolls."
+        },
+        {
+          "name": "Song of Restructuring",
+          "dice": "2d8+4",
+          "desc": "Reallocates sprint story points effortlessly."
+        }
+      ],
+      "inventory": [
+        "Lute of Jira",
+        "Polished Slide Deck",
+        "Venti Latte of Urgency"
+      ],
+      "traits": [
+        "Jack of All Trades",
+        "Agile Routing",
+        "Charismatic Deflection"
+      ]
+    },
+    "tasks_total": 5,
+    "tasks_completed": 0
+  },
+  "project-alpha-solution-architect-wizard": {
+    "name": "Solution Architect Wizard",
+    "role": "solution-architect-wizard",
+    "project": "project-alpha",
+    "status": "active",
+    "context_len": 128000,
+    "context_used": 1500,
+    "created_at": "2026-08-23T13:33:32.324Z",
+    "last_activity_ms": 1787492012324,
+    "stats": {
+      "name": "Solution Architect Wizard",
+      "role": "solution-architect-wizard",
+      "class": "Wizard (School of Architecture)",
+      "level": 16,
+      "hp": 85,
+      "maxHp": 85,
+      "ac": 14,
+      "avatarColor": 3447003,
+      "stats": {
+        "STR": 8,
+        "DEX": 14,
+        "CON": 13,
+        "INT": 20,
+        "WIS": 16,
+        "CHA": 10
+      },
+      "spells": [
+        {
+          "name": "Arcane Blueprint",
+          "dice": "4d6+5",
+          "desc": "Draws flawless microservice diagrams."
+        },
+        {
+          "name": "Divination: Tech Debt",
+          "dice": "3d8",
+          "desc": "Foresees breaking API changes months ahead."
+        },
+        {
+          "name": "Wall of Abstraction",
+          "dice": "5d10",
+          "desc": "Blocks messy quick-hack implementations."
+        }
+      ],
+      "inventory": [
+        "Spellbook of Distributed Systems",
+        "Wand of Schema Design",
+        "Crystal of Latency Optimization"
+      ],
+      "traits": [
+        "Arcane Recovery",
+        "Deep Spec Analysis",
+        "Theoretical Mastery"
+      ]
+    },
+    "tasks_total": 5,
+    "tasks_completed": 0
+  },
+  "project-alpha-backend-dev-cleric": {
+    "name": "Backend Dev Cleric",
+    "role": "backend-dev-cleric",
+    "project": "project-alpha",
+    "status": "active",
+    "context_len": 128000,
+    "context_used": 1500,
+    "created_at": "2026-08-23T13:33:32.324Z",
+    "last_activity_ms": 1787492012324,
+    "stats": {
+      "name": "Backend Dev Cleric",
+      "role": "backend-dev-cleric",
+      "class": "Cleric (Domain of Persistence)",
+      "level": 12,
+      "hp": 98,
+      "maxHp": 98,
+      "ac": 18,
+      "avatarColor": 1752220,
+      "stats": {
+        "STR": 14,
+        "DEX": 10,
+        "CON": 15,
+        "INT": 14,
+        "WIS": 18,
+        "CHA": 10
+      },
+      "spells": [
+        {
+          "name": "Prayer of Schema Migration",
+          "dice": "3d8+4",
+          "desc": "Lossless zero-downtime database update."
+        },
+        {
+          "name": "Turn Deadlocks",
+          "dice": "Special",
+          "desc": "Banishes race conditions across worker threads."
+        },
+        {
+          "name": "Bless REST Endpoint",
+          "dice": "1d4",
+          "desc": "Sub-10ms response time blessing."
+        }
+      ],
+      "inventory": [
+        "Warhammer of SQL Queries",
+        "Shield of ACID Transactions",
+        "Vial of Connection Pool Holy Water"
+      ],
+      "traits": [
+        "Divine Connection Pooling",
+        "Channel Energy (Query Opt)",
+        "Transaction Safeguard"
+      ]
+    },
+    "tasks_total": 5,
+    "tasks_completed": 0
+  },
+  "project-alpha-frontend-dev-sorcerer": {
+    "name": "Frontend Dev Sorcerer",
+    "role": "frontend-dev-sorcerer",
+    "project": "project-alpha",
+    "status": "active",
+    "context_len": 128000,
+    "context_used": 1500,
+    "created_at": "2026-08-23T13:33:32.325Z",
+    "last_activity_ms": 1787492012325,
+    "stats": {
+      "name": "Frontend Dev Sorcerer",
+      "role": "frontend-dev-sorcerer",
+      "class": "Sorcerer (Wild Magic of CSS)",
+      "level": 12,
+      "hp": 78,
+      "maxHp": 78,
+      "ac": 13,
+      "avatarColor": 15277667,
+      "stats": {
+        "STR": 8,
+        "DEX": 16,
+        "CON": 14,
+        "INT": 12,
+        "WIS": 10,
+        "CHA": 18
+      },
+      "spells": [
+        {
+          "name": "Wild Magic Surge (Flexbox)",
+          "dice": "3d6+4",
+          "desc": "Instantly centers div in all dimensions."
+        },
+        {
+          "name": "PixiJS Canvas Summoning",
+          "dice": "4d8",
+          "desc": "Renders 60FPS GPU accelerated canvas."
+        },
+        {
+          "name": "Twinned Responsive Layout",
+          "dice": "2d10",
+          "desc": "Seamless mobile and desktop rendering."
+        }
+      ],
+      "inventory": [
+        "Orb of WebGL Shaders",
+        "Cloak of Visual Aesthetics",
+        "Figma Color Swatch Wand"
+      ],
+      "traits": [
+        "Wild Magic Surge",
+        "Flexible Casting",
+        "Responsive Intuition"
+      ]
+    },
+    "tasks_total": 5,
+    "tasks_completed": 0
   }
 }

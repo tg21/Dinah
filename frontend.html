@@ -3,679 +3,1739 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DND - Multi-Agent System</title>
+  <title>DND — Multi-Agent System</title>
+  <!-- PixiJS v7 CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+  <!-- FontAwesome Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     :root {
-      --bg-color: #0a0a0f;
-      --card-bg: #1a1a24;
+      --bg-dark: #08080d;
+      --bg-panel: #111119;
+      --bg-card: #181824;
+      --bg-hover: #222233;
       --primary: #9b59b6;
+      --primary-glow: rgba(155, 89, 182, 0.4);
       --secondary: #3498db;
       --accent: #e74c3c;
-      --text: #ecf0f1;
-      --muted: #7f8c8d;
-      --border: #2c3e50;
+      --gold: #f39c12;
+      --green: #2ecc71;
+      --text: #f0f3f8;
+      --text-muted: #8892b0;
+      --border: #28283c;
+      --border-light: #3a3a55;
     }
 
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+      user-select: none;
     }
 
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: var(--bg-color);
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background: var(--bg-dark);
       color: var(--text);
       min-height: 100vh;
       overflow: hidden;
     }
 
-    /* Top Navigation / Project Bar */
+    /* ============================================================
+       TOP NAVIGATION BAR
+    ============================================================ */
     .top-nav {
-      background: var(--card-bg);
+      background: var(--bg-panel);
       border-bottom: 1px solid var(--border);
       padding: 0 20px;
       display: flex;
       align-items: center;
       height: 60px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
       z-index: 100;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #fff;
+      margin-right: 30px;
+    }
+
+    .brand i {
+      color: var(--gold);
+      font-size: 22px;
+      text-shadow: 0 0 10px rgba(243, 156, 18, 0.5);
     }
 
     .project-tabs {
       display: flex;
-      gap: 10px;
-      margin-right: 40px;
+      gap: 8px;
+      align-items: center;
     }
 
     .project-tab {
-      background: transparent;
-      border: none;
-      color: var(--muted);
-      padding: 8px 16px;
-      font-size: 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 7px 15px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 6px;
       cursor: pointer;
-      transition: color 0.2s;
-      white-space: nowrap;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .project-tab:hover {
+      background: var(--bg-hover);
       color: var(--text);
+      border-color: var(--border-light);
     }
 
     .project-tab.active {
-      color: var(--primary);
-      border-bottom: 2px solid var(--primary);
+      background: linear-gradient(135deg, rgba(155, 89, 182, 0.25) 0%, rgba(52, 152, 219, 0.2) 100%);
+      color: #fff;
+      border-color: var(--primary);
+      box-shadow: 0 0 12px var(--primary-glow);
     }
 
-    .header-info {
-      color: var(--muted);
+    .new-project-btn {
+      background: transparent;
+      border: 1px dashed var(--border-light);
+      color: var(--text-muted);
+      padding: 7px 12px;
+      border-radius: 6px;
+      cursor: pointer;
       font-size: 13px;
-      margin-left: auto;
+      transition: all 0.2s;
     }
 
-    /* Play Area (Infinite Canvas) */
+    .new-project-btn:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    .nav-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .harness-select-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--bg-card);
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .harness-select-wrap select {
+      background: transparent;
+      border: none;
+      color: var(--gold);
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .harness-select-wrap select option {
+      background: var(--bg-card);
+      color: var(--text);
+    }
+
+    .marshall-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      background: rgba(46, 204, 113, 0.1);
+      border: 1px solid rgba(46, 204, 113, 0.3);
+      padding: 5px 12px;
+      border-radius: 6px;
+      color: var(--green);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .marshall-status:hover {
+      background: rgba(46, 204, 113, 0.2);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.8; }
+    }
+
+    /* ============================================================
+       PLAY AREA (PIXIJS INFINITE CANVAS)
+    ============================================================ */
     .play-area {
       position: fixed;
       top: 60px;
       bottom: 0;
       left: 0;
-      right: 260px;
+      right: 480px;
+      background: radial-gradient(circle at center, #151522 0%, #08080d 100%);
       overflow: hidden;
-      background: linear-gradient(135deg, #1a1a2f 0%, #0d0d15 100%);
     }
 
-    .agent-avatar {
+    #canvasContainer {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    #canvasContainer:active {
+      cursor: grabbing;
+    }
+
+    .canvas-overlay-controls {
       position: absolute;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      border: 2px solid var(--primary);
+      bottom: 20px;
+      left: 20px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .canvas-btn {
+      background: rgba(24, 24, 36, 0.85);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      transition: transform 0.2s;
+      transition: all 0.2s;
+      backdrop-filter: blur(8px);
     }
 
-    .agent-avatar:hover {
-      transform: scale(1.1);
+    .canvas-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--primary);
+      color: var(--primary);
     }
 
-    /* Chat & Info Panel */
-    .panel-wrapper {
+    .canvas-legend {
+      position: absolute;
+      top: 15px;
+      left: 20px;
+      background: rgba(24, 24, 36, 0.8);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 15px;
+      z-index: 10;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ============================================================
+       RIGHT DRAWER (BALDUR'S GATE 3 / D&D CHARACTER SHEET)
+    ============================================================ */
+    .drawer {
       position: fixed;
       top: 60px;
       right: 0;
       bottom: 0;
-      width: 260px;
-      z-index: 50;
+      width: 480px;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border);
       display: flex;
       flex-direction: column;
+      z-index: 50;
+      box-shadow: -4px 0 25px rgba(0,0,0,0.6);
     }
 
-    .panel {
-      background: var(--card-bg);
-      border-left: 1px solid var(--border);
-      height: 100%;
-      display: none;
-    }
-
-    .panel.active {
-      display: block;
-    }
-
-    .panel-header {
-      padding: 15px 20px;
+    .drawer-header {
+      padding: 16px 20px;
+      background: linear-gradient(180deg, rgba(30, 30, 46, 0.7) 0%, rgba(17, 17, 25, 0.9) 100%);
       border-bottom: 1px solid var(--border);
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
     }
 
-    .panel-title {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .close-panel {
-      background: transparent;
-      border: none;
-      color: var(--muted);
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    .close-panel:hover {
-      color: var(--accent);
-    }
-
-    /* Tab Navigation */
-    .tab-nav {
+    .drawer-agent-info {
       display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .drawer-avatar-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 2px solid var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 12px var(--primary-glow);
+    }
+
+    .drawer-agent-meta h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .drawer-agent-meta p {
+      font-size: 12px;
+      color: var(--gold);
+      font-weight: 500;
+    }
+
+    .drawer-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .spawn-badge-btn {
+      background: rgba(155, 89, 182, 0.2);
+      border: 1px solid var(--primary);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .spawn-badge-btn:hover {
+      background: var(--primary);
+    }
+
+    /* Drawer 5-Tab Navigation */
+    .drawer-tabs {
+      display: flex;
+      background: var(--bg-card);
       border-bottom: 1px solid var(--border);
     }
 
     .tab-btn {
       flex: 1;
-      padding: 12px 5px;
+      padding: 12px 6px;
       background: transparent;
       border: none;
-      color: var(--muted);
-      font-size: 12px;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
       cursor: pointer;
-      transition: color 0.2s;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tab-btn i {
+      font-size: 14px;
     }
 
     .tab-btn:hover {
       color: var(--text);
+      background: rgba(255,255,255,0.02);
     }
 
     .tab-btn.active {
-      color: var(--primary);
+      color: var(--gold);
+      border-bottom-color: var(--gold);
+      background: rgba(243, 156, 18, 0.05);
     }
 
-    /* Chat Tab */
-    .chat-area {
+    /* Tab Content Panels */
+    .tab-panel {
       flex: 1;
-      padding: 20px;
       overflow-y: auto;
+      display: none;
+      padding: 16px;
+    }
+
+    .tab-panel.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ============================================================
+       TAB 1: CHAT PANEL
+    ============================================================ */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-bottom: 10px;
+    }
+
+    .msg-bubble {
+      max-width: 88%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.45;
+      user-select: text;
+    }
+
+    .msg-bubble.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+      color: #fff;
+      border-bottom-right-radius: 2px;
+    }
+
+    .msg-bubble.agent {
+      align-self: flex-start;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-bottom-left-radius: 2px;
+    }
+
+    .msg-bubble.system {
+      align-self: center;
+      max-width: 95%;
+      background: rgba(52, 152, 219, 0.1);
+      border: 1px dashed rgba(52, 152, 219, 0.3);
+      color: #85c1e9;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .msg-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    .chat-suggestions {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 8px 0;
+    }
+
+    .chip-btn {
+      white-space: nowrap;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chip-btn:hover {
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .chat-input-box {
+      border-top: 1px solid var(--border);
+      padding: 12px 0 0 0;
+      display: flex;
+      gap: 8px;
+    }
+
+    .chat-input-box input {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+      transition: border 0.2s;
+      user-select: text;
+    }
+
+    .chat-input-box input:focus {
+      border-color: var(--primary);
+    }
+
+    .chat-input-box button {
+      background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+      border: none;
+      color: #fff;
+      padding: 0 18px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chat-input-box button:hover {
+      box-shadow: 0 0 12px var(--primary-glow);
+    }
+
+    /* ============================================================
+       TAB 2: AGENT STATS (D&D / BG3 CHARACTER SHEET)
+    ============================================================ */
+    .stats-sheet {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .vitals-banner {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    .vital-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .vital-card h4 {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .vital-card .vital-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    .hp-bar-wrap {
+      width: 100%;
+      height: 6px;
+      background: #2c3e50;
+      border-radius: 3px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .hp-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #e74c3c 0%, #2ecc71 100%);
+      width: 100%;
+    }
+
+    /* Ability Scores Grid (STR, DEX, CON, INT, WIS, CHA) */
+    .ability-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+    }
+
+    .ability-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 4px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .ability-box:hover {
+      border-color: var(--gold);
+      transform: translateY(-2px);
+    }
+
+    .ability-name {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .ability-mod {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+      margin: 2px 0;
+    }
+
+    .ability-score {
+      font-size: 10px;
+      color: var(--gold);
+    }
+
+    /* Dice Roller Section */
+    .dice-roller-box {
+      background: linear-gradient(135deg, rgba(24, 24, 36, 0.9) 0%, rgba(30, 25, 45, 0.9) 100%);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .dice-btn {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      border: none;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+      transition: all 0.2s;
+    }
+
+    .dice-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .dice-result-badge {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--gold);
+      min-width: 60px;
+      text-align: center;
+    }
+
+    /* Spells & Actions */
+    .section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .spell-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 6px;
+    }
+
+    .spell-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .spell-dice {
+      color: var(--gold);
+      font-size: 11px;
+    }
+
+    .spell-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ============================================================
+       TAB 3: THOUGHT PROCESS PANEL
+    ============================================================ */
+    .thought-stream {
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
 
-    .message {
-      max-width: 80%;
-      padding: 8px 12px;
-      border-radius: 12px;
-      font-size: 13px;
+    .thought-card {
+      background: var(--bg-card);
+      border-left: 3px solid var(--secondary);
+      border-radius: 0 6px 6px 0;
+      padding: 10px 12px;
+      font-size: 12px;
     }
 
-    .message.user {
-      background: var(--primary);
-      color: white;
-      align-self: flex-end;
+    .thought-card.OPENCODE_INVOKE { border-left-color: var(--gold); }
+    .thought-card.REASONING { border-left-color: var(--primary); }
+    .thought-card.EXECUTION { border-left-color: var(--green); }
+
+    .thought-tag {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--secondary);
+      margin-bottom: 4px;
     }
 
-    .message.agent {
-      background: var(--card-bg);
-      color: var(--text);
-      align-self: flex-start;
+    .thought-time {
+      float: right;
+      color: var(--text-muted);
+      font-size: 10px;
     }
 
-    .input-area {
-      padding: 10px 20px;
-      border-top: 1px solid var(--border);
+    /* ============================================================
+       TAB 4: PERSONAL CONTEXT PANEL
+    ============================================================ */
+    .context-meter-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .context-bar-wrap {
+      width: 100%;
+      height: 8px;
+      background: #2c3e50;
+      border-radius: 4px;
+      margin: 8px 0;
+      overflow: hidden;
+    }
+
+    .context-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3498db 0%, #9b59b6 100%);
+      width: 15%;
+    }
+
+    .file-tree {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .file-item {
       display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      padding: 4px 0;
+      color: var(--text-muted);
+    }
+
+    .file-item i {
+      color: var(--gold);
+    }
+
+    /* ============================================================
+       TAB 5: RELATIONSHIPS PANEL
+    ============================================================ */
+    .network-nodes-list {
+      display: flex;
+      flex-direction: column;
       gap: 8px;
     }
 
-    .input-area input {
-      flex: 1;
-      padding: 8px 12px;
+    .network-card {
+      background: var(--bg-card);
       border: 1px solid var(--border);
-      background: var(--bg-color);
-      color: var(--text);
-      border-radius: 4px;
-    }
-
-    .input-area button {
-      background: var(--primary);
-      border: none;
-      color: white;
-      padding: 0 16px;
-      border-radius: 4px;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       cursor: pointer;
-      font-size: 13px;
+      transition: all 0.2s;
     }
 
-    .input-area button:hover {
-      background: #8e44ad;
+    .network-card:hover {
+      border-color: var(--primary);
+      background: var(--bg-hover);
     }
 
-    /* Agent Stats Tab - D&D / BG3 Style */
-    .stats-sheet {
-      padding: 20px;
+    /* Modals */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
     }
 
-    .stat-row {
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      width: 440px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: #fff;
       display: flex;
       justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
+      align-items: center;
     }
 
-    .stat-name {
-      font-weight: 600;
+    .modal-form-group {
+      margin-bottom: 14px;
     }
 
-    .stat-value {
-      color: var(--muted);
-    }
-
-    .d20 {
-      width: 30px;
-      height: 30px;
-      background: #e74c3c;
-      color: white;
-      border-radius: 50%;
-      text-align: center;
-      line-height: 30px;
-      font-size: 14px;
-    }
-
-    /* Thought Process Tab */
-    .thought-log {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-      gap: 8px;
-    }
-
-    .thought-entry {
-      padding: 8px 12px;
-      background: var(--bg-color);
-      border-radius: 6px;
+    .modal-form-group label {
+      display: block;
       font-size: 12px;
-      color: var(--muted);
+      color: var(--text-muted);
+      margin-bottom: 6px;
     }
 
-    /* Personal Context Tab */
-    .context-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 10px;
-      padding: 20px;
-    }
-
-    .context-cell {
-      background: var(--bg-color);
-      padding: 10px;
+    .modal-form-group input, .modal-form-group select {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 8px 12px;
       border-radius: 6px;
-      text-align: center;
+      font-size: 13px;
+      outline: none;
     }
 
-    /* Relationships Tab */
-    .network-graph {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
+    .modal-btn-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
     }
 
-    .node {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      border: 2px solid var(--muted);
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 6px;
       cursor: pointer;
-      margin: 5px;
     }
 
-    .node.connected {
+    .btn-primary {
       background: var(--primary);
-      border-color: var(--primary);
-    }
-
-    .node:hover {
-      opacity: 0.8;
-    }
-
-    .label {
-      font-size: 10px;
-      text-align: center;
-      margin-top: 4px;
-    }
-
-    /* Main Content */
-    main {
-      padding: 20px;
-    }
-
-    h1 {
-      color: var(--primary);
-      margin-bottom: 20px;
-    }
-
-    /* Loading */
-    .loading {
-      color: var(--muted);
-      padding: 20px;
-      text-align: center;
+      border: none;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Navigation -->
-  <div class="top-nav">
-    <div class="project-tabs">
-      <button class="project-tab active">Project 1</button>
-      <button class="project-tab">Project 2</button>
-      <button class="project-tab">Project 3</button>
+  <!-- ============================================================
+       TOP NAVIGATION BAR
+  ============================================================ -->
+  <header class="top-nav">
+    <div class="brand">
+      <i class="fa-solid fa-dice-d20"></i>
+      <span>DND AGENTS</span>
     </div>
-    <div class="header-info">Chat with Manager</div>
+
+    <div class="project-tabs" id="projectTabs">
+      <button class="project-tab active" data-project="project-alpha"><i class="fa-solid fa-cube"></i> Project Alpha</button>
+      <button class="project-tab" data-project="project-beta"><i class="fa-solid fa-cube"></i> Project Beta</button>
+      <button class="new-project-btn" onclick="openNewProjectModal()"><i class="fa-solid fa-plus"></i> New Project</button>
+    </div>
+
+    <div class="nav-actions">
+      <div class="harness-select-wrap">
+        <i class="fa-solid fa-terminal"></i>
+        <span>Harness:</span>
+        <select id="harnessSelect">
+          <option value="opencode">OpenCode CLI (/usr/bin/opencode)</option>
+          <option value="claude-code">Claude Code</option>
+          <option value="codex">Codex</option>
+          <option value="gemini">Gemini CLI</option>
+        </select>
+      </div>
+
+      <div class="marshall-status" onclick="triggerMarshallCheck()" title="Click to trigger Marshall inspection">
+        <div class="pulse-dot"></div>
+        <span>Marshall: Healthy</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       PLAY AREA (PIXIJS CANVAS)
+  ============================================================ -->
+  <main class="play-area" id="playArea">
+    <div id="canvasContainer"></div>
+
+    <div class="canvas-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#9b59b6"></div> Executive (Warlock/Mind Flayer)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#e67e22"></div> Management (Bard)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#3498db"></div> Architecture (Wizard)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2ecc71"></div> Engineering & QA</div>
+    </div>
+
+    <div class="canvas-overlay-controls">
+      <button class="canvas-btn" onclick="zoomCanvas(1.2)" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
+      <button class="canvas-btn" onclick="zoomCanvas(0.8)" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
+      <button class="canvas-btn" onclick="resetCanvasView()" title="Reset Canvas View"><i class="fa-solid fa-compress"></i></button>
+      <button class="canvas-btn" onclick="openSpawnAgentModal()" title="HR Spawn Agent"><i class="fa-solid fa-user-plus"></i></button>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       RIGHT DRAWER (5-TAB BALDUR'S GATE 3 / D&D SHEET)
+  ============================================================ -->
+  <aside class="drawer" id="drawer">
+    <!-- Header -->
+    <div class="drawer-header">
+      <div class="drawer-agent-info">
+        <div class="drawer-avatar-icon" id="drawerAvatar">🧙</div>
+        <div class="drawer-agent-meta">
+          <h3 id="drawerName">CEO Warlock</h3>
+          <p id="drawerClass">Level 20 Warlock (Pact of the Board)</p>
+        </div>
+      </div>
+      <div class="drawer-actions">
+        <button class="spawn-badge-btn" onclick="openSpawnAgentModal()"><i class="fa-solid fa-plus"></i> HR Spawn</button>
+      </div>
+    </div>
+
+    <!-- 5-Tab Buttons -->
+    <div class="drawer-tabs">
+      <button class="tab-btn active" data-tab="chat"><i class="fa-solid fa-comment-dots"></i> Chat</button>
+      <button class="tab-btn" data-tab="stats"><i class="fa-solid fa-shield-halved"></i> Stats</button>
+      <button class="tab-btn" data-tab="thoughts"><i class="fa-solid fa-brain"></i> Thoughts</button>
+      <button class="tab-btn" data-tab="context"><i class="fa-solid fa-database"></i> Context</button>
+      <button class="tab-btn" data-tab="network"><i class="fa-solid fa-circle-nodes"></i> Network</button>
+    </div>
+
+    <!-- TAB 1: CHAT -->
+    <div class="tab-panel active" id="tab-chat">
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-suggestions">
+        <button class="chip-btn" onclick="quickPrompt('What is our current project status and architecture?')">Status Check</button>
+        <button class="chip-btn" onclick="quickPrompt('Draft system specification and API schema.')">Draft Spec</button>
+        <button class="chip-btn" onclick="quickPrompt('Request HR Mind Flayer to spawn a QA Rogue.')">Spawn QA</button>
+      </div>
+      <div class="chat-input-box">
+        <input type="text" id="chatInput" placeholder="+ Type a directive..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+        <button onclick="sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+    </div>
+
+    <!-- TAB 2: AGENT STATS (D&D / BG3 SHEET) -->
+    <div class="tab-panel" id="tab-stats">
+      <div class="stats-sheet">
+        <div class="vitals-banner">
+          <div class="vital-card">
+            <h4>Armor Class</h4>
+            <div class="vital-val" id="statAc">18</div>
+          </div>
+          <div class="vital-card">
+            <h4>Hit Points</h4>
+            <div class="vital-val" id="statHp">140 / 140</div>
+            <div class="hp-bar-wrap"><div class="hp-bar-fill" id="hpBarFill"></div></div>
+          </div>
+          <div class="vital-card">
+            <h4>Level</h4>
+            <div class="vital-val" id="statLevel">20</div>
+          </div>
+        </div>
+
+        <div class="section-title"><i class="fa-solid fa-dice-d20"></i> Ability Scores</div>
+        <div class="ability-grid" id="abilityGrid"></div>
+
+        <div class="dice-roller-box">
+          <div>
+            <div style="font-weight:700;font-size:13px;color:#fff;">D20 Check Roller</div>
+            <div style="font-size:11px;color:var(--text-muted);" id="diceSubtext">Roll with Charisma bonus (+5)</div>
+          </div>
+          <button class="dice-btn" onclick="rollD20()"><i class="fa-solid fa-dice"></i> Roll D20</button>
+          <div class="dice-result-badge" id="diceResult">—</div>
+        </div>
+
+        <div class="section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Spells & Signature Abilities</div>
+        <div id="spellsList"></div>
+
+        <div class="section-title"><i class="fa-solid fa-sack-dollar"></i> Inventory & Items</div>
+        <div id="inventoryList" style="font-size:12px;color:var(--text-muted);background:var(--bg-card);padding:10px;border-radius:6px;border:1px solid var(--border);"></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: THOUGHT PROCESS -->
+    <div class="tab-panel" id="tab-thoughts">
+      <div class="thought-stream" id="thoughtStream"></div>
+    </div>
+
+    <!-- TAB 4: PERSONAL CONTEXT -->
+    <div class="tab-panel" id="tab-context">
+      <div class="context-meter-card">
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span style="color:var(--text-muted)">Context Window Usage:</span>
+          <span id="contextGaugeText" style="color:var(--gold);font-weight:700;">12.4k / 128k Tokens</span>
+        </div>
+        <div class="context-bar-wrap"><div class="context-bar-fill" id="contextBarFill"></div></div>
+      </div>
+
+      <div class="section-title"><i class="fa-solid fa-folder-open"></i> Project Workspace Files</div>
+      <div class="file-tree" id="fileTree"></div>
+    </div>
+
+    <!-- TAB 5: RELATIONSHIPS -->
+    <div class="tab-panel" id="tab-network">
+      <div class="section-title"><i class="fa-solid fa-diagram-project"></i> Active Agent Network</div>
+      <div class="network-nodes-list" id="networkList"></div>
+    </div>
+  </aside>
+
+  <!-- ============================================================
+       MODALS: NEW PROJECT & HR SPAWN
+  ============================================================ -->
+  <!-- New Project Modal -->
+  <div class="modal-backdrop" id="newProjectModal">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span><i class="fa-solid fa-cube"></i> Create New Project</span>
+        <i class="fa-solid fa-xmark" style="cursor:pointer;" onclick="closeModal('newProjectModal')"></i>
+      </div>
+      <div class="modal-form-group">
+        <label>Project Slug (e.g. project-gamma)</label>
+        <input type="text" id="newProjectId" placeholder="project-gamma">
+      </div>
+      <div class="modal-form-group">
+        <label>Initial Agent Assignment</label>
+        <select id="newProjectAgentRole">
+          <option value="manager-bard">Manager Bard (Project Router)</option>
+          <option value="solution-architect-wizard">Solution Architect Wizard</option>
+        </select>
+      </div>
+      <div class="modal-btn-row">
+        <button class="btn-secondary" onclick="closeModal('newProjectModal')">Cancel</button>
+        <button class="btn-primary" onclick="submitNewProject()">Create Project</button>
+      </div>
+    </div>
   </div>
 
-  <!-- Play Area -->
-  <div class="play-area" id="playArea"></div>
-
-  <!-- Panel Wrapper -->
-  <div class="panel-wrapper" id="panelWrapper">
-    <!-- Chat Tab -->
-    <div class="panel" id="chatPanel">
-      <div class="panel-header">
-        <span class="panel-title">Chat</span>
-        <button class="close-panel" onclick="closePanel()">×</button>
+  <!-- HR Spawn Agent Modal -->
+  <div class="modal-backdrop" id="spawnAgentModal">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span><i class="fa-solid fa-brain"></i> HR Mind Flayer — Spawn Agent</span>
+        <i class="fa-solid fa-xmark" style="cursor:pointer;" onclick="closeModal('spawnAgentModal')"></i>
       </div>
-      <div class="tab-nav">
-        <button class="tab-btn active">Chat</button>
-        <button class="tab-btn">Agent Stats</button>
-        <button class="tab-btn">Thought Process</button>
-        <button class="tab-btn">Personal Context</button>
-        <button class="tab-btn">Relationships</button>
+      <div class="modal-form-group">
+        <label>Select Agent Archetype / Role</label>
+        <select id="spawnRoleSelect">
+          <option value="manager-bard">Manager Bard (Router)</option>
+          <option value="solution-architect-wizard">Solution Architect Wizard</option>
+          <option value="staff-engineer-paladin">Staff Engineer Paladin</option>
+          <option value="backend-dev-cleric">Backend Dev Cleric</option>
+          <option value="frontend-dev-sorcerer">Frontend Dev Sorcerer</option>
+          <option value="qa-engineer-rogue">QA Engineer Rogue</option>
+          <option value="devops-sre-dragonborn-warmage">DevOps SRE Dragonborn Warmage</option>
+          <option value="system-analyst-blood-hunter">System Analyst Blood Hunter</option>
+          <option value="information-sourcer-ranger">Information Sourcer Ranger</option>
+          <option value="office-librarian-artificer">Office Librarian Artificer</option>
+          <option value="designers-changeling-sculptor">Designer Changeling Sculptor</option>
+          <option value="cybersecurity-death-knight-lich">Cybersecurity Lich</option>
+          <option value="product-manager-doppelganger">Product Manager Doppelgänger</option>
+          <option value="scrum-master-monk">Scrum Master Monk</option>
+          <option value="data-scientist-alchemist-diviner">Data Scientist Alchemist</option>
+          <option value="legal-compliance-inquisitor">Legal Inquisitor</option>
+          <option value="cleaner-facilities-barbarian">Cleaner Barbarian</option>
+          <option value="excel-admin-druid">Excel Admin Druid</option>
+          <option value="consultants-vampires">Consultant Vampire</option>
+          <option value="interns-kobolds-goblins">Intern Kobold / Goblin</option>
+        </select>
       </div>
-      <div class="chat-area" id="chatArea">
-        <div class="loading">Loading chat...</div>
+      <div class="modal-form-group">
+        <label>Assign to Project</label>
+        <select id="spawnProjectSelect">
+          <option value="project-alpha">project-alpha</option>
+          <option value="project-beta">project-beta</option>
+          <option value="global">global (CEO/HR/Staff)</option>
+        </select>
       </div>
-      <div class="input-area">
-        <input type="text" id="messageInput" placeholder="+ Type..." onkeypress="if(event.key==='Enter') sendMessage()">
-        <button onclick="sendMessage()">Send</button>
-      </div>
-    </div>
-
-    <!-- Agent Stats Panel -->
-    <div class="panel" id="statsPanel">
-      <div class="panel-header">
-        <span class="panel-title">Agent Stats</span>
-        <button class="close-panel" onclick="closePanel()">×</button>
-      </div>
-      <div class="tab-nav">
-        <button class="tab-btn active">Chat</button>
-        <button class="tab-btn">Agent Stats</button>
-        <button class="tab-btn">Thought Process</button>
-        <button class="tab-btn">Personal Context</button>
-        <button class="tab-btn">Relationships</button>
-      </div>
-      <div class="stats-sheet" id="statsSheet">
-        <div class="loading">Loading agent stats...</div>
-      </div>
-    </div>
-
-    <!-- Thought Process Panel -->
-    <div class="panel" id="thoughtPanel">
-      <div class="panel-header">
-        <span class="panel-title">Thought Process</span>
-        <button class="close-panel" onclick="closePanel()">×</button>
-      </div>
-      <div class="tab-nav">
-        <button class="tab-btn active">Chat</button>
-        <button class="tab-btn">Agent Stats</button>
-        <button class="tab-btn">Thought Process</button>
-        <button class="tab-btn">Personal Context</button>
-        <button class="tab-btn">Relationships</button>
-      </div>
-      <div class="thought-log" id="thoughtLog">
-        <div class="loading">Loading thought process...</div>
-      </div>
-    </div>
-
-    <!-- Personal Context Panel -->
-    <div class="panel" id="contextPanel">
-      <div class="panel-header">
-        <span class="panel-title">Personal Context</span>
-        <button class="close-panel" onclick="closePanel()">×</button>
-      </div>
-      <div class="tab-nav">
-        <button class="tab-btn active">Chat</button>
-        <button class="tab-btn">Agent Stats</button>
-        <button class="tab-btn">Thought Process</button>
-        <button class="tab-btn">Personal Context</button>
-        <button class="tab-btn">Relationships</button>
-      </div>
-      <div class="context-grid" id="contextGrid">
-        <div class="loading">Loading context...</div>
-      </div>
-    </div>
-
-    <!-- Relationships Panel -->
-    <div class="panel" id="relationshipsPanel">
-      <div class="panel-header">
-        <span class="panel-title">Relationships</span>
-        <button class="close-panel" onclick="closePanel()">×</button>
-      </div>
-      <div class="tab-nav">
-        <button class="tab-btn active">Chat</button>
-        <button class="tab-btn">Agent Stats</button>
-        <button class="tab-btn">Thought Process</button>
-        <button class="tab-btn">Personal Context</button>
-        <button class="tab-btn">Relationships</button>
-      </div>
-      <div class="network-graph" id="networkGraph">
-        <div class="loading">Loading relationships...</div>
+      <div class="modal-btn-row">
+        <button class="btn-secondary" onclick="closeModal('spawnAgentModal')">Cancel</button>
+        <button class="btn-primary" onclick="submitSpawnAgent()">Spawn via HR</button>
       </div>
     </div>
   </div>
 
+  <!-- ============================================================
+       MAIN CLIENT SCRIPT & PIXIJS INTEGRATION
+  ============================================================ -->
   <script>
-    const BACKEND_URL = 'http://localhost:2121';
+    const BACKEND_URL = window.location.origin;
 
     // State
-    let currentAgent = null;
-    let currentProject = 'project-alpha';
-    let currentTab = 'chat';
+    let currentAgentId = 'ceo-warlock';
+    let currentProjectId = 'project-alpha';
+    let allAgents = {};
+    let pixiApp = null;
+    let worldContainer = null;
+    let agentTokens = {};
+    let linkGraphics = null;
 
-    // DOM Elements
-    const chatArea = document.getElementById('chatArea');
-    const messageInput = document.getElementById('messageInput');
-    const sendBtn = document.querySelector('.input-area button');
-    const projectTabs = document.querySelectorAll('.project-tab');
-    const panelBtns = document.querySelectorAll('.tab-btn');
-    const panels = document.querySelectorAll('.panel');
+    // Archetype Icon mapping
+    const ROLE_ICONS = {
+      'ceo-warlock': '👑',
+      'hr-mind-flayer': '🦑',
+      'manager-bard': '🧝',
+      'solution-architect-wizard': '🧙‍♂️',
+      'staff-engineer-paladin': '⚔️',
+      'backend-dev-cleric': '✝️',
+      'frontend-dev-sorcerer': '✨',
+      'qa-engineer-rogue': '🗡️',
+      'devops-sre-dragonborn-warmage': '🐉',
+      'system-analyst-blood-hunter': '🩸',
+      'information-sourcer-ranger': '🏹',
+      'office-librarian-artificer': '📜',
+      'designers-changeling-sculptor': '🎨',
+      'cybersecurity-death-knight-lich': '💀',
+      'product-manager-doppelganger': '🎭',
+      'scrum-master-monk': '🧘',
+      'data-scientist-alchemist-diviner': '🧪',
+      'legal-compliance-inquisitor': '⚖️',
+      'cleaner-facilities-barbarian': '🪓',
+      'excel-admin-druid': '📊',
+      'consultants-vampires': '🧛',
+      'interns-kobolds-goblins': '🦎',
+      'marshall-agent-system-inspector': '🛡️'
+    };
 
-    // Initialize
+    // Initialize on load
     document.addEventListener('DOMContentLoaded', () => {
-      loadAgents();
-      loadChatHistory();
+      initPixi();
       setupEventListeners();
+      loadProjects();
+      loadAgentsAndRender();
     });
 
-    function setupEventListeners() {
-      // Project tabs
-      projectTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          projectTabs.forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          currentProject = tab.dataset.project || 'project-alpha';
-          loadAgents();
+    // ============================================================
+    // PIXI.JS INFINITE CANVAS SETUP
+    // ============================================================
+    function initPixi() {
+      const container = document.getElementById('canvasContainer');
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+
+      pixiApp = new PIXI.Application({
+        width,
+        height,
+        backgroundColor: 0x0a0a12,
+        antialias: true,
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true
+      });
+
+      container.appendChild(pixiApp.view);
+
+      // World Container for Pan & Zoom
+      worldContainer = new PIXI.Container();
+      worldContainer.position.set(width / 2, height / 2);
+      pixiApp.stage.addChild(worldContainer);
+
+      // Background Grid Graphics
+      const grid = new PIXI.Graphics();
+      grid.lineStyle(1, 0x1f1f33, 0.4);
+      for (let x = -2000; x <= 2000; x += 80) {
+        grid.moveTo(x, -2000);
+        grid.lineTo(x, 2000);
+      }
+      for (let y = -2000; y <= 2000; y += 80) {
+        grid.moveTo(-2000, y);
+        grid.lineTo(2000, y);
+      }
+      worldContainer.addChild(grid);
+
+      // Communication Links Layer
+      linkGraphics = new PIXI.Graphics();
+      worldContainer.addChild(linkGraphics);
+
+      // Interactive Pan / Drag
+      let isDragging = false;
+      let prevPos = { x: 0, y: 0 };
+
+      pixiApp.view.addEventListener('mousedown', (e) => {
+        if (e.target === pixiApp.view) {
+          isDragging = true;
+          prevPos = { x: e.clientX, y: e.clientY };
+        }
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          const dx = e.clientX - prevPos.x;
+          const dy = e.clientY - prevPos.y;
+          worldContainer.x += dx;
+          worldContainer.y += dy;
+          prevPos = { x: e.clientX, y: e.clientY };
+        }
+      });
+
+      window.addEventListener('mouseup', () => { isDragging = false; });
+
+      // Zoom via Mouse Wheel
+      pixiApp.view.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        zoomCanvas(factor);
+      });
+
+      // Window resize
+      window.addEventListener('resize', () => {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        pixiApp.renderer.resize(w, h);
+      });
+
+      // Animation Ticker (Sinusoidal Idle Hover & Links)
+      let ticker = 0;
+      pixiApp.ticker.add((delta) => {
+        ticker += 0.03 * delta;
+        for (const [id, token] of Object.entries(agentTokens)) {
+          if (token && token.tokenContainer) {
+            token.tokenContainer.y = token.baseY + Math.sin(ticker + token.seed) * 5;
+          }
+        }
+        drawCommunicationLinks(ticker);
+      });
+    }
+
+    function zoomCanvas(factor) {
+      const newScale = Math.min(Math.max(worldContainer.scale.x * factor, 0.4), 2.5);
+      worldContainer.scale.set(newScale);
+    }
+
+    function resetCanvasView() {
+      const container = document.getElementById('canvasContainer');
+      worldContainer.position.set(container.clientWidth / 2, container.clientHeight / 2);
+      worldContainer.scale.set(1);
+    }
+
+    // ============================================================
+    // AGENT TOKEN RENDERING ON CANVAS
+    // ============================================================
+    function renderAgentTokens(agents) {
+      // Clear previous tokens
+      for (const [id, token] of Object.entries(agentTokens)) {
+        if (token.tokenContainer) worldContainer.removeChild(token.tokenContainer);
+      }
+      agentTokens = {};
+
+      const agentList = Object.entries(agents);
+      const count = agentList.length;
+      const radius = Math.min(220, 70 + count * 25);
+
+      agentList.forEach(([id, agent], index) => {
+        const tokenContainer = new PIXI.Container();
+        tokenContainer.eventMode = 'static';
+        tokenContainer.cursor = 'pointer';
+
+        // Position in circle / tree layout
+        let x = 0;
+        let y = 0;
+        if (id === 'ceo-warlock') {
+          x = 0;
+          y = -180;
+        } else if (id === 'hr-mind-flayer') {
+          x = 0;
+          y = -60;
+        } else {
+          const angle = ((index - 2) / Math.max(1, count - 2)) * Math.PI * 2;
+          x = Math.cos(angle) * radius;
+          y = 80 + Math.sin(angle) * (radius * 0.75);
+        }
+
+        tokenContainer.position.set(x, y);
+
+        const color = agent.stats?.avatarColor || 0x9b59b6;
+
+        // Outer Aura Ring
+        const aura = new PIXI.Graphics();
+        aura.lineStyle(3, color, 0.8);
+        aura.drawCircle(0, 0, 32);
+        tokenContainer.addChild(aura);
+
+        // Core Circle
+        const core = new PIXI.Graphics();
+        core.beginFill(0x181824);
+        core.lineStyle(2, 0x2c3e50, 1);
+        core.drawCircle(0, 0, 28);
+        core.endFill();
+        tokenContainer.addChild(core);
+
+        // Class Icon Text
+        const iconChar = ROLE_ICONS[agent.role] || '🛡️';
+        const iconText = new PIXI.Text(iconChar, {
+          fontSize: 22,
+          align: 'center'
         });
-      });
+        iconText.anchor.set(0.5);
+        tokenContainer.addChild(iconText);
 
-      // Panel tab buttons
-      panelBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          panelBtns.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          currentTab = btn.dataset.tab || 'chat';
-          switchPanel();
+        // Name & Role Label
+        const nameLabel = new PIXI.Text(agent.name || id, {
+          fontSize: 11,
+          fontWeight: 'bold',
+          fill: 0xf0f3f8,
+          align: 'center'
         });
+        nameLabel.anchor.set(0.5, 0);
+        nameLabel.position.set(0, 36);
+        tokenContainer.addChild(nameLabel);
+
+        // Project Badge
+        const projLabel = new PIXI.Text(agent.project || 'global', {
+          fontSize: 9,
+          fill: 0x8892b0,
+          align: 'center'
+        });
+        projLabel.anchor.set(0.5, 0);
+        projLabel.position.set(0, 50);
+        tokenContainer.addChild(projLabel);
+
+        // Interaction Events
+        tokenContainer.on('pointerover', () => {
+          aura.clear();
+          aura.lineStyle(5, 0xf39c12, 1);
+          aura.drawCircle(0, 0, 36);
+          tokenContainer.scale.set(1.15);
+        });
+
+        tokenContainer.on('pointerout', () => {
+          aura.clear();
+          aura.lineStyle(3, color, 0.8);
+          aura.drawCircle(0, 0, 32);
+          tokenContainer.scale.set(1.0);
+        });
+
+        tokenContainer.on('pointerdown', () => {
+          selectAgent(id);
+        });
+
+        worldContainer.addChild(tokenContainer);
+
+        agentTokens[id] = {
+          tokenContainer,
+          baseX: x,
+          baseY: y,
+          color,
+          seed: index * 1.5
+        };
       });
-
-      // Send message
-      sendBtn.addEventListener('click', sendMessage);
-      messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
-      });
     }
 
-    function switchPanel() {
-      panels.forEach(p => p.classList.remove('active'));
-      const activePanel = document.getElementById(`${currentTab}Panel`);
-      if (activePanel) activePanel.classList.add('active');
+    function drawCommunicationLinks(ticker) {
+      if (!linkGraphics) return;
+      linkGraphics.clear();
 
-      // Load content based on tab
-      if (currentTab === 'chat') loadChatHistory();
-      if (currentTab === 'stats') loadAgentStats();
-      if (currentTab === 'thought') loadThoughtProcess();
-      if (currentTab === 'context') loadPersonalContext();
-      if (currentTab === 'relationships') loadRelationships();
-    }
+      const ceo = agentTokens['ceo-warlock'];
+      const hr = agentTokens['hr-mind-flayer'];
 
-    function closePanel() {
-      document.querySelector('.panel.active').classList.remove('active');
-    }
+      if (ceo && hr) {
+        linkGraphics.lineStyle(2, 0x9b59b6, 0.4);
+        linkGraphics.moveTo(ceo.tokenContainer.x, ceo.tokenContainer.y);
+        linkGraphics.lineTo(hr.tokenContainer.x, hr.tokenContainer.y);
+      }
 
-    // API calls
-    async function api(endpoint, method = 'GET', body = null) {
-      const options = {
-        method,
-        headers: { 'Content-Type': 'application/json' }
-      };
-      if (body) options.body = JSON.stringify(body);
-      const res = await fetch(`${BACKEND_URL}${endpoint}`, options);
-      return res.ok ? await res.json() : null;
-    }
-
-    async function loadAgents() {
-      const data = await api('/handleGetAgentStatus', 'POST', { agentId: 'ceo-warlock' });
-      if (!data) return;
-      renderAgents(data);
-    }
-
-    function renderAgents(hrSystem) {
-      const playArea = document.getElementById('playArea');
-      playArea.innerHTML = '';
-      
-      for (const [id, agent] of Object.entries(hrSystem)) {
-        const avatar = document.createElement('div');
-        avatar.className = 'agent-avatar';
-        avatar.dataset.agentId = id;
-        avatar.title = `${agent.name} (${agent.role})`;
-        avatar.onclick = () => openAgentPanel(id);
-        // Position randomly in play area
-        avatar.style.left = `${Math.random() * 100}%`;
-        avatar.style.top = `${Math.random() * 80 + 10}%`;
-        playArea.appendChild(avatar);
+      // Connect HR to all others
+      if (hr) {
+        for (const [id, token] of Object.entries(agentTokens)) {
+          if (id !== 'ceo-warlock' && id !== 'hr-mind-flayer' && token.tokenContainer) {
+            linkGraphics.lineStyle(1.5, 0x3498db, 0.25);
+            linkGraphics.moveTo(hr.tokenContainer.x, hr.tokenContainer.y);
+            linkGraphics.lineTo(token.tokenContainer.x, token.tokenContainer.y);
+          }
+        }
       }
     }
 
-    function openAgentPanel(agentId) {
-      currentAgent = agentId;
-      loadAgentDetails(agentId);
-      document.getElementById('chatPanel').classList.add('active');
-      switchPanel();
+    // ============================================================
+    // DRAWER & TAB LOGIC
+    // ============================================================
+    function setupEventListeners() {
+      // Drawer tab buttons
+      document.querySelectorAll('.drawer-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.drawer-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+          btn.classList.add('active');
+          const tabKey = btn.dataset.tab;
+          const targetPanel = document.getElementById(`tab-${tabKey}`);
+          if (targetPanel) targetPanel.classList.add('active');
+        });
+      });
     }
 
-    async function loadAgentDetails(agentId) {
-      const data = await api('/handleGetAgentStatus', 'POST', { agentId });
-      if (!data) return;
-      renderAgentStats(data.agent);
+    async function selectAgent(agentId) {
+      currentAgentId = agentId;
+      await loadAgentDrawer(agentId);
+    }
+
+    async function loadAgentDrawer(agentId) {
+      const res = await fetch(`${BACKEND_URL}/handleGetAgentStatus`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId })
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const agent = data.agent;
+
+      // Update Header
+      document.getElementById('drawerName').innerText = agent.name || agentId;
+      document.getElementById('drawerClass').innerText = agent.stats?.class || `Role: ${agent.role}`;
+      document.getElementById('drawerAvatar').innerText = ROLE_ICONS[agent.role] || '🛡️';
+
+      // Tab 1: Render Chat
       renderChatMessages(data.messages || []);
-    }
 
-    function renderAgentStats(agent) {
-      const sheet = document.getElementById('statsSheet');
-      if (!sheet) return;
-      
-      let html = `
-        <div class="stat-row">
-          <span class="stat-name">Name</span>
-          <span class="stat-value">${agent.name || 'N/A'}</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-name">Role</span>
-          <span class="stat-value">${agent.role || 'N/A'}</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-name">Project</span>
-          <span class="stat-value">${agent.project || 'global'}</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-name">Status</span>
-          <span class="stat-value">${agent.status || 'active'}</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-name">Context</span>
-          <span class="stat-value">${agent.context_len || 'N/A'}</span>
-        </div>
-      `;
-      sheet.innerHTML = html;
-    }
+      // Tab 2: Render Stats (BG3 sheet)
+      renderStatsSheet(agent);
 
-    async function loadChatHistory() {
-      const data = await api('/handleGetAgentStatus', 'POST', { agentId: 'ceo-warlock' });
-      if (!data || !data.messages) return;
-      renderChatMessages(data.messages);
+      // Tab 3: Render Thoughts
+      renderThoughtStream(data.thoughts || []);
+
+      // Tab 4: Render Context
+      renderContextTab(data.personalContext || {});
+
+      // Tab 5: Render Network
+      renderNetworkTab();
     }
 
     function renderChatMessages(messages) {
-      const area = document.getElementById('chatArea');
-      if (!area) return;
-      
+      const box = document.getElementById('chatMessages');
+      if (!box) return;
       let html = '';
-      messages.forEach((msg, i) => {
-        const isUser = msg.from === 'frontend';
-        const cls = isUser ? 'user' : 'agent';
-        const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
-        html += `<div class="message ${cls}"><strong>${msg.from || 'Agent'}</strong>: ${msg.request || ''}${time ? `<span style="font-size:10px;color:var(--muted);margin-left:8px;">${time}</span>` : ''}</div>`;
-      });
-      area.innerHTML = html || '<div class="loading">No messages yet</div>';
-      area.scrollTop = area.scrollHeight;
+      if (messages.length === 0) {
+        html = '<div class="msg-bubble system">No messages yet. Send a prompt below to direct this agent.</div>';
+      } else {
+        messages.forEach(m => {
+          const roleCls = m.role === 'user' ? 'user' : (m.role === 'system' ? 'system' : 'agent');
+          const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : '';
+          html += `
+            <div class="msg-bubble ${roleCls}">
+              <div class="msg-header">
+                <strong>${m.from || 'Agent'}</strong>
+                <span>${time}</span>
+              </div>
+              <div>${escapeHtml(m.request || '')}</div>
+            </div>
+          `;
+        });
+      }
+      box.innerHTML = html;
+      box.scrollTop = box.scrollHeight;
     }
 
-    async function sendMessage() {
-      const text = messageInput.value.trim();
-      if (!text) return;
+    function renderStatsSheet(agent) {
+      const stats = agent.stats || {};
+      document.getElementById('statAc').innerText = stats.ac || 15;
+      document.getElementById('statHp').innerText = `${stats.hp || 100} / ${stats.maxHp || 100}`;
+      document.getElementById('statLevel').innerText = stats.level || 10;
 
-      // Send to backend
-      const data = await api('/handleSendMessage', 'POST', {
-        agentId: currentAgent || 'ceo-warlock',
-        project: currentProject,
-        message: text
+      // Abilities
+      const abilityGrid = document.getElementById('abilityGrid');
+      const scores = stats.stats || { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 };
+      let abilityHtml = '';
+      for (const [key, val] of Object.entries(scores)) {
+        const mod = Math.floor((val - 10) / 2);
+        const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
+        abilityHtml += `
+          <div class="ability-box" onclick="rollAbilityCheck('${key}', ${mod})">
+            <div class="ability-name">${key}</div>
+            <div class="ability-mod">${modStr}</div>
+            <div class="ability-score">${val}</div>
+          </div>
+        `;
+      }
+      abilityGrid.innerHTML = abilityHtml;
+
+      // Spells
+      const spellsList = document.getElementById('spellsList');
+      const spells = stats.spells || [{ name: 'Standard Directive', dice: '1d20', desc: 'Standard task execution' }];
+      let spellsHtml = '';
+      spells.forEach(s => {
+        spellsHtml += `
+          <div class="spell-card">
+            <div class="spell-head">
+              <span>${s.name}</span>
+              <span class="spell-dice">${s.dice}</span>
+            </div>
+            <div class="spell-desc">${s.desc}</div>
+          </div>
+        `;
       });
+      spellsList.innerHTML = spellsHtml;
 
-      // Display user message
-      const area = document.getElementById('chatArea');
-      area.innerHTML += `<div class="message user"><strong>You</strong>: ${text}</div>`;
-      area.scrollTop = area.scrollHeight;
+      // Inventory
+      const invList = document.getElementById('inventoryList');
+      const items = stats.inventory || ['Basic Equipment'];
+      invList.innerText = items.join(' • ');
+    }
 
-      messageInput.value = '';
+    function renderThoughtStream(thoughts) {
+      const stream = document.getElementById('thoughtStream');
+      if (!stream) return;
+      let html = '';
+      thoughts.forEach(t => {
+        const time = t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : '';
+        html += `
+          <div class="thought-card ${t.step}">
+            <div class="thought-time">${time}</div>
+            <div class="thought-tag">${t.step}</div>
+            <div>${escapeHtml(t.thought)}</div>
+          </div>
+        `;
+      });
+      stream.innerHTML = html;
+      stream.scrollTop = stream.scrollHeight;
+    }
 
-      // TODO: In full implementation, this would trigger harness agent execution
-      // For now, show a response after a brief delay
-      if (data && data.success) {
-        setTimeout(() => {
-          area.innerHTML += `<div class="message agent"><strong>Agent</strong>: Processing your request...</div>`;
-          area.scrollTop = area.scrollHeight;
-        }, 500);
+    function renderContextTab(context) {
+      const used = context.contextUsed || 12000;
+      const limit = context.contextLimit || 128000;
+      const pct = Math.min(100, Math.round((used / limit) * 100));
+
+      document.getElementById('contextGaugeText').innerText = `${used.toLocaleString()} / ${limit.toLocaleString()} Tokens (${pct}%)`;
+      document.getElementById('contextBarFill').style.width = `${pct}%`;
+
+      const tree = document.getElementById('fileTree');
+      const files = context.files || ['README.md'];
+      let treeHtml = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Path: ${context.projectFolder || 'projects/global'}</div>`;
+      files.forEach(f => {
+        treeHtml += `<div class="file-item"><i class="fa-solid fa-file-code"></i> <span>${f}</span></div>`;
+      });
+      tree.innerHTML = treeHtml;
+    }
+
+    function renderNetworkTab() {
+      const list = document.getElementById('networkList');
+      if (!list) return;
+      let html = '';
+      for (const [id, agent] of Object.entries(allAgents)) {
+        html += `
+          <div class="network-card" onclick="selectAgent('${id}')">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:18px;">${ROLE_ICONS[agent.role] || '🛡️'}</span>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#fff;">${agent.name || id}</div>
+                <div style="font-size:11px;color:var(--text-muted);">${agent.project || 'global'}</div>
+              </div>
+            </div>
+            <span style="font-size:11px;color:var(--gold);"><i class="fa-solid fa-bolt"></i> Connected</span>
+          </div>
+        `;
+      }
+      list.innerHTML = html;
+    }
+
+    // ============================================================
+    // API CALLS & ACTIONS
+    // ============================================================
+    async function loadProjects() {
+      const res = await fetch(`${BACKEND_URL}/api/projects`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const tabs = document.getElementById('projectTabs');
+      let html = '';
+      data.projects.forEach((p, i) => {
+        const active = p === currentProjectId ? 'active' : '';
+        html += `<button class="project-tab ${active}" data-project="${p}" onclick="switchProject('${p}')"><i class="fa-solid fa-cube"></i> ${p}</button>`;
+      });
+      html += `<button class="new-project-btn" onclick="openNewProjectModal()"><i class="fa-solid fa-plus"></i> New Project</button>`;
+      tabs.innerHTML = html;
+    }
+
+    function switchProject(pId) {
+      currentProjectId = pId;
+      loadProjects();
+      loadAgentsAndRender();
+    }
+
+    async function loadAgentsAndRender() {
+      const res = await fetch(`${BACKEND_URL}/api/agents`);
+      if (!res.ok) return;
+      const data = await res.json();
+      allAgents = data.agents || {};
+      renderAgentTokens(allAgents);
+      if (allAgents[currentAgentId]) {
+        loadAgentDrawer(currentAgentId);
+      } else {
+        selectAgent('ceo-warlock');
       }
     }
 
-    // Additional tab content loaders
-    async function loadThoughtProcess() {
-      const data = await api('/handleGetAgentStatus', 'POST', { agentId: currentAgent || 'ceo-warlock' });
-      if (!data) return;
-      const log = document.getElementById('thoughtLog');
-      if (!log) return;
-      let html = '';
-      // Simulated thought entries
-      html += `<div class="thought-entry">Analyzing project requirements...</div>`;
-      html += `<div class="thought-entry">Assessing agent context windows...</div>`;
-      html += `<div class="thought-entry">Delegating tasks to harness agents...</div>`;
-      log.innerHTML = html;
+    async function sendChatMessage() {
+      const input = document.getElementById('chatInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      input.value = '';
+      const harness = document.getElementById('harnessSelect').value;
+
+      // Optimistically show user bubble
+      const box = document.getElementById('chatMessages');
+      box.innerHTML += `
+        <div class="msg-bubble user">
+          <div class="msg-header"><strong>You (Overseer)</strong><span>Just now</span></div>
+          <div>${escapeHtml(msg)}</div>
+        </div>
+      `;
+      box.scrollTop = box.scrollHeight;
+
+      const res = await fetch(`${BACKEND_URL}/handleSendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: currentAgentId,
+          projectId: currentProjectId,
+          message: msg,
+          harness
+        })
+      });
+
+      if (res.ok) {
+        await loadAgentDrawer(currentAgentId);
+      }
     }
 
-    async function loadPersonalContext() {
-      const grid = document.getElementById('contextGrid');
-      if (!grid) return;
-      grid.innerHTML = '<div style="color:var(--muted)">Context data would visualize agent memory state here</div>';
+    function quickPrompt(text) {
+      document.getElementById('chatInput').value = text;
+      sendChatMessage();
     }
 
-    async function loadRelationships() {
-      const graph = document.getElementById('networkGraph');
-      if (!graph) return;
-      let html = '';
-      // Simple network nodes
-      html += `<div class="node connected" title="CEO Warlock" onclick="openAgentPanel('ceo-warlock')"><span class="label">CEO</span></div>`;
-      html += `<div class="node connected" title="HR Mind Flayer" onclick="openAgentPanel('hr-mind-flayer')"><span class="label">HR</span></div>`;
-      html += `<div class="node" title="Manager Bard" onclick="openAgentPanel('manager-bard')"><span class="label">Manager</span></div>`;
-      graph.innerHTML = html;
+    function rollD20() {
+      const roll = Math.floor(Math.random() * 20) + 1;
+      const total = roll + 5;
+      const badge = document.getElementById('diceResult');
+      badge.innerText = `🎲 ${total} (${roll}+5)`;
+      badge.style.color = roll === 20 ? '#2ecc71' : (roll === 1 ? '#e74c3c' : '#f39c12');
+    }
+
+    function rollAbilityCheck(abilityName, mod) {
+      const roll = Math.floor(Math.random() * 20) + 1;
+      const total = roll + mod;
+      const badge = document.getElementById('diceResult');
+      const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
+      document.getElementById('diceSubtext').innerText = `Rolling for ${abilityName} (${modStr})`;
+      badge.innerText = `🎲 ${total} (${roll}${modStr})`;
+    }
+
+    async function triggerMarshallCheck() {
+      const res = await fetch(`${BACKEND_URL}/api/marshall/run`, { method: 'POST' });
+      if (res.ok) {
+        alert('🛡️ Marshall Agent completed 5-minute health check. System healthy!');
+        loadAgentsAndRender();
+      }
+    }
+
+    // Modal helpers
+    function openNewProjectModal() { document.getElementById('newProjectModal').classList.add('active'); }
+    function openSpawnAgentModal() { document.getElementById('spawnAgentModal').classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    async function submitNewProject() {
+      const pId = document.getElementById('newProjectId').value.trim();
+      const role = document.getElementById('newProjectAgentRole').value;
+      if (!pId) return;
+
+      const res = await fetch(`${BACKEND_URL}/handleStartProject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: pId, initialAgentRole: role })
+      });
+
+      if (res.ok) {
+        closeModal('newProjectModal');
+        switchProject(pId);
+      }
+    }
+
+    async function submitSpawnAgent() {
+      const role = document.getElementById('spawnRoleSelect').value;
+      const proj = document.getElementById('spawnProjectSelect').value;
+
+      const res = await fetch(`${BACKEND_URL}/api/agents/spawn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, projectId: proj })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        closeModal('spawnAgentModal');
+        await loadAgentsAndRender();
+        if (data.agentId) selectAgent(data.agentId);
+      }
+    }
+
+    function escapeHtml(text) {
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+      return text.replace(/[&<>"']/g, m => map[m]);
     }
   </script>
 </body>
