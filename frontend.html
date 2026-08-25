@@ -3,27 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DND — Multi-Agent System</title>
-  <!-- PixiJS v7 CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+  <title>DND — Modular AI Agent Orchestrator</title>
+  <!-- Anime.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <!-- FontAwesome Icons CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     :root {
-      --bg-dark: #08080d;
-      --bg-panel: #111119;
-      --bg-card: #181824;
-      --bg-hover: #222233;
+      --bg-dark: #08080f;
+      --bg-panel: #10101a;
+      --bg-card: #161626;
+      --bg-card-hover: #202036;
+      --bg-outer: #0e0e18;
       --primary: #9b59b6;
-      --primary-glow: rgba(155, 89, 182, 0.4);
+      --primary-glow: rgba(155, 89, 182, 0.45);
       --secondary: #3498db;
       --accent: #e74c3c;
       --gold: #f39c12;
+      --gold-glow: rgba(243, 156, 18, 0.4);
       --green: #2ecc71;
       --text: #f0f3f8;
       --text-muted: #8892b0;
-      --border: #28283c;
-      --border-light: #3a3a55;
+      --border: #232338;
+      --border-light: #363652;
     }
 
     * {
@@ -47,33 +49,33 @@
     .top-nav {
       background: var(--bg-panel);
       border-bottom: 1px solid var(--border);
-      padding: 0 20px;
+      padding: 0 18px;
       display: flex;
       align-items: center;
-      height: 60px;
+      height: 52px;
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
-      z-index: 100;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      z-index: 120;
+      box-shadow: 0 3px 15px rgba(0,0,0,0.6);
     }
 
     .brand {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: 1px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
       color: #fff;
-      margin-right: 30px;
+      margin-right: 24px;
     }
 
     .brand i {
       color: var(--gold);
-      font-size: 22px;
-      text-shadow: 0 0 10px rgba(243, 156, 18, 0.5);
+      font-size: 20px;
+      text-shadow: 0 0 12px var(--gold-glow);
     }
 
     .project-tabs {
@@ -86,8 +88,8 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       color: var(--text-muted);
-      padding: 7px 15px;
-      font-size: 13px;
+      padding: 6px 14px;
+      font-size: 12px;
       font-weight: 600;
       border-radius: 6px;
       cursor: pointer;
@@ -98,13 +100,13 @@
     }
 
     .project-tab:hover {
-      background: var(--bg-hover);
+      background: var(--bg-card-hover);
       color: var(--text);
       border-color: var(--border-light);
     }
 
     .project-tab.active {
-      background: linear-gradient(135deg, rgba(155, 89, 182, 0.25) 0%, rgba(52, 152, 219, 0.2) 100%);
+      background: linear-gradient(135deg, rgba(155, 89, 182, 0.3) 0%, rgba(52, 152, 219, 0.25) 100%);
       color: #fff;
       border-color: var(--primary);
       box-shadow: 0 0 12px var(--primary-glow);
@@ -114,10 +116,10 @@
       background: transparent;
       border: 1px dashed var(--border-light);
       color: var(--text-muted);
-      padding: 7px 12px;
+      padding: 6px 12px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
       transition: all 0.2s;
     }
 
@@ -130,7 +132,7 @@
       margin-left: auto;
       display: flex;
       align-items: center;
-      gap: 15px;
+      gap: 12px;
     }
 
     .harness-select-wrap {
@@ -140,7 +142,7 @@
       font-size: 12px;
       color: var(--text-muted);
       background: var(--bg-card);
-      padding: 5px 12px;
+      padding: 4px 10px;
       border-radius: 6px;
       border: 1px solid var(--border);
     }
@@ -152,6 +154,7 @@
       font-weight: 600;
       outline: none;
       cursor: pointer;
+      font-size: 12px;
     }
 
     .harness-select-wrap select option {
@@ -162,11 +165,11 @@
     .marshall-status {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 12px;
+      gap: 6px;
+      font-size: 11px;
       background: rgba(46, 204, 113, 0.1);
       border: 1px solid rgba(46, 204, 113, 0.3);
-      padding: 5px 12px;
+      padding: 4px 10px;
       border-radius: 6px;
       color: var(--green);
       cursor: pointer;
@@ -178,8 +181,8 @@
     }
 
     .pulse-dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       background: var(--green);
       border-radius: 50%;
       box-shadow: 0 0 8px var(--green);
@@ -193,43 +196,185 @@
     }
 
     /* ============================================================
-       PLAY AREA (PIXIJS INFINITE CANVAS)
+       TOP OUTER LAYER: EXECUTIVE PENTHOUSE (CEO, HR, STAFF PALADIN)
+       These agents are global and live outside of any project playground!
+    ============================================================ */
+    .executive-outer-layer {
+      position: fixed;
+      top: 52px;
+      left: 0;
+      right: 480px;
+      height: 74px;
+      background: linear-gradient(180deg, #12121f 0%, #0d0d17 100%);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 16px;
+      z-index: 110;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+
+    .outer-layer-tag {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gold);
+      background: rgba(243, 156, 18, 0.12);
+      border: 1px solid rgba(243, 156, 18, 0.3);
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .executive-roster {
+      display: flex;
+      gap: 12px;
+      flex: 1;
+      overflow-x: auto;
+      padding: 4px 0;
+    }
+
+    .exec-agent-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      min-width: 220px;
+    }
+
+    .exec-agent-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--gold);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    }
+
+    .exec-agent-card.selected {
+      border-color: var(--gold);
+      background: linear-gradient(135deg, rgba(243, 156, 18, 0.15) 0%, rgba(155, 89, 182, 0.15) 100%);
+      box-shadow: 0 0 14px var(--gold-glow);
+    }
+
+    .exec-avatar-token {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      background: #1a1a2b;
+      border: 2px solid var(--primary);
+      box-shadow: 0 0 8px var(--primary-glow);
+      position: relative;
+    }
+
+    .exec-avatar-token .level-badge {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      background: var(--gold);
+      color: #000;
+      font-size: 8px;
+      font-weight: 900;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+
+    .exec-info {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .exec-name-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .exec-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .exec-role-title {
+      font-size: 10px;
+      color: var(--gold);
+      font-weight: 600;
+    }
+
+    .exec-thought-preview {
+      font-size: 10px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+      font-style: italic;
+    }
+
+    .exec-thought-preview i {
+      color: var(--secondary);
+      margin-right: 4px;
+    }
+
+    /* ============================================================
+       PLAY AREA: INTERACTIVE FANTASY LANDSCAPE CANVAS
     ============================================================ */
     .play-area {
       position: fixed;
-      top: 60px;
+      top: 126px;
       bottom: 0;
       left: 0;
       right: 480px;
-      background: radial-gradient(circle at center, #151522 0%, #08080d 100%);
+      background: #08080f;
       overflow: hidden;
     }
 
-    #canvasContainer {
+    #landscapeCanvas {
       width: 100%;
       height: 100%;
+      display: block;
       cursor: grab;
+      image-rendering: auto;
     }
 
-    #canvasContainer:active {
+    #landscapeCanvas:active {
       cursor: grabbing;
     }
 
     .canvas-overlay-controls {
       position: absolute;
-      bottom: 20px;
-      left: 20px;
+      bottom: 18px;
+      left: 18px;
       display: flex;
       gap: 8px;
       z-index: 10;
     }
 
     .canvas-btn {
-      background: rgba(24, 24, 36, 0.85);
-      border: 1px solid var(--border);
+      background: rgba(22, 22, 38, 0.88);
+      border: 1px solid var(--border-light);
       color: var(--text);
-      width: 38px;
-      height: 38px;
+      width: 36px;
+      height: 36px;
       border-radius: 8px;
       display: flex;
       align-items: center;
@@ -237,48 +382,59 @@
       cursor: pointer;
       transition: all 0.2s;
       backdrop-filter: blur(8px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
 
     .canvas-btn:hover {
-      background: var(--bg-hover);
+      background: var(--bg-card-hover);
       border-color: var(--primary);
       color: var(--primary);
+      transform: scale(1.05);
     }
 
-    .canvas-legend {
+    .canvas-project-badge {
       position: absolute;
-      top: 15px;
-      left: 20px;
-      background: rgba(24, 24, 36, 0.8);
+      top: 14px;
+      left: 18px;
+      background: rgba(22, 22, 38, 0.85);
       backdrop-filter: blur(8px);
-      border: 1px solid var(--border);
-      padding: 8px 14px;
+      border: 1px solid var(--border-light);
+      padding: 6px 14px;
       border-radius: 8px;
-      font-size: 11px;
-      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
       display: flex;
-      gap: 15px;
+      align-items: center;
+      gap: 8px;
       z-index: 10;
     }
 
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .canvas-project-badge i {
+      color: var(--gold);
     }
 
-    .legend-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
+    .canvas-tip {
+      position: absolute;
+      top: 14px;
+      right: 18px;
+      background: rgba(22, 22, 38, 0.8);
+      backdrop-filter: blur(6px);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      pointer-events: none;
+      z-index: 10;
     }
 
     /* ============================================================
-       RIGHT DRAWER (BALDUR'S GATE 3 / D&D CHARACTER SHEET)
+       RIGHT DRAWER (5-TAB BALDUR'S GATE 3 / D&D CHARACTER SHEET)
     ============================================================ */
     .drawer {
       position: fixed;
-      top: 60px;
+      top: 52px;
       right: 0;
       bottom: 0;
       width: 480px;
@@ -286,13 +442,13 @@
       border-left: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      z-index: 50;
-      box-shadow: -4px 0 25px rgba(0,0,0,0.6);
+      z-index: 130;
+      box-shadow: -4px 0 25px rgba(0,0,0,0.7);
     }
 
     .drawer-header {
-      padding: 16px 20px;
-      background: linear-gradient(180deg, rgba(30, 30, 46, 0.7) 0%, rgba(17, 17, 25, 0.9) 100%);
+      padding: 14px 18px;
+      background: linear-gradient(180deg, rgba(30, 30, 48, 0.8) 0%, rgba(16, 16, 26, 0.95) 100%);
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
@@ -310,24 +466,24 @@
       height: 44px;
       border-radius: 50%;
       background: var(--bg-card);
-      border: 2px solid var(--primary);
+      border: 2px solid var(--gold);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      box-shadow: 0 0 12px var(--primary-glow);
+      font-size: 22px;
+      box-shadow: 0 0 12px var(--gold-glow);
     }
 
     .drawer-agent-meta h3 {
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 800;
       color: #fff;
     }
 
     .drawer-agent-meta p {
       font-size: 12px;
       color: var(--gold);
-      font-weight: 500;
+      font-weight: 600;
     }
 
     .drawer-actions {
@@ -342,13 +498,14 @@
       padding: 6px 12px;
       border-radius: 6px;
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .spawn-badge-btn:hover {
       background: var(--primary);
+      box-shadow: 0 0 10px var(--primary-glow);
     }
 
     /* Drawer 5-Tab Navigation */
@@ -360,12 +517,12 @@
 
     .tab-btn {
       flex: 1;
-      padding: 12px 6px;
+      padding: 10px 4px;
       background: transparent;
       border: none;
       color: var(--text-muted);
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       transition: all 0.2s;
       border-bottom: 2px solid transparent;
@@ -376,18 +533,18 @@
     }
 
     .tab-btn i {
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .tab-btn:hover {
       color: var(--text);
-      background: rgba(255,255,255,0.02);
+      background: rgba(255,255,255,0.03);
     }
 
     .tab-btn.active {
       color: var(--gold);
       border-bottom-color: var(--gold);
-      background: rgba(243, 156, 18, 0.05);
+      background: rgba(243, 156, 18, 0.08);
     }
 
     /* Tab Content Panels */
@@ -416,7 +573,7 @@
     }
 
     .msg-bubble {
-      max-width: 88%;
+      max-width: 90%;
       padding: 10px 14px;
       border-radius: 10px;
       font-size: 13px;
@@ -429,6 +586,7 @@
       background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
       color: #fff;
       border-bottom-right-radius: 2px;
+      box-shadow: 0 2px 8px rgba(155, 89, 182, 0.3);
     }
 
     .msg-bubble.agent {
@@ -441,7 +599,7 @@
 
     .msg-bubble.system {
       align-self: center;
-      max-width: 95%;
+      max-width: 96%;
       background: rgba(52, 152, 219, 0.1);
       border: 1px dashed rgba(52, 152, 219, 0.3);
       color: #85c1e9;
@@ -526,43 +684,43 @@
     .stats-sheet {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
 
     .vitals-banner {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
     }
 
     .vital-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px;
       text-align: center;
     }
 
     .vital-card h4 {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .vital-card .vital-val {
-      font-size: 18px;
-      font-weight: 700;
+      font-size: 17px;
+      font-weight: 800;
       color: var(--gold);
     }
 
     .hp-bar-wrap {
       width: 100%;
-      height: 6px;
-      background: #2c3e50;
+      height: 5px;
+      background: #232338;
       border-radius: 3px;
-      margin-top: 6px;
+      margin-top: 4px;
       overflow: hidden;
     }
 
@@ -583,7 +741,7 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 8px 4px;
+      padding: 8px 3px;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s;
@@ -595,29 +753,29 @@
     }
 
     .ability-name {
-      font-size: 10px;
+      font-size: 9px;
       color: var(--text-muted);
-      font-weight: 700;
+      font-weight: 800;
     }
 
     .ability-mod {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 800;
       color: #fff;
-      margin: 2px 0;
+      margin: 1px 0;
     }
 
     .ability-score {
-      font-size: 10px;
+      font-size: 9px;
       color: var(--gold);
     }
 
     /* Dice Roller Section */
     .dice-roller-box {
-      background: linear-gradient(135deg, rgba(24, 24, 36, 0.9) 0%, rgba(30, 25, 45, 0.9) 100%);
+      background: linear-gradient(135deg, rgba(24, 24, 38, 0.95) 0%, rgba(32, 26, 48, 0.95) 100%);
       border: 1px solid var(--border-light);
       border-radius: 8px;
-      padding: 14px;
+      padding: 12px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -627,14 +785,14 @@
       background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
       border: none;
       color: #fff;
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 6px;
-      font-weight: 700;
-      font-size: 13px;
+      font-weight: 800;
+      font-size: 12px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
       transition: all 0.2s;
     }
@@ -644,7 +802,7 @@
     }
 
     .dice-result-badge {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 800;
       color: var(--gold);
       min-width: 60px;
@@ -653,31 +811,32 @@
 
     /* Spells & Actions */
     .section-title {
-      font-size: 12px;
+      font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--text-muted);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       display: flex;
       align-items: center;
       gap: 6px;
+      font-weight: 700;
     }
 
     .spell-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 10px;
+      padding: 8px 10px;
       margin-bottom: 6px;
     }
 
     .spell-head {
       display: flex;
       justify-content: space-between;
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 700;
       color: #fff;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .spell-dice {
@@ -696,14 +855,14 @@
     .thought-stream {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
 
     .thought-card {
       background: var(--bg-card);
       border-left: 3px solid var(--secondary);
       border-radius: 0 6px 6px 0;
-      padding: 10px 12px;
+      padding: 8px 12px;
       font-size: 12px;
     }
 
@@ -713,10 +872,10 @@
 
     .thought-tag {
       font-size: 10px;
-      font-weight: 700;
+      font-weight: 800;
       text-transform: uppercase;
       color: var(--secondary);
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     .thought-time {
@@ -732,14 +891,14 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 14px;
+      padding: 12px;
+      margin-bottom: 12px;
     }
 
     .context-bar-wrap {
       width: 100%;
-      height: 8px;
-      background: #2c3e50;
+      height: 7px;
+      background: #232338;
       border-radius: 4px;
       margin: 8px 0;
       overflow: hidden;
@@ -784,7 +943,7 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -794,7 +953,7 @@
 
     .network-card:hover {
       border-color: var(--primary);
-      background: var(--bg-hover);
+      background: var(--bg-card-hover);
     }
 
     /* Modals */
@@ -804,12 +963,12 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(5px);
       display: none;
       align-items: center;
       justify-content: center;
-      z-index: 200;
+      z-index: 300;
     }
 
     .modal-backdrop.active {
@@ -821,13 +980,13 @@
       border: 1px solid var(--border-light);
       border-radius: 10px;
       width: 440px;
-      padding: 24px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      padding: 22px;
+      box-shadow: 0 10px 35px rgba(0,0,0,0.9);
     }
 
     .modal-title {
       font-size: 16px;
-      font-weight: 700;
+      font-weight: 800;
       margin-bottom: 16px;
       color: #fff;
       display: flex;
@@ -861,7 +1020,7 @@
       display: flex;
       justify-content: flex-end;
       gap: 10px;
-      margin-top: 20px;
+      margin-top: 18px;
     }
 
     .btn-secondary {
@@ -879,8 +1038,9 @@
       color: #fff;
       padding: 8px 16px;
       border-radius: 6px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
+      box-shadow: 0 0 10px var(--primary-glow);
     }
   </style>
 </head>
@@ -892,7 +1052,7 @@
   <header class="top-nav">
     <div class="brand">
       <i class="fa-solid fa-dice-d20"></i>
-      <span>DND AGENTS</span>
+      <span>DND ORCHESTRATOR</span>
     </div>
 
     <div class="project-tabs" id="projectTabs">
@@ -921,23 +1081,40 @@
   </header>
 
   <!-- ============================================================
-       PLAY AREA (PIXIJS CANVAS)
+       TOP OUTER LAYER: EXECUTIVE PENTHOUSE (CEO, HR, STAFF PALADIN)
+       These agents are global and live outside of any project playground!
+  ============================================================ -->
+  <section class="executive-outer-layer" id="executiveOuterLayer">
+    <div class="outer-layer-tag">
+      <i class="fa-solid fa-crown"></i>
+      <span>Global Outer Layer</span>
+    </div>
+
+    <div class="executive-roster" id="executiveRoster">
+      <!-- Injected dynamically: CEO, HR, Staff Engineer Paladin -->
+    </div>
+  </section>
+
+  <!-- ============================================================
+       PLAY AREA (FANTASY LANDSCAPE CANVAS)
   ============================================================ -->
   <main class="play-area" id="playArea">
-    <div id="canvasContainer"></div>
+    <canvas id="landscapeCanvas"></canvas>
 
-    <div class="canvas-legend">
-      <div class="legend-item"><div class="legend-dot" style="background:#9b59b6"></div> Executive (Warlock/Mind Flayer)</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#e67e22"></div> Management (Bard)</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#3498db"></div> Architecture (Wizard)</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#2ecc71"></div> Engineering & QA</div>
+    <div class="canvas-project-badge" id="canvasProjectBadge">
+      <i class="fa-solid fa-layer-group"></i>
+      <span id="canvasProjectTitle">Project Alpha Playground</span>
+    </div>
+
+    <div class="canvas-tip">
+      <i class="fa-solid fa-mouse-pointer"></i> Click agents to inspect • Drag to pan • Scroll to zoom
     </div>
 
     <div class="canvas-overlay-controls">
-      <button class="canvas-btn" onclick="zoomCanvas(1.2)" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
-      <button class="canvas-btn" onclick="zoomCanvas(0.8)" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
-      <button class="canvas-btn" onclick="resetCanvasView()" title="Reset Canvas View"><i class="fa-solid fa-compress"></i></button>
-      <button class="canvas-btn" onclick="openSpawnAgentModal()" title="HR Spawn Agent"><i class="fa-solid fa-user-plus"></i></button>
+      <button class="canvas-btn" onclick="zoomLandscape(1.2)" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
+      <button class="canvas-btn" onclick="zoomLandscape(0.8)" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
+      <button class="canvas-btn" onclick="resetLandscapeView()" title="Reset Canvas View"><i class="fa-solid fa-compress"></i></button>
+      <button class="canvas-btn" onclick="openSpawnAgentModal()" title="HR Summon Specialist"><i class="fa-solid fa-user-plus"></i></button>
     </div>
   </main>
 
@@ -948,10 +1125,10 @@
     <!-- Header -->
     <div class="drawer-header">
       <div class="drawer-agent-info">
-        <div class="drawer-avatar-icon" id="drawerAvatar">🧙</div>
+        <div class="drawer-avatar-icon" id="drawerAvatar">🧝</div>
         <div class="drawer-agent-meta">
-          <h3 id="drawerName">CEO Warlock</h3>
-          <p id="drawerClass">Level 20 Warlock (Pact of the Board)</p>
+          <h3 id="drawerName">Manager Bard</h3>
+          <p id="drawerClass">Level 15 Bard (College of Agile)</p>
         </div>
       </div>
       <div class="drawer-actions">
@@ -972,12 +1149,12 @@
     <div class="tab-panel active" id="tab-chat">
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-suggestions">
-        <button class="chip-btn" onclick="quickPrompt('What is our current project status and architecture?')">Status Check</button>
+        <button class="chip-btn" onclick="quickPrompt('What is our current project status and sprint backlog?')">Sprint Status</button>
         <button class="chip-btn" onclick="quickPrompt('Draft system specification and API schema.')">Draft Spec</button>
         <button class="chip-btn" onclick="quickPrompt('Request HR Mind Flayer to spawn a QA Rogue.')">Spawn QA</button>
       </div>
       <div class="chat-input-box">
-        <input type="text" id="chatInput" placeholder="+ Type a directive..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+        <input type="text" id="chatInput" placeholder="+ Type a directive for this agent..." onkeypress="if(event.key==='Enter') sendChatMessage()">
         <button onclick="sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
       </div>
     </div>
@@ -988,16 +1165,16 @@
         <div class="vitals-banner">
           <div class="vital-card">
             <h4>Armor Class</h4>
-            <div class="vital-val" id="statAc">18</div>
+            <div class="vital-val" id="statAc">15</div>
           </div>
           <div class="vital-card">
             <h4>Hit Points</h4>
-            <div class="vital-val" id="statHp">140 / 140</div>
+            <div class="vital-val" id="statHp">105 / 105</div>
             <div class="hp-bar-wrap"><div class="hp-bar-fill" id="hpBarFill"></div></div>
           </div>
           <div class="vital-card">
             <h4>Level</h4>
-            <div class="vital-val" id="statLevel">20</div>
+            <div class="vital-val" id="statLevel">15</div>
           </div>
         </div>
 
@@ -1007,13 +1184,13 @@
         <div class="dice-roller-box">
           <div>
             <div style="font-weight:700;font-size:13px;color:#fff;">D20 Check Roller</div>
-            <div style="font-size:11px;color:var(--text-muted);" id="diceSubtext">Roll with Charisma bonus (+5)</div>
+            <div style="font-size:11px;color:var(--text-muted);" id="diceSubtext">Roll with Charisma bonus (+4)</div>
           </div>
           <button class="dice-btn" onclick="rollD20()"><i class="fa-solid fa-dice"></i> Roll D20</button>
           <div class="dice-result-badge" id="diceResult">—</div>
         </div>
 
-        <div class="section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Spells & Signature Abilities</div>
+        <div class="section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Spells & Actions</div>
         <div id="spellsList"></div>
 
         <div class="section-title"><i class="fa-solid fa-sack-dollar"></i> Inventory & Items</div>
@@ -1031,7 +1208,7 @@
       <div class="context-meter-card">
         <div style="display:flex;justify-content:space-between;font-size:12px;">
           <span style="color:var(--text-muted)">Context Window Usage:</span>
-          <span id="contextGaugeText" style="color:var(--gold);font-weight:700;">12.4k / 128k Tokens</span>
+          <span id="contextGaugeText" style="color:var(--gold);font-weight:700;">1.5k / 128k Tokens</span>
         </div>
         <div class="context-bar-wrap"><div class="context-bar-fill" id="contextBarFill"></div></div>
       </div>
@@ -1042,7 +1219,7 @@
 
     <!-- TAB 5: RELATIONSHIPS -->
     <div class="tab-panel" id="tab-network">
-      <div class="section-title"><i class="fa-solid fa-diagram-project"></i> Active Agent Network</div>
+      <div class="section-title"><i class="fa-solid fa-diagram-project"></i> Active Collaboration Network</div>
       <div class="network-nodes-list" id="networkList"></div>
     </div>
   </aside>
@@ -1062,11 +1239,11 @@
         <input type="text" id="newProjectId" placeholder="project-gamma">
       </div>
       <div class="modal-form-group">
-        <label>Initial Agent Assignment</label>
-        <select id="newProjectAgentRole">
+        <label>Manager Archetype (Spawned automatically by HR)</label>
+        <select id="newProjectAgentRole" disabled>
           <option value="manager-bard">Manager Bard (Project Router)</option>
-          <option value="solution-architect-wizard">Solution Architect Wizard</option>
         </select>
+        <small style="color:var(--text-muted);font-size:10px;margin-top:4px;display:block;">* Per company rules, only Manager Bard is spawned initially. Other agents are summoned as needed.</small>
       </div>
       <div class="modal-btn-row">
         <button class="btn-secondary" onclick="closeModal('newProjectModal')">Cancel</button>
@@ -1079,15 +1256,13 @@
   <div class="modal-backdrop" id="spawnAgentModal">
     <div class="modal-box">
       <div class="modal-title">
-        <span><i class="fa-solid fa-brain"></i> HR Mind Flayer — Spawn Agent</span>
+        <span><i class="fa-solid fa-brain"></i> HR Mind Flayer — Summon Specialist</span>
         <i class="fa-solid fa-xmark" style="cursor:pointer;" onclick="closeModal('spawnAgentModal')"></i>
       </div>
       <div class="modal-form-group">
         <label>Select Agent Archetype / Role</label>
         <select id="spawnRoleSelect">
-          <option value="manager-bard">Manager Bard (Router)</option>
           <option value="solution-architect-wizard">Solution Architect Wizard</option>
-          <option value="staff-engineer-paladin">Staff Engineer Paladin</option>
           <option value="backend-dev-cleric">Backend Dev Cleric</option>
           <option value="frontend-dev-sorcerer">Frontend Dev Sorcerer</option>
           <option value="qa-engineer-rogue">QA Engineer Rogue</option>
@@ -1112,326 +1287,871 @@
         <select id="spawnProjectSelect">
           <option value="project-alpha">project-alpha</option>
           <option value="project-beta">project-beta</option>
-          <option value="global">global (CEO/HR/Staff)</option>
         </select>
       </div>
       <div class="modal-btn-row">
         <button class="btn-secondary" onclick="closeModal('spawnAgentModal')">Cancel</button>
-        <button class="btn-primary" onclick="submitSpawnAgent()">Spawn via HR</button>
+        <button class="btn-primary" onclick="submitSpawnAgent()">Summon via HR</button>
       </div>
     </div>
   </div>
 
   <!-- ============================================================
-       MAIN CLIENT SCRIPT & PIXIJS INTEGRATION
+       PLAYFUL LANDSCAPE & AGENT ORCHESTRATOR SCRIPT
   ============================================================ -->
   <script>
     const BACKEND_URL = window.location.origin;
 
     // State
-    let currentAgentId = 'ceo-warlock';
+    let currentAgentId = 'project-alpha-manager-bard';
     let currentProjectId = 'project-alpha';
     let allAgents = {};
-    let pixiApp = null;
-    let worldContainer = null;
-    let agentTokens = {};
-    let linkGraphics = null;
+    let globalAgents = {};
+    let projectAgents = {};
+    let agentThoughts = {};
 
-    // Archetype Icon mapping
-    const ROLE_ICONS = {
-      'ceo-warlock': '👑',
-      'hr-mind-flayer': '🦑',
-      'manager-bard': '🧝',
-      'solution-architect-wizard': '🧙‍♂️',
-      'staff-engineer-paladin': '⚔️',
-      'backend-dev-cleric': '✝️',
-      'frontend-dev-sorcerer': '✨',
-      'qa-engineer-rogue': '🗡️',
-      'devops-sre-dragonborn-warmage': '🐉',
-      'system-analyst-blood-hunter': '🩸',
-      'information-sourcer-ranger': '🏹',
-      'office-librarian-artificer': '📜',
-      'designers-changeling-sculptor': '🎨',
-      'cybersecurity-death-knight-lich': '💀',
-      'product-manager-doppelganger': '🎭',
-      'scrum-master-monk': '🧘',
-      'data-scientist-alchemist-diviner': '🧪',
-      'legal-compliance-inquisitor': '⚖️',
-      'cleaner-facilities-barbarian': '🪓',
-      'excel-admin-druid': '📊',
-      'consultants-vampires': '🧛',
-      'interns-kobolds-goblins': '🦎',
-      'marshall-agent-system-inspector': '🛡️'
+    // Archetype Roles Config
+    const ROLE_CONFIGS = {
+      'ceo-warlock': { icon: '👑', color: '#9b59b6', hat: 'crown', tool: 'scepter', cloth: '#552277', hair: '#111111', pants: '#331144' },
+      'hr-mind-flayer': { icon: '🦑', color: '#8e44ad', hat: 'tentacles', tool: 'orb', cloth: '#441166', skin: '#7d669e', pants: '#220033' },
+      'staff-engineer-paladin': { icon: '⚔️', color: '#f1c40f', hat: 'helm', tool: 'sword', cloth: '#e67e22', hair: '#e0e0e0', pants: '#7f8c8d' },
+      'manager-bard': { icon: '🧝', color: '#e67e22', hat: 'feather', tool: 'lute', cloth: '#dd6633', hair: '#f39c12', pants: '#5a3825' },
+      'solution-architect-wizard': { icon: '🧙‍♂️', color: '#3498db', hat: 'pointed', tool: 'staff', cloth: '#2980b9', hair: '#ecf0f1', pants: '#1a5276' },
+      'backend-dev-cleric': { icon: '✝️', color: '#1abc9c', hat: 'halo', tool: 'hammer', cloth: '#16a085', hair: '#7f8c8d', pants: '#117a65' },
+      'frontend-dev-sorcerer': { icon: '✨', color: '#e91e63', hat: 'glow', tool: 'orb', cloth: '#d81b60', hair: '#f06292', pants: '#880e4f' },
+      'qa-engineer-rogue': { icon: '🗡️', color: '#27ae60', hat: 'hood', tool: 'daggers', cloth: '#2e7d32', hair: '#1b5e20', pants: '#212121' },
+      'devops-sre-dragonborn-warmage': { icon: '🐉', color: '#e74c3c', hat: 'horns', tool: 'staff', cloth: '#c0392b', hair: '#962d22', pants: '#641e16' },
+      'system-analyst-blood-hunter': { icon: '🩸', color: '#c0392b', hat: 'hood', tool: 'sword', cloth: '#78281f', hair: '#17202a', pants: '#424949' },
+      'information-sourcer-ranger': { icon: '🏹', color: '#27ae60', hat: 'cap', tool: 'bow', cloth: '#196f3d', hair: '#7d6608', pants: '#515a5a' },
+      'office-librarian-artificer': { icon: '📜', color: '#d35400', hat: 'goggles', tool: 'wrench', cloth: '#a04000', hair: '#566573', pants: '#6e2c00' },
+      'designers-changeling-sculptor': { icon: '🎨', color: '#9b59b6', hat: 'beret', tool: 'brush', cloth: '#8e44ad', hair: '#f5b041', pants: '#4a235a' },
+      'cybersecurity-death-knight-lich': { icon: '💀', color: '#34495e', hat: 'skull', tool: 'scythe', cloth: '#1b2631', hair: '#85929e', pants: '#17202a' },
+      'product-manager-doppelganger': { icon: '🎭', color: '#f39c12', hat: 'mask', tool: 'lute', cloth: '#b7950b', hair: '#2c3e50', pants: '#7d6608' },
+      'scrum-master-monk': { icon: '🧘', color: '#f1c40f', hat: 'beads', tool: 'staff', cloth: '#d4ac0d', hair: '#17202a', pants: '#9a7d0a' },
+      'data-scientist-alchemist-diviner': { icon: '🧪', color: '#16a085', hat: 'spectacles', tool: 'flask', cloth: '#117a65', hair: '#95a5a6', pants: '#0e6251' },
+      'legal-compliance-inquisitor': { icon: '⚖️', color: '#7f8c8d', hat: 'mitre', tool: 'scroll', cloth: '#5d6d7e', hair: '#273746', pants: '#34495e' },
+      'cleaner-facilities-barbarian': { icon: '🪓', color: '#e74c3c', hat: 'horns', tool: 'axe', cloth: '#922b21', hair: '#641e16', pants: '#4a235a' },
+      'excel-admin-druid': { icon: '📊', color: '#2ecc71', hat: 'wreath', tool: 'staff', cloth: '#229954', hair: '#196f3d', pants: '#145a32' },
+      'consultants-vampires': { icon: '🧛', color: '#8e44ad', hat: 'cape', tool: 'chalice', cloth: '#5b2c6f', hair: '#17202a', pants: '#4a235a' },
+      'interns-kobolds-goblins': { icon: '🦎', color: '#27ae60', hat: 'none', tool: 'wrench', cloth: '#1e8449', hair: '#145a32', pants: '#239b56' },
+      'marshall-agent-system-inspector': { icon: '🛡️', color: '#00bcd4', hat: 'visor', tool: 'badge', cloth: '#0097a7', hair: '#cfd8dc', pants: '#006064' }
     };
 
-    // Initialize on load
-    document.addEventListener('DOMContentLoaded', () => {
-      initPixi();
-      setupEventListeners();
-      loadProjects();
-      loadAgentsAndRender();
+    // Realistic AI thoughts pool for speech bubbles
+    const AI_THOUGHT_SNIPPETS = [
+      "Marinating on the spec...",
+      "Pondering type safety...",
+      "Brewing async queries...",
+      "Consulting arcane doc scrolls...",
+      "Tuning story points in Jira...",
+      "Channeling UI aesthetic vibes...",
+      "Stabbing edge cases in shadows...",
+      "Inspecting clean code invariants...",
+      "Optimizing token throughput...",
+      "Synthesizing modular components..."
+    ];
+
+    // ============================================================
+    // CANVAS ENGINE & LANDSCAPE RENDERING
+    // ============================================================
+    const canvas = document.getElementById('landscapeCanvas');
+    const ctx = canvas.getContext('2d');
+    let W, H;
+    let camera = { x: 0, y: 0, zoom: 1.0 };
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+    let landscapeChars = [];
+    let sceneryProps = [];
+    let particles = [];
+    let waterRipples = [];
+
+    function resizeCanvas() {
+      const container = document.getElementById('playArea');
+      W = canvas.width = container.clientWidth;
+      H = canvas.height = container.clientHeight;
+      buildWorldLandscape();
+    }
+
+    // World Building
+    const worldCv = document.createElement('canvas');
+    function buildWorldLandscape() {
+      worldCv.width = Math.max(1600, W);
+      worldCv.height = Math.max(1200, H);
+      const g = worldCv.getContext('2d');
+      const ww = worldCv.width;
+      const wh = worldCv.height;
+
+      // 1. Lush grass gradient
+      const grassGrad = g.createLinearGradient(0, 0, ww, wh);
+      grassGrad.addColorStop(0, '#2d5e2a');
+      grassGrad.addColorStop(0.5, '#3b7a38');
+      grassGrad.addColorStop(1, '#2c5929');
+      g.fillStyle = grassGrad;
+      g.fillRect(0, 0, ww, wh);
+
+      // Noise & Grass Tufts
+      for (let i = 0; i < 2000; i++) {
+        g.fillStyle = Math.random() < 0.5 ? '#244d21' : '#479443';
+        g.fillRect(Math.random() * ww, Math.random() * wh, 3, 3);
+      }
+
+      // 2. Winding Cobblestone Road
+      g.fillStyle = '#7a6f5d';
+      for (let px = 0; px < ww; px += 6) {
+        const py = wh * 0.42 + Math.sin(px / 160) * 80 + Math.cos(px / 280) * 40;
+        g.beginPath();
+        g.ellipse(px, py, 42, 28, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      // Path Stones texture
+      for (let i = 0; i < 600; i++) {
+        const px = Math.random() * ww;
+        const py = wh * 0.42 + Math.sin(px / 160) * 80 + Math.cos(px / 280) * 40 + (Math.random() - 0.5) * 40;
+        g.fillStyle = Math.random() < 0.5 ? '#5d5547' : '#968974';
+        g.fillRect(px, py, 4, 3);
+      }
+
+      // 3. Glowing Mana Spring / Pond
+      const pondX = ww * 0.76;
+      const pondY = wh * 0.68;
+      const pondGrad = g.createRadialGradient(pondX, pondY, 10, pondX, pondY, 110);
+      pondGrad.addColorStop(0, '#00e5ff');
+      pondGrad.addColorStop(0.4, '#0091ea');
+      pondGrad.addColorStop(1, '#0d47a1');
+      g.fillStyle = pondGrad;
+      g.beginPath();
+      g.ellipse(pondX, pondY, 110, 65, 0.1, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = '#80deea';
+      g.lineWidth = 3;
+      g.stroke();
+
+      // Lily pads
+      for (let i = 0; i < 5; i++) {
+        g.fillStyle = '#2e7d32';
+        g.beginPath();
+        g.arc(pondX - 50 + i * 25, pondY - 20 + (i % 2) * 25, 10, 0, Math.PI * 1.8);
+        g.fill();
+      }
+
+      // 4. Flowers
+      const flowerColors = ['#ff5252', '#ffeb3b', '#e040fb', '#ffffff', '#ffab40'];
+      for (let i = 0; i < 120; i++) {
+        const fx = Math.random() * ww;
+        const fy = Math.random() * wh;
+        g.fillStyle = flowerColors[i % flowerColors.length];
+        g.beginPath();
+        g.arc(fx, fy, 2.5, 0, Math.PI * 2);
+        g.fill();
+      }
+
+      // 5. Scenery Objects (Trees, Workstations, Campfires)
+      sceneryProps.length = 0;
+
+      // Workstation: Agile Pavilion Table
+      sceneryProps.push({
+        x: ww * 0.28,
+        y: wh * 0.38,
+        type: 'table',
+        name: 'Agile Strategy Desk'
+      });
+
+      // Workstation: Blueprint Monolith
+      sceneryProps.push({
+        x: ww * 0.52,
+        y: wh * 0.32,
+        type: 'monolith',
+        name: 'Rune Architecture Monolith'
+      });
+
+      // Workstation: Campfire Forge
+      sceneryProps.push({
+        x: ww * 0.40,
+        y: wh * 0.72,
+        type: 'campfire',
+        name: 'DevOps Forge'
+      });
+
+      // Trees
+      for (let i = 0; i < 18; i++) {
+        const tx = 60 + Math.random() * (ww - 120);
+        const ty = 60 + Math.random() * (wh - 120);
+        // Avoid pond center
+        if (Math.hypot(tx - pondX, ty - pondY) > 130) {
+          sceneryProps.push({
+            x: tx,
+            y: ty,
+            type: 'tree',
+            scale: 0.9 + Math.random() * 0.3
+          });
+        }
+      }
+    }
+
+    // Pixel Character Class for Landscape
+    class LandscapeAgent {
+      constructor(agentId, agentData, x, y) {
+        this.id = agentId;
+        this.agent = agentData;
+        this.name = agentData.name || agentId;
+        this.role = agentData.role || 'manager-bard';
+        this.config = ROLE_CONFIGS[this.role] || ROLE_CONFIGS['manager-bard'];
+        this.x = x;
+        this.y = y;
+        this.target = { x, y };
+        this.dir = 1;
+        this.speed = 35 + Math.random() * 20;
+        this.walkT = 0;
+        this.frame = 0;
+        this.bubble = null;
+        this.bubblePop = 0;
+        this.sayT = 2 + Math.random() * 4;
+        this.actT = 3 + Math.random() * 5;
+        this.toolAngle = 0;
+        this.scale = 2.8;
+        this.state = 'IDLE'; // IDLE | WALKING | WORKING
+        this.pickNewTarget();
+      }
+
+      pickNewTarget() {
+        const ww = worldCv.width || 1200;
+        const wh = worldCv.height || 800;
+        // 60% chance to visit a workstation
+        if (Math.random() < 0.6 && sceneryProps.length > 0) {
+          const prop = sceneryProps[Math.floor(Math.random() * Math.min(3, sceneryProps.length))];
+          this.target = { x: prop.x + (Math.random() - 0.5) * 60, y: prop.y + (Math.random() - 0.5) * 40 };
+        } else {
+          this.target = { x: 100 + Math.random() * (ww - 200), y: 100 + Math.random() * (wh - 200) };
+        }
+      }
+
+      say(text) {
+        this.bubble = { text, t: 4.5 };
+        this.bubblePop = 0;
+        anime({
+          targets: this,
+          bubblePop: [0, 1],
+          duration: 320,
+          easing: 'easeOutBack'
+        });
+      }
+
+      update(dt) {
+        const dx = this.target.x - this.x;
+        const dy = this.target.y - this.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist < 10) {
+          this.state = 'WORKING';
+          this.walkT = 0;
+          this.frame = 0;
+          this.actT -= dt;
+          if (this.actT <= 0) {
+            this.actT = 4 + Math.random() * 6;
+            this.doAction();
+            this.pickNewTarget();
+          }
+        } else {
+          this.state = 'WALKING';
+          this.x += (dx / dist) * this.speed * dt;
+          this.y += (dy / dist) * this.speed * dt;
+          this.dir = dx >= 0 ? 1 : -1;
+          this.walkT += dt * 6;
+          this.frame = Math.floor(this.walkT) % 2;
+        }
+
+        // Live Thought Say Timer
+        this.sayT -= dt;
+        if (this.sayT <= 0) {
+          this.sayT = 6 + Math.random() * 8;
+          const liveThought = agentThoughts[this.id]?.currentThought;
+          const fallback = AI_THOUGHT_SNIPPETS[Math.floor(Math.random() * AI_THOUGHT_SNIPPETS.length)];
+          this.say(liveThought || fallback);
+        }
+
+        // Bubble countdown
+        if (this.bubble) {
+          this.bubble.t -= dt;
+          if (this.bubble.t <= 0) this.bubble = null;
+        }
+      }
+
+      doAction() {
+        const self = this;
+        // Animate tool & emit particles
+        anime({
+          targets: self,
+          toolAngle: [0, 1.2 * self.dir, 0],
+          duration: 600,
+          easing: 'easeInOutQuad'
+        });
+
+        // Spawn role particles
+        if (this.role.includes('bard')) {
+          for (let i = 0; i < 3; i++) {
+            setTimeout(() => {
+              particles.push({
+                x: self.x + 12 * self.dir,
+                y: self.y - 15,
+                txt: '♪',
+                a: 1,
+                vx: (Math.random() - 0.5) * 30,
+                vy: -30 - Math.random() * 20
+              });
+            }, i * 200);
+          }
+        } else if (this.role.includes('wizard') || this.role.includes('sorcerer')) {
+          for (let i = 0; i < 8; i++) {
+            particles.push({
+              x: self.x + (Math.random() - 0.5) * 20,
+              y: self.y - 10,
+              c: Math.random() < 0.5 ? '#00e5ff' : '#e040fb',
+              r: 2 + Math.random() * 3,
+              a: 1,
+              vx: (Math.random() - 0.5) * 40,
+              vy: -25 - Math.random() * 35
+            });
+          }
+        } else if (this.role.includes('rogue')) {
+          for (let i = 0; i < 6; i++) {
+            particles.push({
+              x: self.x + (Math.random() - 0.5) * 20,
+              y: self.y + 10,
+              c: '#757575',
+              r: 3 + Math.random() * 4,
+              a: 0.8,
+              vx: (Math.random() - 0.5) * 30,
+              vy: -20 - Math.random() * 20
+            });
+          }
+        } else {
+          for (let i = 0; i < 5; i++) {
+            particles.push({
+              x: self.x + (Math.random() - 0.5) * 20,
+              y: self.y - 5,
+              c: '#f39c12',
+              r: 2.5,
+              a: 1,
+              vx: (Math.random() - 0.5) * 30,
+              vy: -25 - Math.random() * 20
+            });
+          }
+        }
+      }
+
+      draw() {
+        const s = this.scale;
+        const px = this.x;
+        const py = this.y;
+        const isSelected = currentAgentId === this.id;
+
+        ctx.save();
+
+        // 1. Selection Aura
+        if (isSelected) {
+          ctx.strokeStyle = '#f39c12';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.ellipse(px, py + 12 * s, 16 * s, 6 * s, 0, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.fillStyle = 'rgba(243, 156, 18, 0.2)';
+          ctx.fill();
+        }
+
+        // 2. Ground Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(px, py + 11 * s, 12 * s, 4 * s, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 3. Body rendering (Pixel Art Map)
+        const bounce = Math.abs(Math.sin(this.walkT)) * -2;
+        const flip = this.dir < 0;
+
+        // Draw Pixel Character
+        const map = [
+          "..hhhh..",
+          ".hhhhhh.",
+          ".hssssh.",
+          ".hsese..",
+          "..ssss..",
+          ".cccccc.",
+          "sccccct.",
+          "scccccc.",
+          ".bbbbbb.",
+          ".pppppp.",
+          this.frame === 0 ? ".pp..pp." : "..ppp...",
+          this.frame === 0 ? ".oo..oo." : "..oo.o.."
+        ];
+
+        const pal = {
+          h: this.config.hair || '#4a3728',
+          s: this.config.skin || '#f0c090',
+          e: '#1a1a24',
+          c: this.config.cloth || '#9b59b6',
+          b: '#5a3a1e',
+          p: this.config.pants || '#333344',
+          o: '#221810',
+          t: null
+        };
+
+        const charOffsetX = px - 4 * s;
+        const charOffsetY = py + bounce;
+
+        for (let r = 0; r < map.length; r++) {
+          const row = map[r];
+          for (let c = 0; c < row.length; c++) {
+            const col = pal[row[c]];
+            if (!col) continue;
+            ctx.fillStyle = col;
+            const rx = flip ? charOffsetX + (row.length - 1 - c) * s : charOffsetX + c * s;
+            ctx.fillRect(rx, charOffsetY + r * s, s, s);
+          }
+        }
+
+        // Tool / Weapon
+        const toolHandX = flip ? px - 7 * s : px + 7 * s;
+        const toolHandY = charOffsetY + 6 * s;
+        this.drawTool(toolHandX, toolHandY, this.toolAngle);
+
+        // Name Tag
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+        ctx.strokeText(this.name, px, py - 10);
+        ctx.fillStyle = isSelected ? '#f39c12' : '#ffffff';
+        ctx.fillText(this.name, px, py - 10);
+
+        // Role Icon Tag
+        ctx.font = '10px sans-serif';
+        ctx.fillStyle = '#8892b0';
+        ctx.fillText(`${this.config.icon} ${this.role.split('-').slice(0, 2).join(' ')}`, px, py + 16 * s);
+
+        // Speech Bubble
+        if (this.bubble && this.bubblePop > 0.05) {
+          const pop = this.bubblePop;
+          ctx.font = 'bold 11px sans-serif';
+          const text = this.bubble.text;
+          const tw = ctx.measureText(text).width;
+          const bw = (tw + 20) * pop;
+          const bh = 26 * pop;
+          const bx = px - bw / 2;
+          const by = py - 38 - bh;
+
+          // Bubble background
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+          ctx.strokeStyle = '#1e1e2f';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 6);
+          else ctx.rect(bx, by, bw, bh);
+          ctx.fill();
+          ctx.stroke();
+
+          // Bubble tail
+          ctx.beginPath();
+          ctx.moveTo(px - 5, by + bh);
+          ctx.lineTo(px + 5, by + bh);
+          ctx.lineTo(px, by + bh + 6);
+          ctx.closePath();
+          ctx.fill();
+
+          // Bubble text
+          ctx.fillStyle = '#111119';
+          ctx.textAlign = 'center';
+          ctx.fillText(text, px, by + 17, tw);
+        }
+
+        ctx.restore();
+      }
+
+      drawTool(x, y, angle) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        const tool = this.config.tool || 'staff';
+
+        if (tool === 'lute') {
+          ctx.fillStyle = '#a06a3a';
+          ctx.beginPath();
+          ctx.ellipse(0, -12, 6, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#5c3a1e';
+          ctx.fillRect(-1.5, -6, 3, 10);
+        } else if (tool === 'sword') {
+          ctx.fillStyle = '#e0e0e0';
+          ctx.fillRect(-1.5, -20, 3, 18);
+          ctx.fillStyle = '#f39c12';
+          ctx.fillRect(-4, -3, 8, 2.5);
+        } else if (tool === 'staff') {
+          ctx.fillStyle = '#6d4c41';
+          ctx.fillRect(-1.5, -24, 3, 26);
+          ctx.fillStyle = '#00e5ff';
+          ctx.beginPath();
+          ctx.arc(0, -26, 4, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (tool === 'hammer') {
+          ctx.fillStyle = '#5d4037';
+          ctx.fillRect(-1.5, -18, 3, 20);
+          ctx.fillStyle = '#90a4ae';
+          ctx.fillRect(-5, -22, 10, 6);
+        } else if (tool === 'daggers') {
+          ctx.fillStyle = '#cfd8dc';
+          ctx.fillRect(-2, -14, 2, 12);
+          ctx.fillRect(4, -14, 2, 12);
+        } else {
+          // Orb / Magic
+          ctx.fillStyle = '#e040fb';
+          ctx.beginPath();
+          ctx.arc(0, -10, 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+
+    // Render Loop
+    let lastTime = performance.now();
+    function landscapeLoop(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      ctx.save();
+      ctx.clearRect(0, 0, W, H);
+
+      // Camera Transform (Pan & Zoom)
+      ctx.translate(camera.x, camera.y);
+      ctx.scale(camera.zoom, camera.zoom);
+
+      // 1. Draw World Background
+      ctx.drawImage(worldCv, 0, 0);
+
+      // 2. Water Ripples on Pond
+      const pondX = worldCv.width * 0.76;
+      const pondY = worldCv.height * 0.68;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.lineWidth = 1.5;
+      const wave = (now / 1000) % 3;
+      ctx.beginPath();
+      ctx.ellipse(pondX, pondY, 30 + wave * 25, 18 + wave * 14, 0.1, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 3. Draw Scenery & Agents with Depth Sort (Y-sorting)
+      const renderables = [];
+
+      sceneryProps.forEach(p => {
+        renderables.push({
+          y: p.y,
+          draw: () => drawSceneryProp(p, now)
+        });
+      });
+
+      landscapeChars.forEach(c => {
+        renderables.push({
+          y: c.y,
+          draw: () => c.draw()
+        });
+      });
+
+      renderables.sort((a, b) => a.y - b.y);
+      renderables.forEach(r => r.draw());
+
+      // 4. Particle Systems
+      particles.forEach((p, idx) => {
+        p.x += (p.vx || 0) * dt;
+        p.y += (p.vy || 0) * dt;
+        p.a -= dt * 0.8;
+
+        ctx.globalAlpha = Math.max(0, p.a);
+        if (p.txt) {
+          ctx.font = 'bold 15px monospace';
+          ctx.fillStyle = '#ffeb3b';
+          ctx.fillText(p.txt, p.x, p.y);
+        } else {
+          ctx.fillStyle = p.c || '#ffffff';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r || 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      });
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        if (particles[i].a <= 0) particles.splice(i, 1);
+      }
+
+      ctx.restore();
+
+      // Update character logic
+      landscapeChars.forEach(c => c.update(dt));
+
+      requestAnimationFrame(landscapeLoop);
+    }
+
+    function drawSceneryProp(prop, now) {
+      ctx.save();
+      const x = prop.x;
+      const y = prop.y;
+
+      if (prop.type === 'tree') {
+        const s = prop.scale || 1.0;
+        // Tree Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.beginPath();
+        ctx.ellipse(x, y, 22 * s, 8 * s, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Trunk
+        ctx.fillStyle = '#5d4037';
+        ctx.fillRect(x - 5 * s, y - 28 * s, 10 * s, 28 * s);
+
+        // Foliage Layers
+        ctx.fillStyle = '#1b5e20';
+        ctx.beginPath();
+        ctx.arc(x, y - 36 * s, 24 * s, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#2e7d32';
+        ctx.beginPath();
+        ctx.arc(x, y - 48 * s, 20 * s, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#43a047';
+        ctx.beginPath();
+        ctx.arc(x, y - 58 * s, 14 * s, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (prop.type === 'table') {
+        // Wooden Table
+        ctx.fillStyle = '#4e342e';
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(x - 30, y - 16, 60, 32, 6) : ctx.rect(x - 30, y - 16, 60, 32);
+        ctx.fill();
+        ctx.fillStyle = '#fff9c4';
+        ctx.fillRect(x - 18, y - 10, 20, 14); // Map scroll
+        ctx.fillStyle = '#00bcd4';
+        ctx.beginPath();
+        ctx.arc(x + 14, y - 4, 4, 0, Math.PI * 2); // Coffee/potion mug
+        ctx.fill();
+      } else if (prop.type === 'monolith') {
+        // Rune Monolith
+        ctx.fillStyle = '#263238';
+        ctx.beginPath();
+        ctx.moveTo(x - 14, y);
+        ctx.lineTo(x - 8, y - 50);
+        ctx.lineTo(x + 8, y - 50);
+        ctx.lineTo(x + 14, y);
+        ctx.closePath();
+        ctx.fill();
+        // Glowing Rune
+        const glow = 0.5 + Math.sin(now / 400) * 0.4;
+        ctx.fillStyle = `rgba(0, 229, 255, ${glow})`;
+        ctx.fillRect(x - 2, y - 38, 4, 20);
+      } else if (prop.type === 'campfire') {
+        // Stones
+        ctx.fillStyle = '#546e7a';
+        for (let a = 0; a < 6; a++) {
+          const rx = x + Math.cos(a) * 12;
+          const ry = y + Math.sin(a) * 7;
+          ctx.beginPath(); ctx.arc(rx, ry, 3.5, 0, Math.PI * 2); ctx.fill();
+        }
+        // Flame
+        const fH = 14 + Math.sin(now / 150) * 5;
+        ctx.fillStyle = '#ff5722';
+        ctx.beginPath();
+        ctx.moveTo(x - 7, y);
+        ctx.lineTo(x, y - fH);
+        ctx.lineTo(x + 7, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#ffeb3b';
+        ctx.beginPath();
+        ctx.moveTo(x - 3, y);
+        ctx.lineTo(x, y - fH * 0.7);
+        ctx.lineTo(x + 3, y);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // Canvas Mouse Interaction (Pan & Click)
+    canvas.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      dragStart = { x: e.clientX - camera.x, y: e.clientY - camera.y };
     });
 
-    // ============================================================
-    // PIXI.JS INFINITE CANVAS SETUP
-    // ============================================================
-    function initPixi() {
-      const container = document.getElementById('canvasContainer');
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-
-      pixiApp = new PIXI.Application({
-        width,
-        height,
-        backgroundColor: 0x0a0a12,
-        antialias: true,
-        resolution: window.devicePixelRatio || 1,
-        autoDensity: true
-      });
-
-      container.appendChild(pixiApp.view);
-
-      // World Container for Pan & Zoom
-      worldContainer = new PIXI.Container();
-      worldContainer.position.set(width / 2, height / 2);
-      pixiApp.stage.addChild(worldContainer);
-
-      // Background Grid Graphics
-      const grid = new PIXI.Graphics();
-      grid.lineStyle(1, 0x1f1f33, 0.4);
-      for (let x = -2000; x <= 2000; x += 80) {
-        grid.moveTo(x, -2000);
-        grid.lineTo(x, 2000);
+    window.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        camera.x = e.clientX - dragStart.x;
+        camera.y = e.clientY - dragStart.y;
       }
-      for (let y = -2000; y <= 2000; y += 80) {
-        grid.moveTo(-2000, y);
-        grid.lineTo(2000, y);
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+    });
+
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = (e.clientX - rect.left - camera.x) / camera.zoom;
+      const clickY = (e.clientY - rect.top - camera.y) / camera.zoom;
+
+      // Check if clicked any agent
+      for (const char of landscapeChars) {
+        const d = Math.hypot(clickX - char.x, clickY - char.y);
+        if (d < 30) {
+          selectAgent(char.id);
+          char.say("Reporting for duty!");
+          return;
+        }
       }
-      worldContainer.addChild(grid);
+    });
 
-      // Communication Links Layer
-      linkGraphics = new PIXI.Graphics();
-      worldContainer.addChild(linkGraphics);
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      zoomLandscape(factor);
+    });
 
-      // Interactive Pan / Drag
-      let isDragging = false;
-      let prevPos = { x: 0, y: 0 };
+    function zoomLandscape(factor) {
+      camera.zoom = Math.min(Math.max(camera.zoom * factor, 0.5), 2.2);
+    }
 
-      pixiApp.view.addEventListener('mousedown', (e) => {
-        if (e.target === pixiApp.view) {
-          isDragging = true;
-          prevPos = { x: e.clientX, y: e.clientY };
+    function resetLandscapeView() {
+      camera.x = 0;
+      camera.y = 0;
+      camera.zoom = 1.0;
+    }
+
+    // ============================================================
+    // EXECUTIVE OUTER LAYER (CEO, HR, STAFF PALADIN)
+    // ============================================================
+    function renderExecutiveOuterLayer() {
+      const container = document.getElementById('executiveRoster');
+      if (!container) return;
+
+      const globalIds = ['ceo-warlock', 'hr-mind-flayer', 'staff-engineer-paladin'];
+      let html = '';
+
+      globalIds.forEach(id => {
+        const agent = allAgents[id] || { name: id, role: id, stats: { level: 20 } };
+        const conf = ROLE_CONFIGS[agent.role] || ROLE_CONFIGS['ceo-warlock'];
+        const isSelected = currentAgentId === id;
+        const thought = agentThoughts[id]?.currentThought || "Directing enterprise strategy...";
+
+        html += `
+          <div class="exec-agent-card ${isSelected ? 'selected' : ''}" onclick="selectAgent('${id}')">
+            <div class="exec-avatar-token" style="border-color:${conf.color};">
+              <span>${conf.icon}</span>
+              <div class="level-badge">${agent.stats?.level || 15}</div>
+            </div>
+            <div class="exec-info">
+              <div class="exec-name-row">
+                <div class="exec-name">${agent.name || id}</div>
+                <div class="exec-role-title">${agent.role.split('-').slice(0, 2).join(' ').toUpperCase()}</div>
+              </div>
+              <div class="exec-thought-preview">
+                <i class="fa-solid fa-brain"></i><span>${thought}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // ============================================================
+    // AGENT LIFECYCLE & PROJECT SYNC
+    // ============================================================
+    async function loadAgentsAndRender() {
+      const res = await fetch(`${BACKEND_URL}/api/agents`);
+      if (!res.ok) return;
+      const data = await res.json();
+      allAgents = data.agents || {};
+
+      // Fetch live thoughts
+      const thoughtsRes = await fetch(`${BACKEND_URL}/api/agent-thoughts`);
+      if (thoughtsRes.ok) {
+        const tData = await thoughtsRes.json();
+        agentThoughts = tData.thoughts || {};
+      }
+
+      // 1. Separate Global vs Project Agents
+      globalAgents = {};
+      projectAgents = {};
+
+      for (const [id, agent] of Object.entries(allAgents)) {
+        if (agent.project === 'global' || id === 'ceo-warlock' || id === 'hr-mind-flayer' || id === 'staff-engineer-paladin') {
+          globalAgents[id] = agent;
+        } else if (agent.project === currentProjectId) {
+          projectAgents[id] = agent;
         }
-      });
+      }
 
-      window.addEventListener('mousemove', (e) => {
-        if (isDragging) {
-          const dx = e.clientX - prevPos.x;
-          const dy = e.clientY - prevPos.y;
-          worldContainer.x += dx;
-          worldContainer.y += dy;
-          prevPos = { x: e.clientX, y: e.clientY };
-        }
-      });
+      // 2. Render Top Outer Layer
+      renderExecutiveOuterLayer();
 
-      window.addEventListener('mouseup', () => { isDragging = false; });
+      // 3. Render Landscape Playground Canvas with current project agents
+      syncLandscapeAgents(projectAgents);
 
-      // Zoom via Mouse Wheel
-      pixiApp.view.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const factor = e.deltaY < 0 ? 1.1 : 0.9;
-        zoomCanvas(factor);
-      });
+      // 4. Update title badge
+      document.getElementById('canvasProjectTitle').innerText = `${currentProjectId.toUpperCase()} Playground (${Object.keys(projectAgents).length} active agent${Object.keys(projectAgents).length === 1 ? '' : 's'})`;
 
-      // Window resize
-      window.addEventListener('resize', () => {
-        const w = container.clientWidth;
-        const h = container.clientHeight;
-        pixiApp.renderer.resize(w, h);
-      });
+      // Select default agent if needed
+      if (!allAgents[currentAgentId]) {
+        const firstProjAgent = Object.keys(projectAgents)[0];
+        currentAgentId = firstProjAgent || 'ceo-warlock';
+      }
+      loadAgentDrawer(currentAgentId);
+    }
 
-      // Animation Ticker (Sinusoidal Idle Hover & Links)
-      let ticker = 0;
-      pixiApp.ticker.add((delta) => {
-        ticker += 0.03 * delta;
-        for (const [id, token] of Object.entries(agentTokens)) {
-          if (token && token.tokenContainer) {
-            token.tokenContainer.y = token.baseY + Math.sin(ticker + token.seed) * 5;
+    function syncLandscapeAgents(projectAgentsMap) {
+      const existingIds = new Set(landscapeChars.map(c => c.id));
+      const targetIds = new Set(Object.keys(projectAgentsMap));
+
+      // Remove agents not in current project
+      landscapeChars = landscapeChars.filter(c => targetIds.has(c.id));
+
+      // Add newly spawned agents
+      const ww = worldCv.width || 1200;
+      const wh = worldCv.height || 800;
+
+      let idx = 0;
+      for (const [id, agent] of Object.entries(projectAgentsMap)) {
+        if (!existingIds.has(id)) {
+          const spawnX = ww * 0.35 + (idx % 3) * 120 + (Math.random() - 0.5) * 40;
+          const spawnY = wh * 0.45 + Math.floor(idx / 3) * 80 + (Math.random() - 0.5) * 40;
+          const newChar = new LandscapeAgent(id, agent, spawnX, spawnY);
+          landscapeChars.push(newChar);
+
+          // Poof animation
+          for (let p = 0; p < 12; p++) {
+            particles.push({
+              x: spawnX + (Math.random() - 0.5) * 30,
+              y: spawnY + (Math.random() - 0.5) * 20,
+              c: '#f39c12',
+              r: 3,
+              a: 1,
+              vx: (Math.random() - 0.5) * 50,
+              vy: -30 - Math.random() * 30
+            });
           }
         }
-        drawCommunicationLinks(ticker);
-      });
-    }
-
-    function zoomCanvas(factor) {
-      const newScale = Math.min(Math.max(worldContainer.scale.x * factor, 0.4), 2.5);
-      worldContainer.scale.set(newScale);
-    }
-
-    function resetCanvasView() {
-      const container = document.getElementById('canvasContainer');
-      worldContainer.position.set(container.clientWidth / 2, container.clientHeight / 2);
-      worldContainer.scale.set(1);
-    }
-
-    // ============================================================
-    // AGENT TOKEN RENDERING ON CANVAS
-    // ============================================================
-    function renderAgentTokens(agents) {
-      // Clear previous tokens
-      for (const [id, token] of Object.entries(agentTokens)) {
-        if (token.tokenContainer) worldContainer.removeChild(token.tokenContainer);
-      }
-      agentTokens = {};
-
-      const agentList = Object.entries(agents);
-      const count = agentList.length;
-      const radius = Math.min(220, 70 + count * 25);
-
-      agentList.forEach(([id, agent], index) => {
-        const tokenContainer = new PIXI.Container();
-        tokenContainer.eventMode = 'static';
-        tokenContainer.cursor = 'pointer';
-
-        // Position in circle / tree layout
-        let x = 0;
-        let y = 0;
-        if (id === 'ceo-warlock') {
-          x = 0;
-          y = -180;
-        } else if (id === 'hr-mind-flayer') {
-          x = 0;
-          y = -60;
-        } else {
-          const angle = ((index - 2) / Math.max(1, count - 2)) * Math.PI * 2;
-          x = Math.cos(angle) * radius;
-          y = 80 + Math.sin(angle) * (radius * 0.75);
-        }
-
-        tokenContainer.position.set(x, y);
-
-        const color = agent.stats?.avatarColor || 0x9b59b6;
-
-        // Outer Aura Ring
-        const aura = new PIXI.Graphics();
-        aura.lineStyle(3, color, 0.8);
-        aura.drawCircle(0, 0, 32);
-        tokenContainer.addChild(aura);
-
-        // Core Circle
-        const core = new PIXI.Graphics();
-        core.beginFill(0x181824);
-        core.lineStyle(2, 0x2c3e50, 1);
-        core.drawCircle(0, 0, 28);
-        core.endFill();
-        tokenContainer.addChild(core);
-
-        // Class Icon Text
-        const iconChar = ROLE_ICONS[agent.role] || '🛡️';
-        const iconText = new PIXI.Text(iconChar, {
-          fontSize: 22,
-          align: 'center'
-        });
-        iconText.anchor.set(0.5);
-        tokenContainer.addChild(iconText);
-
-        // Name & Role Label
-        const nameLabel = new PIXI.Text(agent.name || id, {
-          fontSize: 11,
-          fontWeight: 'bold',
-          fill: 0xf0f3f8,
-          align: 'center'
-        });
-        nameLabel.anchor.set(0.5, 0);
-        nameLabel.position.set(0, 36);
-        tokenContainer.addChild(nameLabel);
-
-        // Project Badge
-        const projLabel = new PIXI.Text(agent.project || 'global', {
-          fontSize: 9,
-          fill: 0x8892b0,
-          align: 'center'
-        });
-        projLabel.anchor.set(0.5, 0);
-        projLabel.position.set(0, 50);
-        tokenContainer.addChild(projLabel);
-
-        // Interaction Events
-        tokenContainer.on('pointerover', () => {
-          aura.clear();
-          aura.lineStyle(5, 0xf39c12, 1);
-          aura.drawCircle(0, 0, 36);
-          tokenContainer.scale.set(1.15);
-        });
-
-        tokenContainer.on('pointerout', () => {
-          aura.clear();
-          aura.lineStyle(3, color, 0.8);
-          aura.drawCircle(0, 0, 32);
-          tokenContainer.scale.set(1.0);
-        });
-
-        tokenContainer.on('pointerdown', () => {
-          selectAgent(id);
-        });
-
-        worldContainer.addChild(tokenContainer);
-
-        agentTokens[id] = {
-          tokenContainer,
-          baseX: x,
-          baseY: y,
-          color,
-          seed: index * 1.5
-        };
-      });
-    }
-
-    function drawCommunicationLinks(ticker) {
-      if (!linkGraphics) return;
-      linkGraphics.clear();
-
-      const ceo = agentTokens['ceo-warlock'];
-      const hr = agentTokens['hr-mind-flayer'];
-
-      if (ceo && hr) {
-        linkGraphics.lineStyle(2, 0x9b59b6, 0.4);
-        linkGraphics.moveTo(ceo.tokenContainer.x, ceo.tokenContainer.y);
-        linkGraphics.lineTo(hr.tokenContainer.x, hr.tokenContainer.y);
-      }
-
-      // Connect HR to all others
-      if (hr) {
-        for (const [id, token] of Object.entries(agentTokens)) {
-          if (id !== 'ceo-warlock' && id !== 'hr-mind-flayer' && token.tokenContainer) {
-            linkGraphics.lineStyle(1.5, 0x3498db, 0.25);
-            linkGraphics.moveTo(hr.tokenContainer.x, hr.tokenContainer.y);
-            linkGraphics.lineTo(token.tokenContainer.x, token.tokenContainer.y);
-          }
-        }
+        idx++;
       }
     }
 
     // ============================================================
-    // DRAWER & TAB LOGIC
+    // DRAWER LOGIC & TABS
     // ============================================================
-    function setupEventListeners() {
-      // Drawer tab buttons
-      document.querySelectorAll('.drawer-tabs .tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.drawer-tabs .tab-btn').forEach(b => b.classList.remove('active'));
-          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-
-          btn.classList.add('active');
-          const tabKey = btn.dataset.tab;
-          const targetPanel = document.getElementById(`tab-${tabKey}`);
-          if (targetPanel) targetPanel.classList.add('active');
-        });
-      });
-    }
-
     async function selectAgent(agentId) {
       currentAgentId = agentId;
+      renderExecutiveOuterLayer();
       await loadAgentDrawer(agentId);
     }
 
@@ -1444,25 +2164,27 @@
       if (!res.ok) return;
       const data = await res.json();
       const agent = data.agent;
+      const conf = ROLE_CONFIGS[agent.role] || ROLE_CONFIGS['manager-bard'];
 
-      // Update Header
+      // Header
       document.getElementById('drawerName').innerText = agent.name || agentId;
       document.getElementById('drawerClass').innerText = agent.stats?.class || `Role: ${agent.role}`;
-      document.getElementById('drawerAvatar').innerText = ROLE_ICONS[agent.role] || '🛡️';
+      document.getElementById('drawerAvatar').innerText = conf.icon;
+      document.getElementById('drawerAvatar').style.borderColor = conf.color;
 
-      // Tab 1: Render Chat
+      // Tab 1: Chat
       renderChatMessages(data.messages || []);
 
-      // Tab 2: Render Stats (BG3 sheet)
+      // Tab 2: Stats
       renderStatsSheet(agent);
 
-      // Tab 3: Render Thoughts
+      // Tab 3: Thoughts
       renderThoughtStream(data.thoughts || []);
 
-      // Tab 4: Render Context
+      // Tab 4: Context
       renderContextTab(data.personalContext || {});
 
-      // Tab 5: Render Network
+      // Tab 5: Network
       renderNetworkTab();
     }
 
@@ -1471,7 +2193,7 @@
       if (!box) return;
       let html = '';
       if (messages.length === 0) {
-        html = '<div class="msg-bubble system">No messages yet. Send a prompt below to direct this agent.</div>';
+        html = '<div class="msg-bubble system">No messages recorded yet. Type a directive below to instruct this agent.</div>';
       } else {
         messages.forEach(m => {
           const roleCls = m.role === 'user' ? 'user' : (m.role === 'system' ? 'system' : 'agent');
@@ -1497,7 +2219,6 @@
       document.getElementById('statHp').innerText = `${stats.hp || 100} / ${stats.maxHp || 100}`;
       document.getElementById('statLevel').innerText = stats.level || 10;
 
-      // Abilities
       const abilityGrid = document.getElementById('abilityGrid');
       const scores = stats.stats || { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 };
       let abilityHtml = '';
@@ -1514,9 +2235,8 @@
       }
       abilityGrid.innerHTML = abilityHtml;
 
-      // Spells
       const spellsList = document.getElementById('spellsList');
-      const spells = stats.spells || [{ name: 'Standard Directive', dice: '1d20', desc: 'Standard task execution' }];
+      const spells = stats.spells || [{ name: 'Execute Directive', dice: '2d8', desc: 'Performs assigned project task.' }];
       let spellsHtml = '';
       spells.forEach(s => {
         spellsHtml += `
@@ -1531,9 +2251,8 @@
       });
       spellsList.innerHTML = spellsHtml;
 
-      // Inventory
       const invList = document.getElementById('inventoryList');
-      const items = stats.inventory || ['Basic Equipment'];
+      const items = stats.inventory || ['Company Keycard', 'Terminal Access'];
       invList.innerText = items.join(' • ');
     }
 
@@ -1556,7 +2275,7 @@
     }
 
     function renderContextTab(context) {
-      const used = context.contextUsed || 12000;
+      const used = context.contextUsed || 1500;
       const limit = context.contextLimit || 128000;
       const pct = Math.min(100, Math.round((used / limit) * 100));
 
@@ -1577,16 +2296,17 @@
       if (!list) return;
       let html = '';
       for (const [id, agent] of Object.entries(allAgents)) {
+        const conf = ROLE_CONFIGS[agent.role] || ROLE_CONFIGS['manager-bard'];
         html += `
           <div class="network-card" onclick="selectAgent('${id}')">
             <div style="display:flex;align-items:center;gap:10px;">
-              <span style="font-size:18px;">${ROLE_ICONS[agent.role] || '🛡️'}</span>
+              <span style="font-size:18px;">${conf.icon}</span>
               <div>
-                <div style="font-size:13px;font-weight:600;color:#fff;">${agent.name || id}</div>
+                <div style="font-size:13px;font-weight:700;color:#fff;">${agent.name || id}</div>
                 <div style="font-size:11px;color:var(--text-muted);">${agent.project || 'global'}</div>
               </div>
             </div>
-            <span style="font-size:11px;color:var(--gold);"><i class="fa-solid fa-bolt"></i> Connected</span>
+            <span style="font-size:11px;color:var(--gold);"><i class="fa-solid fa-bolt"></i> Telepathic Link</span>
           </div>
         `;
       }
@@ -1601,32 +2321,25 @@
       if (!res.ok) return;
       const data = await res.json();
       const tabs = document.getElementById('projectTabs');
+      const spawnProjSel = document.getElementById('spawnProjectSelect');
       let html = '';
-      data.projects.forEach((p, i) => {
+      let optHtml = '';
+
+      data.projects.forEach((p) => {
         const active = p === currentProjectId ? 'active' : '';
         html += `<button class="project-tab ${active}" data-project="${p}" onclick="switchProject('${p}')"><i class="fa-solid fa-cube"></i> ${p}</button>`;
+        optHtml += `<option value="${p}">${p}</option>`;
       });
+
       html += `<button class="new-project-btn" onclick="openNewProjectModal()"><i class="fa-solid fa-plus"></i> New Project</button>`;
       tabs.innerHTML = html;
+      spawnProjSel.innerHTML = optHtml;
     }
 
     function switchProject(pId) {
       currentProjectId = pId;
       loadProjects();
       loadAgentsAndRender();
-    }
-
-    async function loadAgentsAndRender() {
-      const res = await fetch(`${BACKEND_URL}/api/agents`);
-      if (!res.ok) return;
-      const data = await res.json();
-      allAgents = data.agents || {};
-      renderAgentTokens(allAgents);
-      if (allAgents[currentAgentId]) {
-        loadAgentDrawer(currentAgentId);
-      } else {
-        selectAgent('ceo-warlock');
-      }
     }
 
     async function sendChatMessage() {
@@ -1637,7 +2350,7 @@
       input.value = '';
       const harness = document.getElementById('harnessSelect').value;
 
-      // Optimistically show user bubble
+      // Optimistically append user message
       const box = document.getElementById('chatMessages');
       box.innerHTML += `
         <div class="msg-bubble user">
@@ -1646,6 +2359,10 @@
         </div>
       `;
       box.scrollTop = box.scrollHeight;
+
+      // Find character in landscape and trigger speaking animation
+      const char = landscapeChars.find(c => c.id === currentAgentId);
+      if (char) char.say("Marinating on prompt...");
 
       const res = await fetch(`${BACKEND_URL}/handleSendMessage`, {
         method: 'POST',
@@ -1660,6 +2377,7 @@
 
       if (res.ok) {
         await loadAgentDrawer(currentAgentId);
+        if (char) char.say("Task completed!");
       }
     }
 
@@ -1670,9 +2388,9 @@
 
     function rollD20() {
       const roll = Math.floor(Math.random() * 20) + 1;
-      const total = roll + 5;
+      const total = roll + 4;
       const badge = document.getElementById('diceResult');
-      badge.innerText = `🎲 ${total} (${roll}+5)`;
+      badge.innerText = `🎲 ${total} (${roll}+4)`;
       badge.style.color = roll === 20 ? '#2ecc71' : (roll === 1 ? '#e74c3c' : '#f39c12');
     }
 
@@ -1693,24 +2411,24 @@
       }
     }
 
-    // Modal helpers
+    // Modal Helpers
     function openNewProjectModal() { document.getElementById('newProjectModal').classList.add('active'); }
     function openSpawnAgentModal() { document.getElementById('spawnAgentModal').classList.add('active'); }
     function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
     async function submitNewProject() {
       const pId = document.getElementById('newProjectId').value.trim();
-      const role = document.getElementById('newProjectAgentRole').value;
       if (!pId) return;
 
       const res = await fetch(`${BACKEND_URL}/handleStartProject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: pId, initialAgentRole: role })
+        body: JSON.stringify({ projectId: pId, initialAgentRole: 'manager-bard' })
       });
 
       if (res.ok) {
         closeModal('newProjectModal');
+        await loadProjects();
         switchProject(pId);
       }
     }
@@ -1737,6 +2455,39 @@
       const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
       return text.replace(/[&<>"']/g, m => map[m]);
     }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+
+      // Drawer tabs navigation setup
+      document.querySelectorAll('.drawer-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.drawer-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+          btn.classList.add('active');
+          const tabKey = btn.dataset.tab;
+          const targetPanel = document.getElementById(`tab-${tabKey}`);
+          if (targetPanel) targetPanel.classList.add('active');
+        });
+      });
+
+      loadProjects();
+      loadAgentsAndRender();
+      requestAnimationFrame(landscapeLoop);
+
+      // Periodically refresh agent thoughts
+      setInterval(async () => {
+        const thoughtsRes = await fetch(`${BACKEND_URL}/api/agent-thoughts`);
+        if (thoughtsRes.ok) {
+          const tData = await thoughtsRes.json();
+          agentThoughts = tData.thoughts || {};
+          renderExecutiveOuterLayer();
+        }
+      }, 8000);
+    });
   </script>
 </body>
 </html>

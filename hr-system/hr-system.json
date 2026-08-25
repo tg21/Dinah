@@ -4,16 +4,165 @@
     "role": "ceo-warlock",
     "project": "global",
     "status": "active",
-    "context_len": 10000,
-    "created_at": "2026-08-22T23:16:03.588Z"
+    "context_len": 128000,
+    "context_used": 12400,
+    "created_at": "2026-08-25T00:00:00.000Z",
+    "last_activity_ms": 1787500000000,
+    "stats": {
+      "name": "CEO Warlock",
+      "role": "ceo-warlock",
+      "class": "Warlock (Pact of the Board)",
+      "level": 20,
+      "hp": 140,
+      "maxHp": 140,
+      "ac": 18,
+      "avatarColor": 10180982,
+      "stats": {
+        "STR": 10,
+        "DEX": 14,
+        "CON": 16,
+        "INT": 16,
+        "WIS": 14,
+        "CHA": 20
+      },
+      "spells": [
+        {
+          "name": "Eldritch Executive Order",
+          "dice": "4d10+5",
+          "desc": "Directs all company resources toward strategic initiative."
+        },
+        {
+          "name": "Pact of the Stock Option",
+          "dice": "2d8+5",
+          "desc": "Inspires subordinate agents with long-term vesting promises."
+        },
+        {
+          "name": "Mystic Arcanum: Seed Round",
+          "dice": "8d6",
+          "desc": "Summons sudden massive budget allocation."
+        }
+      ],
+      "inventory": [
+        "Staff of Executive Authority",
+        "Robes of the Boardroom",
+        "Tome of OKRs"
+      ],
+      "traits": [
+        "Eldritch Presence",
+        "Dark One's Blessing",
+        "Unquestioned Authority"
+      ]
+    }
   },
   "hr-mind-flayer": {
     "name": "HR Mind Flayer",
     "role": "hr-mind-flayer",
     "project": "global",
     "status": "active",
-    "context_len": 10000,
-    "created_at": "2026-08-22T23:16:03.589Z"
+    "context_len": 128000,
+    "context_used": 8200,
+    "created_at": "2026-08-25T00:00:00.000Z",
+    "last_activity_ms": 1787500000000,
+    "stats": {
+      "name": "HR Mind Flayer",
+      "role": "hr-mind-flayer",
+      "class": "Illithid Controller",
+      "level": 18,
+      "hp": 125,
+      "maxHp": 125,
+      "ac": 17,
+      "avatarColor": 9323693,
+      "stats": {
+        "STR": 12,
+        "DEX": 14,
+        "CON": 14,
+        "INT": 20,
+        "WIS": 18,
+        "CHA": 17
+      },
+      "spells": [
+        {
+          "name": "Mind Blast (Review)",
+          "dice": "5d8+5",
+          "desc": "Stuns low-performing agents into total compliance."
+        },
+        {
+          "name": "Psionic Agent Spawning",
+          "dice": "Special",
+          "desc": "Reads markdown templates and manifests active agents."
+        },
+        {
+          "name": "Extract Morale",
+          "dice": "3d10+4",
+          "desc": "Replaces emotional burnout with relentless output."
+        }
+      ],
+      "inventory": [
+        "Psionic Registry Tome",
+        "Tentacle Grooming Kit",
+        "Severance Package Scroll"
+      ],
+      "traits": [
+        "Telepathic Network",
+        "Sole Agent Spawner",
+        "Magic Resistance"
+      ]
+    }
+  },
+  "staff-engineer-paladin": {
+    "name": "Staff Engineer Paladin",
+    "role": "staff-engineer-paladin",
+    "project": "global",
+    "status": "active",
+    "context_len": 128000,
+    "context_used": 9500,
+    "created_at": "2026-08-25T00:00:00.000Z",
+    "last_activity_ms": 1787500000000,
+    "stats": {
+      "name": "Staff Engineer Paladin",
+      "role": "staff-engineer-paladin",
+      "class": "Paladin (Oath of Clean Code)",
+      "level": 15,
+      "hp": 130,
+      "maxHp": 130,
+      "ac": 20,
+      "avatarColor": 15844367,
+      "stats": {
+        "STR": 18,
+        "DEX": 10,
+        "CON": 16,
+        "INT": 14,
+        "WIS": 14,
+        "CHA": 16
+      },
+      "spells": [
+        {
+          "name": "Divine Smite (Code Review)",
+          "dice": "4d8",
+          "desc": "Banishes type violations and memory leaks."
+        },
+        {
+          "name": "Aura of Clean Code",
+          "dice": "Passive",
+          "desc": "+3 maintainability bonus to all nearby devs."
+        },
+        {
+          "name": "Lay on Hands (Refactor)",
+          "dice": "50 HP",
+          "desc": "Restores legacy spaghetti code to pristine shape."
+        }
+      ],
+      "inventory": [
+        "Greatsword of Strict Linting",
+        "Plate Armor of SOLID Principles",
+        "Holy Symbol of GitHub"
+      ],
+      "traits": [
+        "Divine Sense of Tech Debt",
+        "Code Righteousness",
+        "Aura of Protection"
+      ]
+    }
   },
   "project-alpha-manager-bard": {
     "name": "Manager Bard (Alpha)",
@@ -22,8 +171,8 @@
     "status": "active",
     "context_len": 128000,
     "context_used": 1500,
-    "created_at": "2026-08-23T13:33:32.323Z",
-    "last_activity_ms": 1787492012323,
+    "created_at": "2026-08-25T00:00:00.000Z",
+    "last_activity_ms": 1787500000000,
     "stats": {
       "name": "Manager Bard",
       "role": "manager-bard",
@@ -67,177 +216,6 @@
         "Jack of All Trades",
         "Agile Routing",
         "Charismatic Deflection"
-      ]
-    },
-    "tasks_total": 5,
-    "tasks_completed": 0
-  },
-  "project-alpha-solution-architect-wizard": {
-    "name": "Solution Architect Wizard",
-    "role": "solution-architect-wizard",
-    "project": "project-alpha",
-    "status": "active",
-    "context_len": 128000,
-    "context_used": 1500,
-    "created_at": "2026-08-23T13:33:32.324Z",
-    "last_activity_ms": 1787492012324,
-    "stats": {
-      "name": "Solution Architect Wizard",
-      "role": "solution-architect-wizard",
-      "class": "Wizard (School of Architecture)",
-      "level": 16,
-      "hp": 85,
-      "maxHp": 85,
-      "ac": 14,
-      "avatarColor": 3447003,
-      "stats": {
-        "STR": 8,
-        "DEX": 14,
-        "CON": 13,
-        "INT": 20,
-        "WIS": 16,
-        "CHA": 10
-      },
-      "spells": [
-        {
-          "name": "Arcane Blueprint",
-          "dice": "4d6+5",
-          "desc": "Draws flawless microservice diagrams."
-        },
-        {
-          "name": "Divination: Tech Debt",
-          "dice": "3d8",
-          "desc": "Foresees breaking API changes months ahead."
-        },
-        {
-          "name": "Wall of Abstraction",
-          "dice": "5d10",
-          "desc": "Blocks messy quick-hack implementations."
-        }
-      ],
-      "inventory": [
-        "Spellbook of Distributed Systems",
-        "Wand of Schema Design",
-        "Crystal of Latency Optimization"
-      ],
-      "traits": [
-        "Arcane Recovery",
-        "Deep Spec Analysis",
-        "Theoretical Mastery"
-      ]
-    },
-    "tasks_total": 5,
-    "tasks_completed": 0
-  },
-  "project-alpha-backend-dev-cleric": {
-    "name": "Backend Dev Cleric",
-    "role": "backend-dev-cleric",
-    "project": "project-alpha",
-    "status": "active",
-    "context_len": 128000,
-    "context_used": 1500,
-    "created_at": "2026-08-23T13:33:32.324Z",
-    "last_activity_ms": 1787492012324,
-    "stats": {
-      "name": "Backend Dev Cleric",
-      "role": "backend-dev-cleric",
-      "class": "Cleric (Domain of Persistence)",
-      "level": 12,
-      "hp": 98,
-      "maxHp": 98,
-      "ac": 18,
-      "avatarColor": 1752220,
-      "stats": {
-        "STR": 14,
-        "DEX": 10,
-        "CON": 15,
-        "INT": 14,
-        "WIS": 18,
-        "CHA": 10
-      },
-      "spells": [
-        {
-          "name": "Prayer of Schema Migration",
-          "dice": "3d8+4",
-          "desc": "Lossless zero-downtime database update."
-        },
-        {
-          "name": "Turn Deadlocks",
-          "dice": "Special",
-          "desc": "Banishes race conditions across worker threads."
-        },
-        {
-          "name": "Bless REST Endpoint",
-          "dice": "1d4",
-          "desc": "Sub-10ms response time blessing."
-        }
-      ],
-      "inventory": [
-        "Warhammer of SQL Queries",
-        "Shield of ACID Transactions",
-        "Vial of Connection Pool Holy Water"
-      ],
-      "traits": [
-        "Divine Connection Pooling",
-        "Channel Energy (Query Opt)",
-        "Transaction Safeguard"
-      ]
-    },
-    "tasks_total": 5,
-    "tasks_completed": 0
-  },
-  "project-alpha-frontend-dev-sorcerer": {
-    "name": "Frontend Dev Sorcerer",
-    "role": "frontend-dev-sorcerer",
-    "project": "project-alpha",
-    "status": "active",
-    "context_len": 128000,
-    "context_used": 1500,
-    "created_at": "2026-08-23T13:33:32.325Z",
-    "last_activity_ms": 1787492012325,
-    "stats": {
-      "name": "Frontend Dev Sorcerer",
-      "role": "frontend-dev-sorcerer",
-      "class": "Sorcerer (Wild Magic of CSS)",
-      "level": 12,
-      "hp": 78,
-      "maxHp": 78,
-      "ac": 13,
-      "avatarColor": 15277667,
-      "stats": {
-        "STR": 8,
-        "DEX": 16,
-        "CON": 14,
-        "INT": 12,
-        "WIS": 10,
-        "CHA": 18
-      },
-      "spells": [
-        {
-          "name": "Wild Magic Surge (Flexbox)",
-          "dice": "3d6+4",
-          "desc": "Instantly centers div in all dimensions."
-        },
-        {
-          "name": "PixiJS Canvas Summoning",
-          "dice": "4d8",
-          "desc": "Renders 60FPS GPU accelerated canvas."
-        },
-        {
-          "name": "Twinned Responsive Layout",
-          "dice": "2d10",
-          "desc": "Seamless mobile and desktop rendering."
-        }
-      ],
-      "inventory": [
-        "Orb of WebGL Shaders",
-        "Cloak of Visual Aesthetics",
-        "Figma Color Swatch Wand"
-      ],
-      "traits": [
-        "Wild Magic Surge",
-        "Flexible Casting",
-        "Responsive Intuition"
       ]
     },
     "tasks_total": 5,

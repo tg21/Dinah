@@ -233,13 +233,40 @@ function loadHrSystem() {
         created_at: new Date().toISOString(),
         last_activity_ms: Date.now(),
         stats: AGENT_RPG_REGISTRY['hr-mind-flayer']
+      },
+      'staff-engineer-paladin': {
+        name: 'Staff Engineer Paladin',
+        role: 'staff-engineer-paladin',
+        project: 'global',
+        status: 'active',
+        context_len: 128000,
+        context_used: 9500,
+        created_at: new Date().toISOString(),
+        last_activity_ms: Date.now(),
+        stats: AGENT_RPG_REGISTRY['staff-engineer-paladin']
       }
     };
     fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(initialRegistry, null, 2));
     return initialRegistry;
   }
   try {
-    return JSON.parse(fs.readFileSync(HR_SYSTEM_FILE, 'utf-8'));
+    const data = JSON.parse(fs.readFileSync(HR_SYSTEM_FILE, 'utf-8'));
+    // Ensure the 3 global agents exist
+    if (!data['staff-engineer-paladin']) {
+      data['staff-engineer-paladin'] = {
+        name: 'Staff Engineer Paladin',
+        role: 'staff-engineer-paladin',
+        project: 'global',
+        status: 'active',
+        context_len: 128000,
+        context_used: 9500,
+        created_at: new Date().toISOString(),
+        last_activity_ms: Date.now(),
+        stats: AGENT_RPG_REGISTRY['staff-engineer-paladin']
+      };
+      fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(data, null, 2));
+    }
+    return data;
   } catch (e) {
     return {};
   }
@@ -406,7 +433,7 @@ function spawnOpencodeAgent(projectId, prompt, agentId) {
     // Sanitize prompt for command line
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} run --dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 5000 });
     appendAgentThought(agentId, 'OPENCODE_SUCCESS', `OpenCode execution completed.`);
     return { success: true, output, agentId, harness: 'opencode' };
   } catch (error) {
@@ -429,7 +456,7 @@ function spawnClaudeCodeAgent(projectId, prompt, agentId) {
   try {
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} -p "${escapedPrompt}" --workdir "${projectDir}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 5000 });
     return { success: true, output, agentId, harness: 'claude-code' };
   } catch (error) {
     return simulateHarnessExecution('claude-code', projectId, prompt, agentId);
@@ -449,7 +476,7 @@ function spawnCodexAgent(projectId, prompt, agentId) {
   try {
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} --dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 5000 });
     return { success: true, output, agentId, harness: 'codex' };
   } catch (error) {
     return simulateHarnessExecution('codex', projectId, prompt, agentId);
@@ -876,6 +903,106 @@ app.get('/api/relationships', (req, res) => {
   res.json({ nodes: agents, links });
 });
 
+// Dynamic AI Agent Thoughts Pool
+const ROLE_THOUGHT_POOLS = {
+  'ceo-warlock': [
+    "Consulting the Eldritch Board of Directors...",
+    "Marinating on long-term enterprise strategy...",
+    "Reviewing quarterly OKRs and burn rate...",
+    "Evaluating executive resource allocation...",
+    "Delegating new initiative to HR Mind Flayer..."
+  ],
+  'hr-mind-flayer': [
+    "Psionically scanning agent roster...",
+    "Measuring team morale and context limits...",
+    "Reading markdown templates for optimal recruitment...",
+    "Reviewing compliance and talent pipeline...",
+    "Preparing psionic spawn protocol..."
+  ],
+  'staff-engineer-paladin': [
+    "Enforcing the Sacred Oath of Clean Code...",
+    "Pondering type safety and architectural boundaries...",
+    "Inspecting system interfaces for tech debt...",
+    "Reviewing PRs with divine discernment...",
+    "Contemplating domain-driven design purity..."
+  ],
+  'manager-bard': [
+    "Marinating on project requirements...",
+    "Tuning the Lute of Jira...",
+    "Organizing sprint backlog and routing tasks...",
+    "Casting Bardic Inspiration on engineers...",
+    "Resolving blocker with diplomatic charisma..."
+  ],
+  'solution-architect-wizard': [
+    "Drafting arcane microservice blueprints...",
+    "Divining distributed latency bottlenecks...",
+    "Synthesizing data flow diagrams...",
+    "Evaluating async event bus topology...",
+    "Optimizing schema normalization runes..."
+  ],
+  'backend-dev-cleric': [
+    "Praying to PostgreSQL gods for low latency...",
+    "Brewing connection pool holy water...",
+    "Migrating schemas with zero downtime...",
+    "Banishing database deadlocks...",
+    "Refactoring REST controllers and middleware..."
+  ],
+  'frontend-dev-sorcerer': [
+    "Channeling wild magic into CSS flexbox...",
+    "Marinating on responsive UI aesthetics...",
+    "Summoning 60FPS PixiJS canvas shaders...",
+    "Brewing glassmorphic gradients and animations...",
+    "Fixing z-index dimension anomalies..."
+  ],
+  'qa-engineer-rogue': [
+    "Lurking in shadows with null injection payloads...",
+    "Stabbing code in edge-case boundary conditions...",
+    "Executing stealth regression test suites...",
+    "Hunting subtle off-by-one errors...",
+    "Bypassing defensive developer excuses..."
+  ],
+  'devops-sre-dragonborn-warmage': [
+    "Tanking explosive deployment fallout...",
+    "Fortifying Kubernetes cluster perimeter...",
+    "Monitoring Prometheus metrics and thermal spikes...",
+    "Automating CI/CD pipeline incantations...",
+    "Scaling server pods against traffic storm..."
+  ],
+  'marshall-agent-system-inspector': [
+    "Scrying active processes for 100% completed tasks...",
+    "Measuring agent context token telemetry...",
+    "Inspecting system vital signs for stuck loops...",
+    "Running scheduled 5-minute sentinel audit...",
+    "Keeping the realm organized and healthy..."
+  ]
+};
+
+// API: Get live thoughts for all agents
+app.get('/api/agent-thoughts', (req, res) => {
+  const hrSystem = loadHrSystem();
+  const thoughtsMap = {};
+  for (const [agentId, agent] of Object.entries(hrSystem)) {
+    const role = agent.role || 'manager-bard';
+    const rolePool = ROLE_THOUGHT_POOLS[role] || [
+      "Processing task directives...",
+      "Marinating on optimal approach...",
+      "Analyzing project context..."
+    ];
+    const loggedThoughts = loadAgentThoughts(agentId);
+    const lastThought = loggedThoughts.length > 0 ? loggedThoughts[loggedThoughts.length - 1].thought : null;
+    const randomThought = rolePool[Math.floor(Math.random() * rolePool.length)];
+    thoughtsMap[agentId] = {
+      agentId,
+      name: agent.name || agentId,
+      role: agent.role,
+      project: agent.project,
+      currentThought: lastThought || randomThought,
+      thoughtPool: rolePool
+    };
+  }
+  res.json({ thoughts: thoughtsMap });
+});
+
 // Trigger manual Marshall Health Check
 app.post('/api/marshall/run', (req, res) => {
   const report = runMarshallChecks();
@@ -891,20 +1018,19 @@ loadHrSystem();
 createProjectFolder('project-alpha');
 createProjectFolder('project-beta');
 
-// Ensure manager and solution architect exist for project-alpha
+// Ensure ONLY manager exists for project-alpha (No other agents spawned by default)
 const initialHr = loadHrSystem();
 if (!initialHr['project-alpha-manager-bard']) {
   spawnAgentViaHr('manager-bard', 'project-alpha', 'Manager Bard (Alpha)');
 }
-if (!initialHr['project-alpha-solution-architect-wizard']) {
-  spawnAgentViaHr('solution-architect-wizard', 'project-alpha', 'Solution Architect Wizard');
+
+// Clean up any old pre-spawned worker agents from previous test runs if needed
+for (const [id, agent] of Object.entries(initialHr)) {
+  if (agent.project === 'project-alpha' && id !== 'project-alpha-manager-bard') {
+    delete initialHr[id];
+  }
 }
-if (!initialHr['project-alpha-backend-dev-cleric']) {
-  spawnAgentViaHr('backend-dev-cleric', 'project-alpha', 'Backend Dev Cleric');
-}
-if (!initialHr['project-alpha-frontend-dev-sorcerer']) {
-  spawnAgentViaHr('frontend-dev-sorcerer', 'project-alpha', 'Frontend Dev Sorcerer');
-}
+saveHrSystem(initialHr);
 
 app.listen(PORT, () => {
   console.log(`====================================================`);
