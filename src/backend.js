@@ -3,7 +3,6 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { exec, execSync } from 'child_process';
-import os from 'os';
 import {
   initializeHarnessesAndModels,
   getAvailableModels,
@@ -722,7 +721,7 @@ function runSeniorAnalystInspection() {
     const pFolder = getProjectFolder(pId);
     let files = [];
     if (fs.existsSync(pFolder)) {
-      try { files = fs.readdirSync(pFolder); } catch (e) {}
+      try { files = fs.readdirSync(pFolder); } catch (e) { }
     }
     const projAgents = Object.values(hrSystem).filter(a => a.project === pId).map(a => a.name);
     kb.projectSummaries[pId] = {
@@ -863,6 +862,31 @@ setInterval(() => {
 // HARNESS DETECTION & EXECUTION
 // ============================================================
 
+function spawnAntigravityAgent(projectId, prompt, agentId) {
+  const projectDir = getProjectFolder(projectId);
+  createProjectFolder(projectId);
+  const harnessBin = findHarnessBinary('agy') || findHarnessBinary('antigravity');
+
+  if (!harnessBin) {
+    return simulateHarnessExecution('antigravity', projectId, prompt, agentId);
+  }
+
+  try {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
+    const modelFlag = agent?.model ? `--model "${agent.model}" ` : '';
+    appendAgentThought(agentId, 'ANTIGRAVITY_INVOKE', `Invoking Antigravity CLI (agy) [${agent?.model || 'default'}] in ${projectDir}`);
+    const escapedPrompt = prompt.replace(/"/g, '\\"');
+    const cmd = `${harnessBin} ${modelFlag}--dangerously-skip-permissions -p "${escapedPrompt}"`;
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 45000 });
+    appendAgentThought(agentId, 'ANTIGRAVITY_SUCCESS', `Antigravity CLI (agy) execution completed.`);
+    return { success: true, output: (output || '').trim(), agentId, harness: 'antigravity', model: agent?.model };
+  } catch (error) {
+    appendAgentThought(agentId, 'ANTIGRAVITY_FALLBACK', `Harness note: ${error.message.slice(0, 80)}`);
+    return simulateHarnessExecution('antigravity', projectId, prompt, agentId);
+  }
+}
+
 function spawnOpencodeAgent(projectId, prompt, agentId) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
@@ -977,7 +1001,7 @@ function spawnOllamaAgent(projectId, prompt, agentId) {
 function simulateHarnessExecution(harness, projectId, prompt, agentId) {
   const hrSystem = loadHrSystem();
   const agent = hrSystem[agentId] || { name: agentId, role: agentId, model: 'system-simulator/balanced-agent' };
-  
+
   let roleFlavor = '';
   if (agent.role && agent.role.includes('ceo')) {
     roleFlavor = `[CEO Warlock]: I have received your strategic directive: "${prompt}". Delegating to HR Mind Flayer to ensure Manager Bard and project resources are allocated.`;
@@ -1018,6 +1042,9 @@ function simulateHarnessExecution(harness, projectId, prompt, agentId) {
 
 function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId) {
   switch (harness) {
+    case 'antigravity':
+    case 'agy':
+      return spawnAntigravityAgent(projectId, prompt, agentId);
     case 'opencode':
       return spawnOpencodeAgent(projectId, prompt, agentId);
     case 'claude-code':
@@ -1042,7 +1069,7 @@ function calculateAgentCostEstimation(role, model, effortLevel = 'High') {
   const modelObj = getModelById(model);
   const inRate = meta.costPer1kInput || 0.002;
   const outRate = meta.costPer1kOutput || 0.010;
-  
+
   let multiplier = 1.0;
   if (effortLevel === 'Low') multiplier = 0.5;
   if (effortLevel === 'High') multiplier = 1.5;
@@ -1087,7 +1114,7 @@ function requestAgentSummoning(role, projectId = 'project-alpha', customOptions 
     traits: ['Task Execution']
   };
 
-  const selectedModel = customOptions.model 
+  const selectedModel = customOptions.model
     ? (getModelById(customOptions.model) || selectBestModelForRole(role, customOptions.model))
     : selectBestModelForRole(role);
 
@@ -1199,7 +1226,7 @@ function spawnAgentViaHr(role, projectId = 'global', customName = null, options 
     traits: ['Task Execution']
   };
 
-  const selectedModel = options.model 
+  const selectedModel = options.model
     ? (getModelById(options.model) || selectBestModelForRole(role, options.model))
     : selectBestModelForRole(role);
 
@@ -1560,8 +1587,8 @@ app.post('/api/knowledge-base/query', (req, res) => {
   const { query = '' } = req.body;
   const kb = loadKnowledgeBase();
   const lower = query.toLowerCase();
-  const matchingTopics = (kb.topics || []).filter(t => 
-    t.title.toLowerCase().includes(lower) || 
+  const matchingTopics = (kb.topics || []).filter(t =>
+    t.title.toLowerCase().includes(lower) ||
     t.summary.toLowerCase().includes(lower) ||
     (t.tags || []).some(tag => tag.toLowerCase().includes(lower))
   );

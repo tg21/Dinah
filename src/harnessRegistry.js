@@ -1,6 +1,8 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import http from 'http';
+import os from 'os';
+import path from 'path';
 
 /**
  * @typedef {Object} ModelCapability
@@ -54,7 +56,7 @@ export function findHarnessBinary(binaryName) {
       if (result && result.trim()) {
         return result.trim();
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   return null;
 }
@@ -247,6 +249,51 @@ function discoverOpencodeModels(binPath) {
 }
 
 /**
+ * Discover models from Antigravity CLI (agy).
+ */
+function discoverAntigravityModels(binPath) {
+  try {
+    const output = execSync(`${binPath} models 2>/dev/null`, {
+      encoding: 'utf-8',
+      timeout: 10000
+    });
+    const lines = output.split('\n');
+    const models = [];
+    for (const line of lines) {
+      // Strip ANSI escape codes (from spinners or color output)
+      const cleanLine = line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '').trim();
+      if (!cleanLine) continue;
+      // agy models output format: model-id<tab or spaces>Display Name
+      const parts = cleanLine.split(/\s+/);
+      const rawId = parts[0];
+      if (!rawId || rawId.includes('Fetching') || rawId.startsWith('Usage:') || rawId.startsWith('Flags:')) {
+        continue;
+      }
+      let provider = 'google';
+      if (rawId.startsWith('claude')) provider = 'anthropic';
+      else if (rawId.startsWith('gpt')) provider = 'openai';
+      else if (rawId.startsWith('gemini')) provider = 'google';
+      else provider = 'antigravity';
+
+      models.push(buildModelCapability(rawId, 'antigravity', provider));
+    }
+    return models;
+  } catch (err) {
+    console.warn('[HarnessRegistry] Could not query antigravity models:', err.message);
+    return [
+      buildModelCapability('gemini-3.8-flash-high', 'antigravity', 'google'),
+      buildModelCapability('gemini-3.8-flash-medium', 'antigravity', 'google'),
+      buildModelCapability('gemini-3.8-flash-low', 'antigravity', 'google'),
+      buildModelCapability('gemini-3.7-flash-high', 'antigravity', 'google'),
+      buildModelCapability('gemini-3.1-pro-high', 'antigravity', 'google'),
+      buildModelCapability('claude-sonnet-4-6', 'antigravity', 'anthropic'),
+      buildModelCapability('claude-opus-4-6-thinking', 'antigravity', 'anthropic'),
+      buildModelCapability('gpt-oss-120b-medium', 'antigravity', 'openai')
+    ];
+  }
+}
+
+/**
  * Discover models from Ollama harness.
  */
 async function discoverOllamaModels(binPath, host = 'http://localhost:11434') {
@@ -259,7 +306,7 @@ async function discoverOllamaModels(binPath, host = 'http://localhost:11434') {
         return json.models.map(m => buildModelCapability(m.name, 'ollama', 'ollama-local'));
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 
   // Try CLI binary
   if (binPath) {
@@ -274,7 +321,7 @@ async function discoverOllamaModels(binPath, host = 'http://localhost:11434') {
         }
       }
       return models;
-    } catch (e) {}
+    } catch (e) { }
   }
 
   return [];
@@ -309,7 +356,23 @@ function discoverGeminiModels(binPath) {
  * Discover models from Codex / OpenAI CLI.
  */
 function discoverCodexModels(binPath) {
+  // 1. Check local Codex CLI cache (populated via OAuth/login)
+  const homeDir = os.homedir();
+  const cachePath = path.join(homeDir, '.codex', 'models_cache.json');
+  console.log(`Getting Codex Models from CLI cache at: ${cachePath}`);
+  if (fs.existsSync(cachePath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+      if (Array.isArray(data.models) && data.models.length > 0) {
+        return data.models.map(m => buildModelCapability(m.slug, 'codex', 'openai'));
+      }
+    } catch (e) {
+      console.warn('[HarnessRegistry] Failed to read Codex models_cache.json:', e.message);
+    }
+  }
+  // 2. Fallback if no cache file exists
   if (!binPath && !process.env.OPENAI_API_KEY) return [];
+  console.log('Codex: Using fallback Codex models');
   return [
     buildModelCapability('gpt-4o', 'codex', 'openai'),
     buildModelCapability('gpt-4o-mini', 'codex', 'openai'),
@@ -379,7 +442,22 @@ export async function initializeHarnessesAndModels(forceRefresh = false) {
   const harnesses = [];
   const models = [];
 
-  // 1. Detect OpenCode
+  // 1. Detect Antigravity CLI (agy)
+  const agyBin = findHarnessBinary('agy') || findHarnessBinary('antigravity');
+  if (agyBin) {
+    console.log(`  ✓ Found Antigravity CLI (agy) harness at: ${agyBin}`);
+    const agyModels = discoverAntigravityModels(agyBin);
+    harnesses.push({
+      id: 'antigravity',
+      name: 'Antigravity CLI (agy)',
+      status: 'active',
+      binaryPath: agyBin,
+      modelCount: agyModels.length
+    });
+    models.push(...agyModels);
+  }
+
+  // 2. Detect OpenCode
   const opencodeBin = findHarnessBinary('opencode');
   if (opencodeBin) {
     console.log(`  ✓ Found OpenCode harness at: ${opencodeBin}`);

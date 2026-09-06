@@ -1327,6 +1327,7 @@
         <i class="fa-solid fa-bolt"></i>
         <span>Default Harness:</span>
         <select id="harnessSelect">
+          <option value="antigravity">Antigravity CLI (agy)</option>
           <option value="opencode">OpenCode CLI</option>
           <option value="claude-code">Claude Code</option>
           <option value="codex">Codex</option>
@@ -3128,11 +3129,27 @@
         if (harnessRes.ok) {
           const hData = await harnessRes.json();
           systemHarnesses = hData.harnesses || [];
+          populateHarnessSelectDropdown();
         }
 
         populateModelSelectDropdowns();
       } catch (err) {
         console.error('Error loading dynamic system models:', err);
+      }
+    }
+
+    function populateHarnessSelectDropdown() {
+      const hSelect = document.getElementById('harnessSelect');
+      if (!hSelect || !systemHarnesses || systemHarnesses.length === 0) return;
+      const currentVal = hSelect.value;
+      let html = '';
+      for (const h of systemHarnesses) {
+        const countStr = h.modelCount ? ` (${h.modelCount} models)` : '';
+        html += `<option value="${h.id}">${escapeHtml(h.name)}${countStr}</option>`;
+      }
+      hSelect.innerHTML = html;
+      if (currentVal && systemHarnesses.some(h => h.id === currentVal)) {
+        hSelect.value = currentVal;
       }
     }
 
