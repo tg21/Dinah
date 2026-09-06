@@ -684,6 +684,36 @@
       line-height: 1.45;
       max-width: 92%;
       word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    .log-details {
+      min-width: 0;
+    }
+
+    .log-details summary {
+      cursor: pointer;
+      color: var(--cyan);
+      font-size: 10px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .log-details summary::marker {
+      color: var(--gold);
+    }
+
+    .log-detail-content {
+      max-height: 320px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      margin-top: 6px;
+      padding: 7px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: rgba(0,0,0,0.18);
     }
 
     .msg-bubble.user {
@@ -1013,6 +1043,7 @@
       padding: 8px 10px;
       font-size: 11px;
       line-height: 1.4;
+      overflow-wrap: anywhere;
     }
 
     .thought-card.USER_INPUT { border-left-color: var(--secondary); }
@@ -2817,13 +2848,25 @@
                 <strong>${escapeHtml(m.from || 'Agent')}</strong>
                 <span>${time}</span>
               </div>
-              <div>${escapeHtml(m.request || '')}</div>
+              <div>${renderExpandableLogText(m.request || '')}</div>
             </div>
           `;
         });
       }
       box.innerHTML = html;
       box.scrollTop = box.scrollHeight;
+    }
+
+    function renderExpandableLogText(value, threshold = 900) {
+      const text = String(value || '');
+      if (text.length <= threshold) return escapeHtml(text);
+      const preview = text.slice(0, 220).replace(/\s+/g, ' ').trim();
+      return `
+        <details class="log-details">
+          <summary>Show full log (${text.length.toLocaleString()} characters): ${escapeHtml(preview)}${text.length > 220 ? '…' : ''}</summary>
+          <div class="log-detail-content">${escapeHtml(text)}</div>
+        </details>
+      `;
     }
 
     function renderStatsSheet(agent) {
@@ -2900,7 +2943,7 @@
           <div class="thought-card ${t.step}">
             <div class="thought-time">${time}</div>
             <div class="thought-tag">${t.step}</div>
-            <div>${escapeHtml(t.thought)}</div>
+            <div>${renderExpandableLogText(t.thought || '')}</div>
           </div>
         `;
       });

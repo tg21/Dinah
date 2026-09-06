@@ -39,6 +39,7 @@ const PROJECTS_CONFIG_FILE = path.join(PROJECTS_DIR, 'projects-config.json');
 const KNOWLEDGE_BASE_FILE = path.join(SHARED_STATE_DIR, 'knowledge-base.json');
 const MARSHALL_AUDIT_FILE = path.join(SHARED_STATE_DIR, 'marshall-audit.json');
 const STARTUP_SETUP_FILE = path.join(SHARED_STATE_DIR, 'startup-setup.json');
+const STARTUP_SELECTION_AUDIT_FILE = path.join(SHARED_STATE_DIR, 'startup-model-selection.json');
 const TOP_LEVEL_AGENT_IDS = [
   'hr-mind-flayer',
   'staff-engineer-paladin',
@@ -875,6 +876,7 @@ function selectTopLevelModelsByCeo(ceoModel, requestedAssignments) {
     request: `CEO requested to select models and harnesses for ${delegatedIds.join(', ')}. Evaluation criteria and candidates were provided in prompts/ceo-select-top-level-models.md.`
   });
   appendAgentThought('ceo-warlock', 'MODEL_SELECTION_REQUEST', `Evaluating available models and harnesses on capability, context, reliability, and cost merit for: ${delegatedIds.join(', ')}.`);
+  const startedAt = Date.now();
   const result = spawnHarnessAgent(ceo?.harness || 'opencode', 'global', prompt, 'ceo-warlock');
   const decision = extractJsonObject(result.output);
   const assignments = {};
@@ -890,11 +892,25 @@ function selectTopLevelModelsByCeo(ceoModel, requestedAssignments) {
     if (!assignments[agentId]) assignments[agentId] = selectBestModelForRole(agentId)?.id;
   }
   const source = decision && Object.keys(assignments).some(id => decision.assignments?.[id]) ? 'ceo' : 'capability-fallback';
+  const audit = {
+    timestamp: new Date().toISOString(),
+    durationMs: Date.now() - startedAt,
+    ceoModel,
+    harness: result.harness || ceo?.harness || null,
+    simulated: Boolean(result.simulated),
+    requestedAgentIds: delegatedIds,
+    prompt,
+    rawResponse: result.output || '',
+    parsedDecision: decision,
+    source,
+    resolvedAssignments: assignments
+  };
+  fs.writeFileSync(STARTUP_SELECTION_AUDIT_FILE, JSON.stringify(audit, null, 2));
   appendAgentMessage('ceo-warlock', {
     from: 'CEO Warlock', role: 'agent', project: 'global', path: APP_DIR,
-    request: `Model selection completed for ${delegatedIds.join(', ')}. Source: ${source}. Assignments: ${JSON.stringify(assignments)}.`
+    request: `Model selection completed for ${delegatedIds.join(', ')}. Source: ${source}. Assignments: ${JSON.stringify(assignments)}. Full prompt/response audit: shared-state/startup-model-selection.json.`
   });
-  appendAgentThought('ceo-warlock', 'MODEL_SELECTION_COMPLETE', `Selected top-level model assignments by merit (${source}): ${JSON.stringify(assignments)}.`);
+  appendAgentThought('ceo-warlock', 'MODEL_SELECTION_COMPLETE', `Selected top-level model assignments by merit (${source}): ${JSON.stringify(assignments)}. Full exchange saved to shared-state/startup-model-selection.json.`);
   appendToSharedLog(`CEO Warlock completed top-level model selection (${source}): ${JSON.stringify(assignments)}`);
   return { assignments, source, response: result.output };
 }
@@ -1295,9 +1311,16 @@ function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation) {
   try {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
-    const output = execFileSync(harnessBin, ['--dir', projectDir, prompt], { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
+    // Codex uses the non-interactive `exec` subcommand and `--cd`; `--dir`
+    // belongs to OpenCode and is rejected by current Codex CLI releases.
+    const args = ['exec'];
+    if (agent?.model) args.push('--model', agent.model);
+    args.push('--cd', projectDir, prompt);
+    const output = execFileSync(harnessBin, args, { cwd: projectDir, encoding: 'utf-8', timeout: 45000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
+    appendAgentThought(agentId, 'CODEX_SUCCESS', `Codex CLI execution completed.`);
     return { success: true, output, agentId, harness: 'codex', model: agent?.model };
   } catch (error) {
+    appendAgentThought(agentId, 'CODEX_FALLBACK', `Harness note: ${error.message.slice(0, 120)}`);
     return simulateHarnessExecution('codex', projectId, prompt, agentId);
   }
 }
