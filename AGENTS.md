@@ -22,7 +22,7 @@ Compact instruction file for OpenCode sessions. Every line answers: "Would an ag
 |---|---|
 | `src/` | `backend.js` (Express server), `frontend.html`, `harnessRegistry.js` |
 | `hr-system/` | `hr-system.json` (agent registry), `agent-<id>.msgs.json`, `agent-<id>.thoughts.json` |
-| `projects/` | Isolated project workspaces (project-alpha, project-beta, project-gamma, project-delta) |
+| `projects/` | Isolated project workspaces, created only for explicitly started projects |
 | `agent-templates/` | 23 markdown templates for agent archetypes |
 | `shared-state/` | `shared-state.log` (append-only audit log) |
 
@@ -84,6 +84,7 @@ If no harnesses are found, the system falls back to a virtual simulation harness
 | Script | Effect |
 |---|---|
 | `npm start` | Runs `node src/backend.js` |
+| `npm run fresh-start` | Deletes `projects/`, `hr-system/`, and `shared-state/`, then starts `node src/backend.js`; use only when a full runtime-state reset is intended |
 | `npm run build` | `rm -rf dist && mkdir dist && cp src/backend.js dist/ && cp src/harnessRegistry.js dist/ && cp src/frontend.html dist/` |
 | `npm test` | Exits with error ("no test specified") — no test suite configured |
 
@@ -98,6 +99,10 @@ No lint or typecheck configured. The repo uses `type: "module"` in `package.json
 - **`APP_DIR`**: Server runs from `process.cwd()` — keep `backend.js` in `src/` and run from repo root.
 - **HR registry is the source of truth**. `hr-system/hr-system.json` dictates active agents, their models, harnesses, context limits, and statuses. The UI reads from this file.
 - **Project directories are auto-created**. `createProjectFolder(projectId)` in `backend.js` creates `projects/<id>/` with a `README.md` if missing.
+- **Projects are opt-in**. Startup and `GET /api/projects` must not seed or create `project-alpha`, `project-beta`, or any other project. Project folders/configuration are created only by an explicit project-creation flow or work dispatched to that project. Global CEO work uses the repository root and must not create `projects/global/`.
+- **CEO startup model delegation**. When the frontend sends `"ceo"` for a top-level agent during first-run setup, the backend loads `prompts/ceo-select-top-level-models.md`, sends the selected CEO a candidate list and role requirements, validates the returned model IDs, and records the request/result in the CEO message log, thought log, and shared audit log. The prompt must remain provider-neutral and merit-based.
+- **Model selectors**. First-run CEO and executive-council selectors reuse the grouped model presentation from Configure Agent Capabilities: models are grouped by harness and provider, with capability/context details shown on each option.
+- **Harness prompt execution**. Pass agent prompts to harness CLIs as argument arrays (`execFileSync`), never by interpolating them into shell command strings; prompts can contain Markdown/code fences and shell metacharacters.
 - **Token tracking**. Each message sent via `POST /handleSendMessage` increments `context_used` by `round(message.length * 1.5) + 350` tokens and adds `spentUsd` to the project budget.
 - **Environment variables**. `PORT`, `OLLAMA_HOST` (`default: http://localhost:11434`), `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY` are read at startup to detect harnesses.
 - **5-minute intervals**. Marshall sentinel and Senior Analyst both run on `setInterval(..., 300000)`. Do not manually run them more frequently than every 5 minutes without reason.

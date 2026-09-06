@@ -5,6 +5,7 @@
   "main": "src/backend.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "fresh-start": "rm -rf projects hr-system shared-state && node src/backend.js",
     "build": "rm -rf dist && mkdir dist && cp src/backend.js dist/ && cp src/harnessRegistry.js dist/ && cp src/frontend.html dist/",
     "start": "node src/backend.js"
   },

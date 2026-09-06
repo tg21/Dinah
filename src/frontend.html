@@ -1622,7 +1622,7 @@
       </div>
       <div class="modal-body">
         <div class="startup-intro">
-          Choose the model that leads your guild. For the other executive agents, you can assign a model yourself or let the CEO choose the best available option. This setup is only shown once on this installation.
+          Choose the model that leads your guild. For the other executive agents, you can assign a model yourself or ask the CEO to evaluate available models and harnesses using role requirements and capability evidence. This setup is only shown once on this installation.
         </div>
 
         <div class="startup-section-title">Chief Executive Officer</div>
@@ -3285,30 +3285,7 @@
         return;
       }
 
-      // Group models by harness / provider
-      const groups = {};
-      for (const model of availableSystemModels) {
-        const harness = model.source?.harness || 'system';
-        const provider = model.source?.provider || harness;
-        const groupKey = `${harness.toUpperCase()} • ${provider}`;
-        if (!groups[groupKey]) groups[groupKey] = [];
-        groups[groupKey].push(model);
-      }
-
-      let html = '';
-      for (const [grpName, models] of Object.entries(groups)) {
-        html += `<optgroup label="${grpName}">`;
-        for (const m of models) {
-          const caps = [];
-          if (m.capabilities?.vision) caps.push('👁️ Vision');
-          if (m.capabilities?.thinking) caps.push('🧠 Thinking');
-          if (m.capabilities?.tools) caps.push('🛠️ Tools');
-          const capStr = caps.length > 0 ? ` [${caps.join(' ')}]` : '';
-          const ctxStr = m.contextWindow ? ` (${Math.round(m.contextWindow / 1000)}k ctx)` : '';
-          html += `<option value="${m.id}">${m.displayName}${capStr}${ctxStr}</option>`;
-        }
-        html += `</optgroup>`;
-      }
+      const html = groupedModelOptions();
 
       const prevSpawnVal = spawnSelect.value;
       const prevEditVal = editSelect.value;
@@ -3324,6 +3301,39 @@
       }
     }
 
+    function groupedModelOptions(includeCeoChoice = false) {
+      let html = includeCeoChoice ? '<option value="ceo">CEO chooses from available models</option>' : '';
+      if (availableSystemModels.length === 0) {
+        return `${html}<option value="">No models detected (Simulation mode)</option>`;
+      }
+
+      // Keep startup selection consistent with Configure Agent Capabilities:
+      // harness first, provider second, then the models offered by that group.
+      const groups = {};
+      for (const model of availableSystemModels) {
+        const harness = model.source?.harness || 'system';
+        const provider = model.source?.provider || harness;
+        const groupKey = `${harness.toUpperCase()} • ${provider}`;
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(model);
+      }
+
+      for (const [groupName, models] of Object.entries(groups)) {
+        html += `<optgroup label="${escapeHtml(groupName)}">`;
+        for (const model of models) {
+          const caps = [];
+          if (model.capabilities?.vision) caps.push('👁️ Vision');
+          if (model.capabilities?.thinking || model.capabilities?.extendedThinking) caps.push('🧠 Thinking');
+          if (model.capabilities?.tools) caps.push('🛠️ Tools');
+          const capStr = caps.length ? ` [${caps.join(' ')}]` : '';
+          const ctxStr = model.contextWindow ? ` (${Math.round(model.contextWindow / 1000)}k ctx)` : '';
+          html += `<option value="${escapeHtml(model.id)}">${escapeHtml(model.displayName || model.id)}${capStr}${ctxStr}</option>`;
+        }
+        html += '</optgroup>';
+      }
+      return html;
+    }
+
     const STARTUP_TOP_LEVEL_LABELS = {
       'hr-mind-flayer': ['HR Mind Flayer', 'People, hiring, and agent orchestration'],
       'staff-engineer-paladin': ['Staff Engineer Paladin', 'Architecture and engineering standards'],
@@ -3332,16 +3342,7 @@
     };
 
     function startupModelOptions(includeCeoChoice = false) {
-      let html = includeCeoChoice ? '<option value="ceo">CEO chooses from available models</option>' : '';
-      for (const model of availableSystemModels) {
-        const harness = model.source?.harness || 'system';
-        const caps = [];
-        if (model.capabilities?.thinking || model.capabilities?.extendedThinking) caps.push('Thinking');
-        if (model.capabilities?.tools) caps.push('Tools');
-        const details = caps.length ? ` — ${caps.join(', ')}` : '';
-        html += `<option value="${escapeHtml(model.id)}">${escapeHtml(model.displayName || model.id)} (${escapeHtml(harness)}${details})</option>`;
-      }
-      return html;
+      return groupedModelOptions(includeCeoChoice);
     }
 
     function populateStartupSetupModal() {

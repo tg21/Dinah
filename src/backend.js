@@ -28,6 +28,7 @@ app.use(cors());
 
 const HR_SYSTEM_DIR = path.join(APP_DIR, 'hr-system');
 const AGENT_TEMPLATES_DIR = path.join(APP_DIR, 'agent-templates');
+const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
 const SHARED_STATE_DIR = path.join(APP_DIR, 'shared-state');
 const PROJECTS_DIR = path.join(APP_DIR, 'projects');
 const MCP_DIR = path.join(APP_DIR, 'mcp');
@@ -53,6 +54,7 @@ function ensureDirExists(dir) {
 
 ensureDirExists(HR_SYSTEM_DIR);
 ensureDirExists(AGENT_TEMPLATES_DIR);
+ensureDirExists(PROMPTS_DIR);
 ensureDirExists(SHARED_STATE_DIR);
 ensureDirExists(PROJECTS_DIR);
 ensureDirExists(MCP_DIR);
@@ -637,24 +639,7 @@ function broadcastAgentEvent(event) {
 
 function loadProjectsConfig() {
   if (!fs.existsSync(PROJECTS_CONFIG_FILE)) {
-    const defaultConfig = {
-      'project-alpha': {
-        path: path.join(PROJECTS_DIR, 'project-alpha'),
-        budgetUsd: 50.00,
-        spentUsd: 1.24,
-        maxTokens: 1000000,
-        tokensUsed: 42300,
-        description: 'Core Next-Gen Portal'
-      },
-      'project-beta': {
-        path: path.join(PROJECTS_DIR, 'project-beta'),
-        budgetUsd: 30.00,
-        spentUsd: 0.45,
-        maxTokens: 500000,
-        tokensUsed: 15400,
-        description: 'Microservices & API Gateway'
-      }
-    };
+    const defaultConfig = {};
     fs.writeFileSync(PROJECTS_CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
     return defaultConfig;
   }
@@ -670,6 +655,7 @@ function saveProjectsConfig(cfg) {
 }
 
 function getProjectFolder(projectId) {
+  if (!projectId || projectId === 'global') return APP_DIR;
   const cfg = loadProjectsConfig();
   if (cfg[projectId] && cfg[projectId].path && fs.existsSync(cfg[projectId].path)) {
     return cfg[projectId].path;
@@ -678,6 +664,7 @@ function getProjectFolder(projectId) {
 }
 
 function createProjectFolder(projectId, customPath = null) {
+  if (!projectId || projectId === 'global') return APP_DIR;
   const projectDir = customPath || path.join(PROJECTS_DIR, projectId);
   if (!fs.existsSync(projectDir)) {
     fs.mkdirSync(projectDir, { recursive: true });
@@ -848,6 +835,70 @@ function applyStartupSetup({ ceoModel, topLevelAssignments = {} }) {
   return setup;
 }
 
+function readCeoModelSelectionPrompt(modelCandidates) {
+  const promptFile = path.join(PROMPTS_DIR, 'ceo-select-top-level-models.md');
+  const template = fs.readFileSync(promptFile, 'utf-8');
+  return `${template}\n\n## Available model candidates\n\n${JSON.stringify(modelCandidates, null, 2)}\n\nReturn only the JSON object requested by the prompt.`;
+}
+
+function extractJsonObject(output) {
+  if (!output) return null;
+  const fenced = output.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const candidate = fenced?.[1] || output.match(/\{[\s\S]*\}/)?.[0];
+  if (!candidate) return null;
+  try { return JSON.parse(candidate); } catch (e) { return null; }
+}
+
+function selectTopLevelModelsByCeo(ceoModel, requestedAssignments) {
+  const delegatedIds = TOP_LEVEL_AGENT_IDS.filter(id => !requestedAssignments[id] || requestedAssignments[id] === 'ceo');
+  if (delegatedIds.length === 0) return { assignments: {}, source: 'none' };
+
+  const candidates = getAvailableModels().map(model => ({
+    id: model.id,
+    displayName: model.displayName,
+    harness: model.source?.harness,
+    provider: model.source?.provider,
+    capabilities: model.capabilities,
+    reasoning: model.reasoning,
+    contextWindow: model.contextWindow
+  }));
+  const roles = delegatedIds.map(agentId => ({
+    agentId,
+    role: AGENT_RPG_REGISTRY[agentId]?.roleFocus || agentId,
+    requiredCapabilities: AGENT_RPG_REGISTRY[agentId]?.requiredCapabilities || [],
+    effortLevel: AGENT_RPG_REGISTRY[agentId]?.effortLevel || 'High'
+  }));
+  const prompt = readCeoModelSelectionPrompt({ ceoModel, roles, candidates });
+  const ceo = loadHrSystem()['ceo-warlock'];
+  appendAgentMessage('ceo-warlock', {
+    from: 'system', role: 'system', project: 'global', path: APP_DIR,
+    request: `CEO requested to select models and harnesses for ${delegatedIds.join(', ')}. Evaluation criteria and candidates were provided in prompts/ceo-select-top-level-models.md.`
+  });
+  appendAgentThought('ceo-warlock', 'MODEL_SELECTION_REQUEST', `Evaluating available models and harnesses on capability, context, reliability, and cost merit for: ${delegatedIds.join(', ')}.`);
+  const result = spawnHarnessAgent(ceo?.harness || 'opencode', 'global', prompt, 'ceo-warlock');
+  const decision = extractJsonObject(result.output);
+  const assignments = {};
+  for (const agentId of delegatedIds) {
+    const modelId = decision?.assignments?.[agentId]?.modelId || decision?.assignments?.[agentId]?.model;
+    const model = getModelById(modelId);
+    if (model) assignments[agentId] = model.id;
+  }
+
+  // A non-JSON response must not leave an agent unconfigured. This deterministic
+  // fallback uses the same capability-based selector and never prefers a provider.
+  for (const agentId of delegatedIds) {
+    if (!assignments[agentId]) assignments[agentId] = selectBestModelForRole(agentId)?.id;
+  }
+  const source = decision && Object.keys(assignments).some(id => decision.assignments?.[id]) ? 'ceo' : 'capability-fallback';
+  appendAgentMessage('ceo-warlock', {
+    from: 'CEO Warlock', role: 'agent', project: 'global', path: APP_DIR,
+    request: `Model selection completed for ${delegatedIds.join(', ')}. Source: ${source}. Assignments: ${JSON.stringify(assignments)}.`
+  });
+  appendAgentThought('ceo-warlock', 'MODEL_SELECTION_COMPLETE', `Selected top-level model assignments by merit (${source}): ${JSON.stringify(assignments)}.`);
+  appendToSharedLog(`CEO Warlock completed top-level model selection (${source}): ${JSON.stringify(assignments)}`);
+  return { assignments, source, response: result.output };
+}
+
 // ============================================================
 // AGENT MESSAGE LOGS & THOUGHT STREAM
 // ============================================================
@@ -983,26 +1034,8 @@ function loadKnowledgeBase() {
           updatedAt: new Date().toISOString()
         }
       ],
-      projectSummaries: {
-        'project-alpha': {
-          status: 'In Development',
-          manager: 'Manager Bard',
-          activeAgents: ['manager-bard'],
-          keyDecisions: ['Adopting modular PixiJS canvas for interactive RPG frontend.'],
-          techStack: ['Node.js', 'Express', 'Vanilla JS', 'Three.js']
-        },
-        'project-beta': {
-          status: 'Planning',
-          manager: 'Manager Bard',
-          activeAgents: ['manager-bard'],
-          keyDecisions: ['Evaluating event streaming and GraphQL Gateway topology.'],
-          techStack: ['FastAPI', 'Redis', 'Docker']
-        }
-      },
-      crossProjectDependencies: [
-        { source: 'project-alpha', target: 'shared-state', relation: 'Audit Log Ingestion' },
-        { source: 'project-beta', target: 'hr-system', relation: 'Shared Specialist Pool' }
-      ]
+      projectSummaries: {},
+      crossProjectDependencies: []
     };
     fs.writeFileSync(KNOWLEDGE_BASE_FILE, JSON.stringify(initialKb, null, 2));
     return initialKb;
@@ -1181,7 +1214,7 @@ setInterval(() => {
 
 function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
-  createProjectFolder(projectId);
+  if (projectId !== 'global') createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('agy') || findHarnessBinary('antigravity');
 
   if (!harnessBin) {
@@ -1191,11 +1224,11 @@ function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation) {
   try {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
-    const modelFlag = agent?.model ? `--model "${agent.model}" ` : '';
     appendAgentThought(agentId, 'ANTIGRAVITY_INVOKE', `Invoking Antigravity CLI (agy) [${agent?.model || 'default'}] in ${projectDir}`);
-    const escapedPrompt = prompt.replace(/"/g, '\\"');
-    const cmd = `${harnessBin} ${modelFlag}--dangerously-skip-permissions -p "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 45000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
+    const args = [];
+    if (agent?.model) args.push('--model', agent.model);
+    args.push('--dangerously-skip-permissions', '-p', prompt);
+    const output = execFileSync(harnessBin, args, { cwd: projectDir, encoding: 'utf-8', timeout: 45000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     appendAgentThought(agentId, 'ANTIGRAVITY_SUCCESS', `Antigravity CLI (agy) execution completed.`);
     return { success: true, output: (output || '').trim(), agentId, harness: 'antigravity', model: agent?.model };
   } catch (error) {
@@ -1206,7 +1239,7 @@ function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation) {
 
 function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
-  createProjectFolder(projectId);
+  if (projectId !== 'global') createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('opencode');
 
   if (!harnessBin) {
@@ -1216,11 +1249,11 @@ function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation) {
   try {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
-    const modelFlag = agent?.model ? `-m "${agent.model}" ` : '';
     appendAgentThought(agentId, 'OPENCODE_INVOKE', `Invoking OpenCode harness [${agent?.model || 'default'}] in ${projectDir}`);
-    const escapedPrompt = prompt.replace(/"/g, '\\"');
-    const cmd = `${harnessBin} run ${modelFlag}--dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
+    const args = ['run'];
+    if (agent?.model) args.push('-m', agent.model);
+    args.push('--dir', projectDir, prompt);
+    const output = execFileSync(harnessBin, args, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     appendAgentThought(agentId, 'OPENCODE_SUCCESS', `OpenCode execution completed.`);
     return { success: true, output, agentId, harness: 'opencode', model: agent?.model };
   } catch (error) {
@@ -1231,7 +1264,7 @@ function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation) {
 
 function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
-  createProjectFolder(projectId);
+  if (projectId !== 'global') createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('claude-code') || findHarnessBinary('claude');
 
   if (!harnessBin) {
@@ -1241,10 +1274,9 @@ function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation) {
   try {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
-    const escapedPrompt = prompt.replace(/"/g, '\\"');
-    const mcpFlag = mcpInvocation?.mcps?.length ? ` --mcp-config "${mcpInvocation.file}"` : '';
-    const cmd = `${harnessBin} -p "${escapedPrompt}" --workdir "${projectDir}"${mcpFlag}`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
+    const args = ['-p', prompt, '--workdir', projectDir];
+    if (mcpInvocation?.mcps?.length) args.push('--mcp-config', mcpInvocation.file);
+    const output = execFileSync(harnessBin, args, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     return { success: true, output, agentId, harness: 'claude-code', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('claude-code', projectId, prompt, agentId);
@@ -1253,7 +1285,7 @@ function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation) {
 
 function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
-  createProjectFolder(projectId);
+  if (projectId !== 'global') createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('codex') || findHarnessBinary('openai');
 
   if (!harnessBin) {
@@ -1263,9 +1295,7 @@ function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation) {
   try {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
-    const escapedPrompt = prompt.replace(/"/g, '\\"');
-    const cmd = `${harnessBin} --dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
+    const output = execFileSync(harnessBin, ['--dir', projectDir, prompt], { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     return { success: true, output, agentId, harness: 'codex', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('codex', projectId, prompt, agentId);
@@ -1274,7 +1304,7 @@ function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation) {
 
 function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
-  createProjectFolder(projectId);
+  if (projectId !== 'global') createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('gemini') || findHarnessBinary('gemini-cli');
 
   if (!harnessBin) {
@@ -1285,9 +1315,7 @@ function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation) {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
     const modelName = agent?.model || 'gemini-2.5-flash';
-    const escapedPrompt = prompt.replace(/"/g, '\\"');
-    const cmd = `${harnessBin} --model "${modelName}" --dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
+    const output = execFileSync(harnessBin, ['--model', modelName, '--dir', projectDir, prompt], { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     return { success: true, output, agentId, harness: 'gemini', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('gemini', projectId, prompt, agentId);
@@ -1296,7 +1324,7 @@ function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation) {
 
 function spawnOllamaAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
-  createProjectFolder(projectId);
+  if (projectId !== 'global') createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('ollama');
 
   if (!harnessBin) {
@@ -1307,9 +1335,7 @@ function spawnOllamaAgent(projectId, prompt, agentId, mcpInvocation) {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
     const modelName = agent?.model || 'llama3';
-    const escapedPrompt = prompt.replace(/"/g, '\\"');
-    const cmd = `${harnessBin} run "${modelName}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
+    const output = execFileSync(harnessBin, ['run', modelName, prompt], { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     return { success: true, output, agentId, harness: 'ollama', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('ollama', projectId, prompt, agentId);
@@ -1609,10 +1635,6 @@ app.use(express.static(APP_DIR));
 // Get all projects
 app.get('/api/projects', (req, res) => {
   const projects = listProjects();
-  if (projects.length === 0) {
-    createProjectFolder('project-alpha');
-    createProjectFolder('project-beta');
-  }
   const config = loadProjectsConfig();
   res.json({ projects: listProjects(), config });
 });
@@ -1702,7 +1724,28 @@ app.post('/api/startup-setup', (req, res) => {
     }
   }
 
-  const setup = applyStartupSetup({ ceoModel, topLevelAssignments });
+  // Persist the selected CEO model before invoking the CEO so the request is
+  // actually executed with the model chosen in the frontend.
+  applyStartupSetup({ ceoModel, topLevelAssignments: {} });
+  const ceoSelections = selectTopLevelModelsByCeo(ceoModel, topLevelAssignments);
+  const resolvedAssignments = { ...topLevelAssignments, ...ceoSelections.assignments };
+  const setup = applyStartupSetup({ ceoModel, topLevelAssignments: resolvedAssignments });
+  setup.topLevelAssignments = Object.fromEntries(TOP_LEVEL_AGENT_IDS.map(id => [
+    id,
+    topLevelAssignments[id] && topLevelAssignments[id] !== 'ceo' ? topLevelAssignments[id] : 'ceo'
+  ]));
+  setup.resolvedTopLevelAssignments = Object.fromEntries(TOP_LEVEL_AGENT_IDS.map(id => [id, resolvedAssignments[id] || null]));
+  setup.ceoSelection = { source: ceoSelections.source, requestedAgentIds: Object.keys(ceoSelections.assignments) };
+  const finalHrSystem = loadHrSystem();
+  for (const agentId of TOP_LEVEL_AGENT_IDS) {
+    if (finalHrSystem[agentId]) {
+      finalHrSystem[agentId].modelAssignment = topLevelAssignments[agentId] && topLevelAssignments[agentId] !== 'ceo'
+        ? 'specified'
+        : 'ceo-delegated';
+    }
+  }
+  saveHrSystem(finalHrSystem);
+  fs.writeFileSync(STARTUP_SETUP_FILE, JSON.stringify(setup, null, 2));
   appendToSharedLog(`Completed DND Guild startup setup. CEO model: [${setup.ceoModel}].`);
   res.json({ success: true, setup });
 });
@@ -2134,14 +2177,6 @@ await initializeHarnessesAndModels();
 loadHrSystem();
 loadKnowledgeBase();
 loadProjectsConfig();
-createProjectFolder('project-alpha');
-createProjectFolder('project-beta');
-
-// Ensure ONLY manager exists for project-alpha
-const initialHr = loadHrSystem();
-if (!initialHr['project-alpha-manager-bard']) {
-  spawnAgentViaHr('manager-bard', 'project-alpha', 'Manager Bard (Alpha)');
-}
 
 app.listen(PORT, () => {
   const harnesses = getDetectedHarnesses();
