@@ -8,6 +8,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <!-- FontAwesome Icons CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Three.js CDN for 3D Context Brain Visualization -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     :root {
       --bg-dark: #08080f;
@@ -21,11 +23,14 @@
       --accent: #e74c3c;
       --gold: #f39c12;
       --gold-glow: rgba(243, 156, 18, 0.4);
+      --cyan: #00bcd4;
+      --cyan-glow: rgba(0, 188, 212, 0.4);
       --green: #2ecc71;
       --text: #f0f3f8;
       --text-muted: #8892b0;
       --border: #232338;
       --border-light: #363652;
+      --drawer-width: 480px;
     }
 
     * {
@@ -49,7 +54,7 @@
     .top-nav {
       background: var(--bg-panel);
       border-bottom: 1px solid var(--border);
-      padding: 0 18px;
+      padding: 0 16px;
       display: flex;
       align-items: center;
       height: 52px;
@@ -65,22 +70,22 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 800;
-      letter-spacing: 1.2px;
+      letter-spacing: 1px;
       color: #fff;
-      margin-right: 24px;
+      margin-right: 18px;
     }
 
     .brand i {
       color: var(--gold);
-      font-size: 20px;
+      font-size: 18px;
       text-shadow: 0 0 12px var(--gold-glow);
     }
 
     .project-tabs {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
     }
 
@@ -88,8 +93,8 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       color: var(--text-muted);
-      padding: 6px 14px;
-      font-size: 12px;
+      padding: 5px 12px;
+      font-size: 11px;
       font-weight: 600;
       border-radius: 6px;
       cursor: pointer;
@@ -106,43 +111,54 @@
     }
 
     .project-tab.active {
-      background: linear-gradient(135deg, rgba(155, 89, 182, 0.3) 0%, rgba(52, 152, 219, 0.25) 100%);
+      background: linear-gradient(135deg, rgba(155, 89, 182, 0.35) 0%, rgba(52, 152, 219, 0.25) 100%);
       color: #fff;
       border-color: var(--primary);
       box-shadow: 0 0 12px var(--primary-glow);
     }
 
-    .new-project-btn {
-      background: transparent;
-      border: 1px dashed var(--border-light);
+    .nav-btn {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border-light);
       color: var(--text-muted);
-      padding: 6px 12px;
+      padding: 5px 10px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 11px;
+      font-weight: 600;
       transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    .new-project-btn:hover {
+    .nav-btn:hover {
       border-color: var(--gold);
       color: var(--gold);
+      background: rgba(243, 156, 18, 0.1);
+    }
+
+    .nav-btn.kb-btn:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: rgba(0, 188, 212, 0.1);
     }
 
     .nav-actions {
       margin-left: auto;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .harness-select-wrap {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 12px;
+      gap: 6px;
+      font-size: 11px;
       color: var(--text-muted);
       background: var(--bg-card);
-      padding: 4px 10px;
+      padding: 4px 8px;
       border-radius: 6px;
       border: 1px solid var(--border);
     }
@@ -154,7 +170,7 @@
       font-weight: 600;
       outline: none;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 11px;
     }
 
     .harness-select-wrap select option {
@@ -167,25 +183,25 @@
       align-items: center;
       gap: 6px;
       font-size: 11px;
-      background: rgba(46, 204, 113, 0.1);
-      border: 1px solid rgba(46, 204, 113, 0.3);
+      background: rgba(0, 188, 212, 0.1);
+      border: 1px solid rgba(0, 188, 212, 0.3);
       padding: 4px 10px;
       border-radius: 6px;
-      color: var(--green);
+      color: var(--cyan);
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .marshall-status:hover {
-      background: rgba(46, 204, 113, 0.2);
+      background: rgba(0, 188, 212, 0.2);
     }
 
     .pulse-dot {
       width: 7px;
       height: 7px;
-      background: var(--green);
+      background: var(--cyan);
       border-radius: 50%;
-      box-shadow: 0 0 8px var(--green);
+      box-shadow: 0 0 8px var(--cyan);
       animation: pulse 1.5s infinite;
     }
 
@@ -196,30 +212,34 @@
     }
 
     /* ============================================================
-       TOP OUTER LAYER: EXECUTIVE PENTHOUSE (CEO, HR, STAFF PALADIN)
-       These agents are global and live outside of any project playground!
+       TOP OUTER LAYER: EXECUTIVE PENTHOUSE (CEO, HR, STAFF PALADIN, SENIOR ANALYST)
     ============================================================ */
     .executive-outer-layer {
       position: fixed;
       top: 52px;
       left: 0;
-      right: 480px;
+      right: var(--drawer-width);
       height: 74px;
       background: linear-gradient(180deg, #12121f 0%, #0d0d17 100%);
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
-      padding: 0 20px;
-      gap: 16px;
+      padding: 0 16px;
+      gap: 12px;
       z-index: 110;
       box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.drawer-collapsed .executive-outer-layer {
+      right: 0;
     }
 
     .outer-layer-tag {
       font-size: 10px;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.8px;
       color: var(--gold);
       background: rgba(243, 156, 18, 0.12);
       border: 1px solid rgba(243, 156, 18, 0.3);
@@ -233,7 +253,7 @@
 
     .executive-roster {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       flex: 1;
       overflow-x: auto;
       padding: 4px 0;
@@ -243,40 +263,41 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 6px 12px;
+      padding: 5px 10px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      position: relative;
       min-width: 220px;
+      max-width: 260px;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
     }
 
     .exec-agent-card:hover {
       background: var(--bg-card-hover);
-      border-color: var(--gold);
+      border-color: var(--border-light);
       transform: translateY(-2px);
-      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
     }
 
     .exec-agent-card.selected {
-      border-color: var(--gold);
-      background: linear-gradient(135deg, rgba(243, 156, 18, 0.15) 0%, rgba(155, 89, 182, 0.15) 100%);
-      box-shadow: 0 0 14px var(--gold-glow);
+      border-color: var(--primary);
+      box-shadow: 0 0 14px var(--primary-glow);
+      background: linear-gradient(135deg, rgba(155, 89, 182, 0.2) 0%, rgba(22, 22, 38, 0.9) 100%);
     }
 
     .exec-avatar-token {
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 18px;
-      background: #1a1a2b;
-      border: 2px solid var(--primary);
-      box-shadow: 0 0 8px var(--primary-glow);
+      background: #1a1a2e;
+      border: 2px solid var(--gold);
+      flex-shrink: 0;
       position: relative;
     }
 
@@ -284,25 +305,25 @@
       position: absolute;
       bottom: -4px;
       right: -4px;
-      background: var(--gold);
-      color: #000;
+      background: var(--bg-dark);
+      border: 1px solid var(--gold);
+      color: var(--gold);
       font-size: 8px;
-      font-weight: 900;
+      font-weight: 800;
       padding: 1px 3px;
       border-radius: 3px;
     }
 
     .exec-info {
-      display: flex;
-      flex-direction: column;
       flex: 1;
       min-width: 0;
     }
 
     .exec-name-row {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      gap: 4px;
     }
 
     .exec-name {
@@ -315,9 +336,11 @@
     }
 
     .exec-role-title {
-      font-size: 10px;
+      font-size: 9px;
       color: var(--gold);
-      font-weight: 600;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.5px;
     }
 
     .exec-thought-preview {
@@ -327,25 +350,27 @@
       overflow: hidden;
       text-overflow: ellipsis;
       margin-top: 2px;
-      font-style: italic;
-    }
-
-    .exec-thought-preview i {
-      color: var(--secondary);
-      margin-right: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
     /* ============================================================
-       PLAY AREA: INTERACTIVE FANTASY LANDSCAPE CANVAS
+       PLAY AREA & INTERACTIVE 2D CANVAS
     ============================================================ */
     .play-area {
       position: fixed;
       top: 126px;
-      bottom: 0;
       left: 0;
-      right: 480px;
-      background: #08080f;
+      right: var(--drawer-width);
+      bottom: 0;
+      background: #0d1a0d;
       overflow: hidden;
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.drawer-collapsed .play-area {
+      right: 0;
     }
 
     #landscapeCanvas {
@@ -353,52 +378,19 @@
       height: 100%;
       display: block;
       cursor: grab;
-      image-rendering: auto;
     }
 
     #landscapeCanvas:active {
       cursor: grabbing;
     }
 
-    .canvas-overlay-controls {
-      position: absolute;
-      bottom: 18px;
-      left: 18px;
-      display: flex;
-      gap: 8px;
-      z-index: 10;
-    }
-
-    .canvas-btn {
-      background: rgba(22, 22, 38, 0.88);
-      border: 1px solid var(--border-light);
-      color: var(--text);
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    }
-
-    .canvas-btn:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--primary);
-      color: var(--primary);
-      transform: scale(1.05);
-    }
-
     .canvas-project-badge {
       position: absolute;
       top: 14px;
-      left: 18px;
-      background: rgba(22, 22, 38, 0.85);
+      left: 14px;
+      background: rgba(16, 16, 26, 0.88);
+      border: 1px solid var(--border);
       backdrop-filter: blur(8px);
-      border: 1px solid var(--border-light);
       padding: 6px 14px;
       border-radius: 8px;
       font-size: 12px;
@@ -407,111 +399,224 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      z-index: 10;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      pointer-events: none;
     }
 
     .canvas-project-badge i {
-      color: var(--gold);
+      color: var(--primary);
+    }
+
+    .canvas-budget-pill {
+      font-size: 10px;
+      background: rgba(46, 204, 113, 0.15);
+      border: 1px solid rgba(46, 204, 113, 0.4);
+      color: var(--green);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
     }
 
     .canvas-tip {
       position: absolute;
-      top: 14px;
-      right: 18px;
-      background: rgba(22, 22, 38, 0.8);
-      backdrop-filter: blur(6px);
+      bottom: 14px;
+      left: 14px;
+      background: rgba(16, 16, 26, 0.85);
       border: 1px solid var(--border);
+      backdrop-filter: blur(6px);
       padding: 5px 12px;
       border-radius: 6px;
       font-size: 11px;
       color: var(--text-muted);
       pointer-events: none;
-      z-index: 10;
+    }
+
+    .canvas-overlay-controls {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      display: flex;
+      gap: 6px;
+      z-index: 50;
+    }
+
+    .canvas-btn {
+      width: 34px;
+      height: 34px;
+      background: rgba(22, 22, 38, 0.9);
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+
+    .canvas-btn:hover {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+      transform: scale(1.05);
+    }
+
+    .drawer-toggle-btn {
+      position: fixed;
+      top: 60px;
+      right: var(--drawer-width);
+      width: 28px;
+      height: 38px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-right: none;
+      border-radius: 6px 0 0 6px;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 130;
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s;
+      box-shadow: -3px 0 10px rgba(0,0,0,0.5);
+    }
+
+    .drawer-toggle-btn:hover {
+      background: var(--bg-card-hover);
+      color: #fff;
+    }
+
+    body.drawer-collapsed .drawer-toggle-btn {
+      right: 0;
+      border-radius: 6px 0 0 6px;
     }
 
     /* ============================================================
-       RIGHT DRAWER (5-TAB BALDUR'S GATE 3 / D&D CHARACTER SHEET)
+       RIGHT DRAWER (5-TAB BALDUR'S GATE 3 / D&D SHEET)
     ============================================================ */
     .drawer {
       position: fixed;
       top: 52px;
       right: 0;
       bottom: 0;
-      width: 480px;
+      width: var(--drawer-width);
       background: var(--bg-panel);
       border-left: 1px solid var(--border);
+      z-index: 100;
       display: flex;
       flex-direction: column;
-      z-index: 130;
-      box-shadow: -4px 0 25px rgba(0,0,0,0.7);
+      box-shadow: -4px 0 20px rgba(0,0,0,0.6);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.drawer-collapsed .drawer {
+      transform: translateX(100%);
     }
 
     .drawer-header {
-      padding: 14px 18px;
-      background: linear-gradient(180deg, rgba(30, 30, 48, 0.8) 0%, rgba(16, 16, 26, 0.95) 100%);
+      padding: 12px 16px;
+      background: linear-gradient(180deg, #161626 0%, #10101a 100%);
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
     }
 
     .drawer-agent-info {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
     }
 
     .drawer-avatar-icon {
       width: 44px;
       height: 44px;
       border-radius: 50%;
-      background: var(--bg-card);
-      border: 2px solid var(--gold);
+      background: #1a1a2e;
+      border: 2px solid var(--primary);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 22px;
-      box-shadow: 0 0 12px var(--gold-glow);
+      flex-shrink: 0;
+    }
+
+    .drawer-agent-meta {
+      flex: 1;
+      min-width: 0;
     }
 
     .drawer-agent-meta h3 {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 800;
       color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .drawer-agent-meta p {
-      font-size: 12px;
-      color: var(--gold);
-      font-weight: 600;
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+
+    .status-badge {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-badge.active { background: rgba(46, 204, 113, 0.15); color: var(--green); border: 1px solid rgba(46, 204, 113, 0.3); }
+    .status-badge.working { background: rgba(243, 156, 18, 0.15); color: var(--gold); border: 1px solid rgba(243, 156, 18, 0.3); }
+    .status-badge.paused { background: rgba(231, 76, 60, 0.15); color: var(--accent); border: 1px solid rgba(231, 76, 60, 0.3); }
+    .status-badge.awaiting-confirmation { background: rgba(0, 188, 212, 0.2); color: var(--cyan); border: 1px solid var(--cyan); box-shadow: 0 0 8px var(--cyan-glow); }
 
     .drawer-actions {
       display: flex;
-      gap: 8px;
+      align-items: center;
+      gap: 6px;
     }
 
-    .spawn-badge-btn {
-      background: rgba(155, 89, 182, 0.2);
-      border: 1px solid var(--primary);
-      color: #fff;
-      padding: 6px 12px;
-      border-radius: 6px;
+    .action-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      color: var(--text);
+      padding: 5px 8px;
+      border-radius: 5px;
       font-size: 11px;
-      font-weight: 700;
       cursor: pointer;
       transition: all 0.2s;
     }
 
-    .spawn-badge-btn:hover {
+    .action-btn:hover {
       background: var(--primary);
-      box-shadow: 0 0 10px var(--primary-glow);
+      border-color: var(--primary);
+      color: #fff;
     }
 
-    /* Drawer 5-Tab Navigation */
+    .action-btn.pause-btn:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* 5-Tab Bar */
     .drawer-tabs {
       display: flex;
-      background: var(--bg-card);
+      background: #0e0e18;
       border-bottom: 1px solid var(--border);
     }
 
@@ -524,172 +629,165 @@
       font-size: 11px;
       font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s;
-      border-bottom: 2px solid transparent;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 4px;
-    }
-
-    .tab-btn i {
-      font-size: 13px;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
     }
 
     .tab-btn:hover {
       color: var(--text);
-      background: rgba(255,255,255,0.03);
+      background: rgba(255,255,255,0.02);
     }
 
     .tab-btn.active {
       color: var(--gold);
       border-bottom-color: var(--gold);
-      background: rgba(243, 156, 18, 0.08);
+      background: rgba(243, 156, 18, 0.06);
     }
 
-    /* Tab Content Panels */
+    .tab-btn i {
+      font-size: 14px;
+    }
+
+    /* Tab Panels */
     .tab-panel {
+      display: none;
       flex: 1;
       overflow-y: auto;
-      display: none;
-      padding: 16px;
+      padding: 14px;
+      flex-direction: column;
+      gap: 12px;
     }
 
     .tab-panel.active {
       display: flex;
-      flex-direction: column;
     }
 
-    /* ============================================================
-       TAB 1: CHAT PANEL
-    ============================================================ */
+    /* Tab 1: Chat */
     .chat-messages {
       flex: 1;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      padding-bottom: 10px;
+      gap: 10px;
+      padding-right: 4px;
+      min-height: 200px;
     }
 
     .msg-bubble {
-      max-width: 90%;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 12px;
       line-height: 1.45;
-      user-select: text;
+      max-width: 92%;
+      word-break: break-word;
     }
 
     .msg-bubble.user {
       align-self: flex-end;
-      background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
       color: #fff;
       border-bottom-right-radius: 2px;
-      box-shadow: 0 2px 8px rgba(155, 89, 182, 0.3);
     }
 
     .msg-bubble.agent {
       align-self: flex-start;
       background: var(--bg-card);
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-light);
       color: var(--text);
       border-bottom-left-radius: 2px;
     }
 
     .msg-bubble.system {
       align-self: center;
-      max-width: 96%;
-      background: rgba(52, 152, 219, 0.1);
-      border: 1px dashed rgba(52, 152, 219, 0.3);
-      color: #85c1e9;
-      font-size: 12px;
+      background: rgba(243, 156, 18, 0.1);
+      border: 1px dashed rgba(243, 156, 18, 0.3);
+      color: var(--gold);
+      font-size: 11px;
       text-align: center;
     }
 
     .msg-header {
+      font-size: 10px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 4px;
       display: flex;
       justify-content: space-between;
-      margin-bottom: 4px;
-      font-size: 11px;
-      opacity: 0.8;
+      gap: 8px;
     }
 
     .chat-suggestions {
       display: flex;
       gap: 6px;
       overflow-x: auto;
-      padding: 8px 0;
+      padding: 4px 0;
     }
 
     .chip-btn {
-      white-space: nowrap;
       background: var(--bg-card);
       border: 1px solid var(--border);
       color: var(--text-muted);
-      font-size: 11px;
       padding: 4px 10px;
       border-radius: 12px;
+      font-size: 11px;
+      white-space: nowrap;
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .chip-btn:hover {
-      border-color: var(--primary);
-      color: #fff;
+      border-color: var(--gold);
+      color: var(--gold);
+      background: rgba(243, 156, 18, 0.08);
     }
 
     .chat-input-box {
-      border-top: 1px solid var(--border);
-      padding: 12px 0 0 0;
       display: flex;
       gap: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 8px;
     }
 
     .chat-input-box input {
       flex: 1;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px 14px;
+      background: transparent;
+      border: none;
       color: #fff;
-      font-size: 13px;
+      font-size: 12px;
       outline: none;
-      transition: border 0.2s;
-      user-select: text;
-    }
-
-    .chat-input-box input:focus {
-      border-color: var(--primary);
+      padding: 6px 0;
     }
 
     .chat-input-box button {
-      background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+      background: var(--primary);
       border: none;
       color: #fff;
-      padding: 0 18px;
+      width: 32px;
       border-radius: 6px;
-      font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .chat-input-box button:hover {
-      box-shadow: 0 0 12px var(--primary-glow);
+      background: #8e44ad;
+      transform: scale(1.05);
     }
 
-    /* ============================================================
-       TAB 2: AGENT STATS (D&D / BG3 CHARACTER SHEET)
-    ============================================================ */
+    /* Tab 2: Stats & AI Capability Sheet */
     .stats-sheet {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
     }
 
     .vitals-banner {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
     }
 
@@ -697,7 +795,7 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 10px;
+      padding: 8px;
       text-align: center;
     }
 
@@ -705,49 +803,119 @@
       font-size: 10px;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 2px;
+      font-weight: 700;
     }
 
-    .vital-card .vital-val {
-      font-size: 17px;
+    .vital-val {
+      font-size: 16px;
       font-weight: 800;
-      color: var(--gold);
+      color: #fff;
+      margin-top: 2px;
     }
 
     .hp-bar-wrap {
-      width: 100%;
-      height: 5px;
       background: #232338;
+      height: 5px;
       border-radius: 3px;
-      margin-top: 4px;
       overflow: hidden;
+      margin-top: 5px;
     }
 
     .hp-bar-fill {
       height: 100%;
-      background: linear-gradient(90deg, #e74c3c 0%, #2ecc71 100%);
+      background: linear-gradient(90deg, #2ecc71, #27ae60);
       width: 100%;
+      transition: width 0.3s;
     }
 
-    /* Ability Scores Grid (STR, DEX, CON, INT, WIS, CHA) */
+    /* AI Capabilities Card */
+    .capability-card {
+      background: linear-gradient(135deg, rgba(155, 89, 182, 0.15) 0%, rgba(22, 22, 38, 0.95) 100%);
+      border: 1px solid rgba(155, 89, 182, 0.4);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .capability-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .capability-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .capability-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .cap-item {
+      background: rgba(0,0,0,0.3);
+      padding: 6px 8px;
+      border-radius: 5px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .cap-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .cap-val {
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 1px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
     .ability-grid {
       display: grid;
       grid-template-columns: repeat(6, 1fr);
-      gap: 6px;
+      gap: 4px;
     }
 
     .ability-box {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 3px;
+      border-radius: 6px;
+      padding: 6px 2px;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .ability-box:hover {
+      background: var(--bg-card-hover);
       border-color: var(--gold);
       transform: translateY(-2px);
     }
@@ -755,103 +923,83 @@
     .ability-name {
       font-size: 9px;
       color: var(--text-muted);
-      font-weight: 800;
+      font-weight: 700;
     }
 
     .ability-mod {
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 800;
-      color: #fff;
-      margin: 1px 0;
+      color: var(--gold);
     }
 
     .ability-score {
       font-size: 9px;
-      color: var(--gold);
+      color: var(--text-muted);
     }
 
-    /* Dice Roller Section */
     .dice-roller-box {
-      background: linear-gradient(135deg, rgba(24, 24, 38, 0.95) 0%, rgba(32, 26, 48, 0.95) 100%);
-      border: 1px solid var(--border-light);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 12px 14px;
+      padding: 10px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
     .dice-btn {
-      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      background: linear-gradient(135deg, var(--gold) 0%, #d35400 100%);
       border: none;
       color: #fff;
-      padding: 8px 14px;
+      padding: 6px 14px;
       border-radius: 6px;
-      font-weight: 800;
-      font-size: 12px;
+      font-size: 11px;
+      font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 6px;
-      box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
       transition: all 0.2s;
     }
 
     .dice-btn:hover {
       transform: scale(1.05);
+      box-shadow: 0 0 12px var(--gold-glow);
     }
 
     .dice-result-badge {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 800;
       color: var(--gold);
-      min-width: 60px;
-      text-align: center;
-    }
-
-    /* Spells & Actions */
-    .section-title {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 700;
     }
 
     .spell-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 8px 10px;
+      padding: 8px;
       margin-bottom: 6px;
     }
 
     .spell-head {
       display: flex;
       justify-content: space-between;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       color: #fff;
-      margin-bottom: 2px;
     }
 
     .spell-dice {
       color: var(--gold);
-      font-size: 11px;
     }
 
     .spell-desc {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-muted);
+      margin-top: 3px;
     }
 
-    /* ============================================================
-       TAB 3: THOUGHT PROCESS PANEL
-    ============================================================ */
+    /* Tab 3: Thoughts */
     .thought-stream {
       display: flex;
       flex-direction: column;
@@ -860,90 +1008,138 @@
 
     .thought-card {
       background: var(--bg-card);
-      border-left: 3px solid var(--secondary);
+      border-left: 3px solid var(--primary);
       border-radius: 0 6px 6px 0;
-      padding: 8px 12px;
-      font-size: 12px;
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.4;
     }
 
-    .thought-card.OPENCODE_INVOKE { border-left-color: var(--gold); }
-    .thought-card.REASONING { border-left-color: var(--primary); }
+    .thought-card.USER_INPUT { border-left-color: var(--secondary); }
+    .thought-card.REASONING { border-left-color: var(--gold); }
     .thought-card.EXECUTION { border-left-color: var(--green); }
-
-    .thought-tag {
-      font-size: 10px;
-      font-weight: 800;
-      text-transform: uppercase;
-      color: var(--secondary);
-      margin-bottom: 3px;
-    }
+    .thought-card.SUMMONED { border-left-color: var(--cyan); }
 
     .thought-time {
-      float: right;
+      font-size: 9px;
       color: var(--text-muted);
-      font-size: 10px;
+      margin-bottom: 2px;
     }
 
-    /* ============================================================
-       TAB 4: PERSONAL CONTEXT PANEL
-    ============================================================ */
+    .thought-tag {
+      display: inline-block;
+      font-size: 8px;
+      font-weight: 800;
+      background: rgba(255,255,255,0.08);
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
+    /* Tab 4: Context & 3D Brain */
+    .context-switch-bar {
+      display: flex;
+      gap: 6px;
+      background: #0e0e18;
+      padding: 3px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .context-switch-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .context-switch-btn.active {
+      background: var(--bg-card);
+      color: var(--gold);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+
     .context-meter-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
+      padding: 10px;
     }
 
     .context-bar-wrap {
-      width: 100%;
-      height: 7px;
       background: #232338;
-      border-radius: 4px;
-      margin: 8px 0;
+      height: 6px;
+      border-radius: 3px;
       overflow: hidden;
+      margin-top: 6px;
     }
 
     .context-bar-fill {
       height: 100%;
-      background: linear-gradient(90deg, #3498db 0%, #9b59b6 100%);
-      width: 15%;
+      background: linear-gradient(90deg, #3498db, #9b59b6, #e74c3c);
+      width: 10%;
+      transition: width 0.3s;
+    }
+
+    #brainCanvasContainer {
+      width: 100%;
+      height: 260px;
+      background: #080812;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .brain-legend {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      font-size: 9px;
+      color: var(--text-muted);
+      background: rgba(0,0,0,0.6);
+      padding: 3px 6px;
+      border-radius: 4px;
+      pointer-events: none;
     }
 
     .file-tree {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 11px;
     }
 
     .file-item {
+      padding: 4px 6px;
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      padding: 4px 0;
+      gap: 6px;
       color: var(--text-muted);
+      border-radius: 4px;
+      transition: all 0.15s;
     }
 
-    .file-item i {
-      color: var(--gold);
+    .file-item:hover {
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
     }
 
-    /* ============================================================
-       TAB 5: RELATIONSHIPS PANEL
-    ============================================================ */
-    .network-nodes-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
+    /* Tab 5: Network */
     .network-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -952,23 +1148,23 @@
     }
 
     .network-card:hover {
-      border-color: var(--primary);
       background: var(--bg-card-hover);
+      border-color: var(--primary);
     }
 
-    /* Modals */
+    /* ============================================================
+       MODALS
+    ============================================================ */
     .modal-backdrop {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      inset: 0;
       background: rgba(0,0,0,0.75);
       backdrop-filter: blur(5px);
       display: none;
       align-items: center;
       justify-content: center;
-      z-index: 300;
+      z-index: 200;
+      padding: 16px;
     }
 
     .modal-backdrop.active {
@@ -979,68 +1175,128 @@
       background: var(--bg-panel);
       border: 1px solid var(--border-light);
       border-radius: 10px;
-      width: 440px;
-      padding: 22px;
-      box-shadow: 0 10px 35px rgba(0,0,0,0.9);
+      width: 100%;
+      max-width: 520px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      overflow: hidden;
+      animation: modalPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes modalPop {
+      0% { transform: scale(0.9); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
     }
 
     .modal-title {
-      font-size: 16px;
-      font-weight: 800;
-      margin-bottom: 16px;
-      color: #fff;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .modal-body {
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
     .modal-form-group {
-      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .modal-form-group label {
-      display: block;
-      font-size: 12px;
+      font-size: 11px;
+      font-weight: 700;
       color: var(--text-muted);
-      margin-bottom: 6px;
+      text-transform: uppercase;
     }
 
-    .modal-form-group input, .modal-form-group select {
-      width: 100%;
+    .modal-form-group input,
+    .modal-form-group select,
+    .modal-form-group textarea {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      color: #fff;
-      padding: 8px 12px;
       border-radius: 6px;
-      font-size: 13px;
+      padding: 8px 10px;
+      color: #fff;
+      font-size: 12px;
       outline: none;
     }
 
+    .modal-form-group input:focus,
+    .modal-form-group select:focus,
+    .modal-form-group textarea:focus {
+      border-color: var(--primary);
+    }
+
     .modal-btn-row {
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
       display: flex;
       justify-content: flex-end;
-      gap: 10px;
-      margin-top: 18px;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, #8e44ad 100%);
+      border: none;
+      color: #fff;
+      padding: 7px 16px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 0 12px var(--primary-glow);
+      transform: scale(1.02);
     }
 
     .btn-secondary {
       background: transparent;
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-light);
       color: var(--text-muted);
-      padding: 8px 16px;
+      padding: 7px 14px;
       border-radius: 6px;
+      font-size: 11px;
       cursor: pointer;
+      transition: all 0.2s;
     }
 
-    .btn-primary {
-      background: var(--primary);
-      border: none;
-      color: #fff;
-      padding: 8px 16px;
+    .btn-secondary:hover {
+      color: var(--text);
+      border-color: var(--text);
+    }
+
+    /* Cost Estimation Pill */
+    .cost-preview-box {
+      background: rgba(0, 188, 212, 0.08);
+      border: 1px solid rgba(0, 188, 212, 0.3);
       border-radius: 6px;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 0 10px var(--primary-glow);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+
+    .cost-preview-box strong {
+      color: var(--cyan);
     }
   </style>
 </head>
@@ -1051,52 +1307,60 @@
   ============================================================ -->
   <header class="top-nav">
     <div class="brand">
-      <i class="fa-solid fa-dice-d20"></i>
-      <span>DND ORCHESTRATOR</span>
+      <i class="fa-solid fa-dragon"></i>
+      <span>DND AGENTS</span>
     </div>
 
-    <div class="project-tabs" id="projectTabs">
-      <button class="project-tab active" data-project="project-alpha"><i class="fa-solid fa-cube"></i> Project Alpha</button>
-      <button class="project-tab" data-project="project-beta"><i class="fa-solid fa-cube"></i> Project Beta</button>
-      <button class="new-project-btn" onclick="openNewProjectModal()"><i class="fa-solid fa-plus"></i> New Project</button>
+    <!-- Active Projects Tabs -->
+    <div class="project-tabs" id="projectTabs"></div>
+
+    <!-- Project Actions -->
+    <div style="display:flex;gap:6px;margin-left:8px;">
+      <button class="nav-btn" onclick="openProjectSettingsModal()" title="Workspace Directory & Budget"><i class="fa-solid fa-folder-gear"></i> Path & Budget</button>
+      <button class="nav-btn kb-btn" onclick="openKnowledgeBaseModal()" title="Company Knowledge Base"><i class="fa-solid fa-brain"></i> Knowledge Base</button>
     </div>
 
+    <!-- Right Controls -->
     <div class="nav-actions">
+      <!-- Default Harness Selector -->
       <div class="harness-select-wrap">
-        <i class="fa-solid fa-terminal"></i>
-        <span>Harness:</span>
+        <i class="fa-solid fa-bolt"></i>
+        <span>Default Harness:</span>
         <select id="harnessSelect">
-          <option value="opencode">OpenCode CLI (/usr/bin/opencode)</option>
+          <option value="opencode">OpenCode CLI</option>
           <option value="claude-code">Claude Code</option>
           <option value="codex">Codex</option>
           <option value="gemini">Gemini CLI</option>
         </select>
       </div>
 
-      <div class="marshall-status" onclick="triggerMarshallCheck()" title="Click to trigger Marshall inspection">
+      <!-- Marshall Sentinel Status -->
+      <div class="marshall-status" onclick="openMarshallAuditModal()" title="Inspect Marshall Sentinel Prioritized Audit">
         <div class="pulse-dot"></div>
-        <span>Marshall: Healthy</span>
+        <span>Marshall Sentinel: Healthy</span>
       </div>
     </div>
   </header>
 
   <!-- ============================================================
-       TOP OUTER LAYER: EXECUTIVE PENTHOUSE (CEO, HR, STAFF PALADIN)
-       These agents are global and live outside of any project playground!
+       TOP OUTER LAYER: EXECUTIVE PENTHOUSE (CEO, HR, STAFF PALADIN, SENIOR ANALYST)
   ============================================================ -->
   <section class="executive-outer-layer" id="executiveOuterLayer">
     <div class="outer-layer-tag">
-      <i class="fa-solid fa-crown"></i>
-      <span>Global Outer Layer</span>
+      <i class="fa-solid fa-crown"></i> Global Overseers
     </div>
-
-    <div class="executive-roster" id="executiveRoster">
-      <!-- Injected dynamically: CEO, HR, Staff Engineer Paladin -->
-    </div>
+    <div class="executive-roster" id="executiveRoster"></div>
   </section>
 
   <!-- ============================================================
-       PLAY AREA (FANTASY LANDSCAPE CANVAS)
+       DRAWER COLLAPSE TOGGLE BUTTON
+  ============================================================ -->
+  <div class="drawer-toggle-btn" id="drawerToggleBtn" onclick="toggleDrawer()" title="Toggle Side Panel">
+    <i class="fa-solid fa-chevron-right" id="drawerToggleIcon"></i>
+  </div>
+
+  <!-- ============================================================
+       PLAY AREA & INTERACTIVE 2D CANVAS
   ============================================================ -->
   <main class="play-area" id="playArea">
     <canvas id="landscapeCanvas"></canvas>
@@ -1104,10 +1368,11 @@
     <div class="canvas-project-badge" id="canvasProjectBadge">
       <i class="fa-solid fa-layer-group"></i>
       <span id="canvasProjectTitle">Project Alpha Playground</span>
+      <span class="canvas-budget-pill" id="canvasBudgetPill">$50.00 Budget</span>
     </div>
 
     <div class="canvas-tip">
-      <i class="fa-solid fa-mouse-pointer"></i> Click agents to inspect • Drag to pan • Scroll to zoom
+      <i class="fa-solid fa-mouse-pointer"></i> Click agents to inspect • Drag to pan • Scroll to zoom [1.0x–2.5x]
     </div>
 
     <div class="canvas-overlay-controls">
@@ -1127,12 +1392,14 @@
       <div class="drawer-agent-info">
         <div class="drawer-avatar-icon" id="drawerAvatar">🧝</div>
         <div class="drawer-agent-meta">
-          <h3 id="drawerName">Manager Bard</h3>
+          <h3 id="drawerName">Manager Bard <span class="status-badge active" id="drawerStatusBadge">Active</span></h3>
           <p id="drawerClass">Level 15 Bard (College of Agile)</p>
         </div>
       </div>
       <div class="drawer-actions">
-        <button class="spawn-badge-btn" onclick="openSpawnAgentModal()"><i class="fa-solid fa-plus"></i> HR Spawn</button>
+        <button class="action-btn" id="btnPauseAgent" onclick="togglePauseAgent()" title="Pause/Resume Agent"><i class="fa-solid fa-pause"></i></button>
+        <button class="action-btn" onclick="openAgentEditModal()" title="Configure Agent"><i class="fa-solid fa-sliders"></i></button>
+        <button class="action-btn" onclick="openSpawnAgentModal()" title="Summon Specialist"><i class="fa-solid fa-plus"></i></button>
       </div>
     </div>
 
@@ -1147,21 +1414,33 @@
 
     <!-- TAB 1: CHAT -->
     <div class="tab-panel active" id="tab-chat">
+      <!-- Confirmation Banner if agent is awaiting confirmation -->
+      <div id="summonConfirmationBanner" style="display:none;background:rgba(0,188,212,0.15);border:1px solid var(--cyan);padding:10px;border-radius:8px;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:700;color:#fff;"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--cyan);"></i> Awaiting Summoning Confirmation</div>
+        <div style="font-size:11px;color:var(--text-muted);margin:4px 0;" id="summonBannerCost">Est. Cost: $0.0150 • Effort: High</div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="btn-primary" style="flex:1;padding:5px;" onclick="confirmCurrentAgentSummon()"><i class="fa-solid fa-check"></i> Confirm Summoning</button>
+          <button class="btn-secondary" style="padding:5px;" onclick="openAgentEditModal()"><i class="fa-solid fa-sliders"></i> Tweak</button>
+        </div>
+      </div>
+
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-suggestions">
         <button class="chip-btn" onclick="quickPrompt('What is our current project status and sprint backlog?')">Sprint Status</button>
-        <button class="chip-btn" onclick="quickPrompt('Draft system specification and API schema.')">Draft Spec</button>
-        <button class="chip-btn" onclick="quickPrompt('Request HR Mind Flayer to spawn a QA Rogue.')">Spawn QA</button>
+        <button class="chip-btn" onclick="quickPrompt('Draft architecture specification and API contract.')">Draft Spec</button>
+        <button class="chip-btn" onclick="quickPrompt('Summon Solution Architect and Backend Cleric for this sprint.')">Summon Devs</button>
+        <button class="chip-btn" onclick="quickPrompt('Run unit test suites and verify edge conditions.')">Run Tests</button>
       </div>
       <div class="chat-input-box">
-        <input type="text" id="chatInput" placeholder="+ Type a directive for this agent..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+        <input type="text" id="chatInput" placeholder="+ Type directive for this agent..." onkeypress="if(event.key==='Enter') sendChatMessage()">
         <button onclick="sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
       </div>
     </div>
 
-    <!-- TAB 2: AGENT STATS (D&D / BG3 SHEET) -->
+    <!-- TAB 2: AGENT STATS (D&D / BG3 SHEET + AI CAPABILITY PROFILE) -->
     <div class="tab-panel" id="tab-stats">
       <div class="stats-sheet">
+        <!-- Vitals -->
         <div class="vitals-banner">
           <div class="vital-card">
             <h4>Armor Class</h4>
@@ -1178,23 +1457,61 @@
           </div>
         </div>
 
+        <!-- AI Engine Capabilities Profile -->
+        <div class="capability-card">
+          <div class="capability-head">
+            <div class="capability-title"><i class="fa-solid fa-microchip"></i> AI Engine Specs</div>
+            <button class="action-btn" style="padding:2px 6px;font-size:10px;" onclick="openAgentEditModal()"><i class="fa-solid fa-pen"></i> Tweak</button>
+          </div>
+          <div class="capability-grid">
+            <div class="cap-item">
+              <div class="cap-label">Model & Provider</div>
+              <div class="cap-val" id="capModel">Claude 3.7 Sonnet</div>
+            </div>
+            <div class="cap-item">
+              <div class="cap-label">Effort Level</div>
+              <div class="cap-val" id="capEffort" style="color:var(--gold);">High (Thinking)</div>
+            </div>
+            <div class="cap-item">
+              <div class="cap-label">Context Capacity</div>
+              <div class="cap-val" id="capContext">200k Tokens</div>
+            </div>
+            <div class="cap-item">
+              <div class="cap-label">Latency / Throughput</div>
+              <div class="cap-val" id="capLatency">85 tokens/sec</div>
+            </div>
+            <div class="cap-item">
+              <div class="cap-label">SWE-bench Verified</div>
+              <div class="cap-val" id="capBench" style="color:var(--green);">70.8%</div>
+            </div>
+            <div class="cap-item">
+              <div class="cap-label">Alignment / WIS</div>
+              <div class="cap-val" id="capAlignment">99.0%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ability Scores -->
         <div class="section-title"><i class="fa-solid fa-dice-d20"></i> Ability Scores</div>
         <div class="ability-grid" id="abilityGrid"></div>
 
+        <!-- Dice Roller -->
         <div class="dice-roller-box">
           <div>
-            <div style="font-weight:700;font-size:13px;color:#fff;">D20 Check Roller</div>
-            <div style="font-size:11px;color:var(--text-muted);" id="diceSubtext">Roll with Charisma bonus (+4)</div>
+            <div style="font-weight:700;font-size:12px;color:#fff;">D20 Check Roller</div>
+            <div style="font-size:10px;color:var(--text-muted);" id="diceSubtext">Roll with Charisma bonus (+4)</div>
           </div>
           <button class="dice-btn" onclick="rollD20()"><i class="fa-solid fa-dice"></i> Roll D20</button>
           <div class="dice-result-badge" id="diceResult">—</div>
         </div>
 
-        <div class="section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Spells & Actions</div>
+        <!-- Spells -->
+        <div class="section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Signature Abilities</div>
         <div id="spellsList"></div>
 
+        <!-- Inventory -->
         <div class="section-title"><i class="fa-solid fa-sack-dollar"></i> Inventory & Items</div>
-        <div id="inventoryList" style="font-size:12px;color:var(--text-muted);background:var(--bg-card);padding:10px;border-radius:6px;border:1px solid var(--border);"></div>
+        <div id="inventoryList" style="font-size:11px;color:var(--text-muted);background:var(--bg-card);padding:8px;border-radius:6px;border:1px solid var(--border);"></div>
       </div>
     </div>
 
@@ -1203,18 +1520,34 @@
       <div class="thought-stream" id="thoughtStream"></div>
     </div>
 
-    <!-- TAB 4: PERSONAL CONTEXT -->
+    <!-- TAB 4: PERSONAL CONTEXT & 3D BRAIN -->
     <div class="tab-panel" id="tab-context">
+      <div class="context-switch-bar">
+        <button class="context-switch-btn active" id="btnContextFiles" onclick="switchContextView('files')"><i class="fa-solid fa-folder-tree"></i> File Explorer</button>
+        <button class="context-switch-btn" id="btnContextBrain" onclick="switchContextView('brain')"><i class="fa-solid fa-brain"></i> 3D Synaptic Brain</button>
+      </div>
+
       <div class="context-meter-card">
-        <div style="display:flex;justify-content:space-between;font-size:12px;">
-          <span style="color:var(--text-muted)">Context Window Usage:</span>
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--text-muted)">Context Usage:</span>
           <span id="contextGaugeText" style="color:var(--gold);font-weight:700;">1.5k / 128k Tokens</span>
         </div>
         <div class="context-bar-wrap"><div class="context-bar-fill" id="contextBarFill"></div></div>
       </div>
 
-      <div class="section-title"><i class="fa-solid fa-folder-open"></i> Project Workspace Files</div>
-      <div class="file-tree" id="fileTree"></div>
+      <!-- File Tree Container -->
+      <div id="contextFilesView">
+        <div class="section-title" style="margin-bottom:6px;"><i class="fa-solid fa-folder-open"></i> Project Workspace Files</div>
+        <div class="file-tree" id="fileTree"></div>
+      </div>
+
+      <!-- 3D Neural Brain Container -->
+      <div id="contextBrainView" style="display:none;flex-direction:column;gap:8px;">
+        <div class="section-title"><i class="fa-solid fa-circle-nodes"></i> Context Vector Embeddings</div>
+        <div id="brainCanvasContainer">
+          <div class="brain-legend">🖱️ Drag to rotate • Scroll to zoom neural vectors</div>
+        </div>
+      </div>
     </div>
 
     <!-- TAB 5: RELATIONSHIPS -->
@@ -1225,25 +1558,28 @@
   </aside>
 
   <!-- ============================================================
-       MODALS: NEW PROJECT & HR SPAWN
+       MODALS
   ============================================================ -->
-  <!-- New Project Modal -->
+  <!-- 1. New Project Modal -->
   <div class="modal-backdrop" id="newProjectModal">
     <div class="modal-box">
       <div class="modal-title">
         <span><i class="fa-solid fa-cube"></i> Create New Project</span>
         <i class="fa-solid fa-xmark" style="cursor:pointer;" onclick="closeModal('newProjectModal')"></i>
       </div>
-      <div class="modal-form-group">
-        <label>Project Slug (e.g. project-gamma)</label>
-        <input type="text" id="newProjectId" placeholder="project-gamma">
-      </div>
-      <div class="modal-form-group">
-        <label>Manager Archetype (Spawned automatically by HR)</label>
-        <select id="newProjectAgentRole" disabled>
-          <option value="manager-bard">Manager Bard (Project Router)</option>
-        </select>
-        <small style="color:var(--text-muted);font-size:10px;margin-top:4px;display:block;">* Per company rules, only Manager Bard is spawned initially. Other agents are summoned as needed.</small>
+      <div class="modal-body">
+        <div class="modal-form-group">
+          <label>Project Slug (e.g. project-gamma)</label>
+          <input type="text" id="newProjectId" placeholder="project-gamma">
+        </div>
+        <div class="modal-form-group">
+          <label>Custom Workspace Directory (Optional)</label>
+          <input type="text" id="newProjectCustomPath" placeholder="/home/starborn/Code/DND/projects/project-gamma">
+        </div>
+        <div class="modal-form-group">
+          <label>Initial Token / USD Budget ($)</label>
+          <input type="number" id="newProjectBudget" value="50" min="5" max="500">
+        </div>
       </div>
       <div class="modal-btn-row">
         <button class="btn-secondary" onclick="closeModal('newProjectModal')">Cancel</button>
@@ -1252,46 +1588,191 @@
     </div>
   </div>
 
-  <!-- HR Spawn Agent Modal -->
+  <!-- 2. Project Directory & Budget Settings Modal -->
+  <div class="modal-backdrop" id="projectSettingsModal">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span><i class="fa-solid fa-folder-gear"></i> Project Workspace & Budget Settings</span>
+        <i class="fa-solid fa-xmark" style="cursor:pointer;" onclick="closeModal('projectSettingsModal')"></i>
+      </div>
+      <div class="modal-body">
+        <div class="modal-form-group">
+          <label>Active Project</label>
+          <input type="text" id="settingProjectId" readonly>
+        </div>
+        <div class="modal-form-group">
+          <label>Workspace Directory Path (Root Folder)</label>
+          <input type="text" id="settingProjectPath" placeholder="/path/to/project">
+          <small style="color:var(--text-muted);font-size:10px;">Backend and harness CLI will execute commands within this directory.</small>
+        </div>
+        <div class="modal-form-group">
+          <label>Project Budget ($ USD)</label>
+          <input type="number" id="settingProjectBudget" step="5" min="5" max="1000">
+        </div>
+        <div class="modal-form-group">
+          <label>Max Token Allowance</label>
+          <input type="number" id="settingProjectTokens" step="100000" min="100000">
+        </div>
+      </div>
+      <div class="modal-btn-row">
+        <button class="btn-secondary" onclick="closeModal('projectSettingsModal')">Cancel</button>
+        <button class="btn-primary" onclick="saveProjectSettings()">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. HR Mind Flayer Summon Specialist Modal -->
   <div class="modal-backdrop" id="spawnAgentModal">
     <div class="modal-box">
       <div class="modal-title">
-        <span><i class="fa-solid fa-brain"></i> HR Mind Flayer — Summon Specialist</span>
+        <span><i class="fa-solid fa-wand-magic-sparkles"></i> HR Mind Flayer — Summon Specialist</span>
         <i class="fa-solid fa-xmark" style="cursor:pointer;" onclick="closeModal('spawnAgentModal')"></i>
       </div>
-      <div class="modal-form-group">
-        <label>Select Agent Archetype / Role</label>
-        <select id="spawnRoleSelect">
-          <option value="solution-architect-wizard">Solution Architect Wizard</option>
-          <option value="backend-dev-cleric">Backend Dev Cleric</option>
-          <option value="frontend-dev-sorcerer">Frontend Dev Sorcerer</option>
-          <option value="qa-engineer-rogue">QA Engineer Rogue</option>
-          <option value="devops-sre-dragonborn-warmage">DevOps SRE Dragonborn Warmage</option>
-          <option value="system-analyst-blood-hunter">System Analyst Blood Hunter</option>
-          <option value="information-sourcer-ranger">Information Sourcer Ranger</option>
-          <option value="office-librarian-artificer">Office Librarian Artificer</option>
-          <option value="designers-changeling-sculptor">Designer Changeling Sculptor</option>
-          <option value="cybersecurity-death-knight-lich">Cybersecurity Lich</option>
-          <option value="product-manager-doppelganger">Product Manager Doppelgänger</option>
-          <option value="scrum-master-monk">Scrum Master Monk</option>
-          <option value="data-scientist-alchemist-diviner">Data Scientist Alchemist</option>
-          <option value="legal-compliance-inquisitor">Legal Inquisitor</option>
-          <option value="cleaner-facilities-barbarian">Cleaner Barbarian</option>
-          <option value="excel-admin-druid">Excel Admin Druid</option>
-          <option value="consultants-vampires">Consultant Vampire</option>
-          <option value="interns-kobolds-goblins">Intern Kobold / Goblin</option>
-        </select>
-      </div>
-      <div class="modal-form-group">
-        <label>Assign to Project</label>
-        <select id="spawnProjectSelect">
-          <option value="project-alpha">project-alpha</option>
-          <option value="project-beta">project-beta</option>
-        </select>
+      <div class="modal-body">
+        <div class="modal-form-group">
+          <label>Select Agent Archetype</label>
+          <select id="spawnRoleSelect" onchange="updateSpawnCostPreview()">
+            <option value="solution-architect-wizard">Solution Architect Wizard</option>
+            <option value="backend-dev-cleric">Backend Dev Cleric</option>
+            <option value="frontend-dev-sorcerer">Frontend Dev Sorcerer</option>
+            <option value="qa-engineer-rogue">QA Engineer Rogue</option>
+            <option value="devops-sre-dragonborn-warmage">DevOps SRE Dragonborn Warmage</option>
+            <option value="system-analyst-blood-hunter">System Analyst Blood Hunter</option>
+            <option value="information-sourcer-ranger">Information Sourcer Ranger</option>
+            <option value="office-librarian-artificer">Office Librarian Artificer</option>
+            <option value="designers-changeling-sculptor">Designer Changeling Sculptor</option>
+            <option value="cybersecurity-death-knight-lich">Cybersecurity Lich</option>
+            <option value="product-manager-doppelganger">Product Manager Doppelgänger</option>
+            <option value="scrum-master-monk">Scrum Master Monk</option>
+            <option value="data-scientist-alchemist-diviner">Data Scientist Alchemist</option>
+            <option value="legal-compliance-inquisitor">Legal Inquisitor</option>
+            <option value="cleaner-facilities-barbarian">Cleaner Barbarian</option>
+            <option value="excel-admin-druid">Excel Admin Druid</option>
+            <option value="consultants-vampires">Consultant Vampire</option>
+            <option value="interns-kobolds-goblins">Intern Kobold / Goblin</option>
+          </select>
+        </div>
+        <div class="modal-form-group">
+          <label>Model Engine</label>
+          <select id="spawnModelSelect" onchange="updateSpawnCostPreview()">
+            <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet (Anthropic)</option>
+            <option value="deepseek-r1">DeepSeek R1 (DeepSeek)</option>
+            <option value="gpt-4o">GPT-4o (OpenAI)</option>
+            <option value="gemini-2.0-flash-thinking">Gemini 2.0 Flash Thinking (Google)</option>
+            <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Google)</option>
+            <option value="claude-3-5-haiku">Claude 3.5 Haiku (Anthropic)</option>
+          </select>
+        </div>
+        <div class="modal-form-group">
+          <label>Reasoning Effort Level</label>
+          <select id="spawnEffortSelect" onchange="updateSpawnCostPreview()">
+            <option value="High">High (Deep reasoning)</option>
+            <option value="Medium">Medium (Balanced)</option>
+            <option value="Extreme">Extreme (Maximum thinking tokens)</option>
+            <option value="Low">Low (Fast & budget-conscious)</option>
+          </select>
+        </div>
+        <div class="modal-form-group">
+          <label>Assign to Project</label>
+          <select id="spawnProjectSelect"></select>
+        </div>
+
+        <!-- Cost Preview -->
+        <div class="cost-preview-box" id="spawnCostPreview">
+          <div>
+            <div>Est. Task Token Budget: <strong id="costEstTokens">4,500 Tokens</strong></div>
+            <div style="font-size:10px;color:var(--text-muted);">Est. Task Cost: <strong id="costEstUsd" style="color:var(--green);">$0.0150 USD</strong></div>
+          </div>
+          <span style="font-size:10px;color:var(--gold);"><i class="fa-solid fa-coins"></i> Budget Safe</span>
+        </div>
       </div>
       <div class="modal-btn-row">
         <button class="btn-secondary" onclick="closeModal('spawnAgentModal')">Cancel</button>
-        <button class="btn-primary" onclick="submitSpawnAgent()">Summon via HR</button>
+        <button class="btn-primary" onclick="submitRequestSummon()">Request Summoning</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Agent Configuration & Tuning Modal -->
+  <div class="modal-backdrop" id="agentEditModal">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span><i class="fa-solid fa-sliders"></i> Configure Agent Capabilities</span>
+        <i class="fa-solid fa-xmark" style="cursor:pointer;" onclick="closeModal('agentEditModal')"></i>
+      </div>
+      <div class="modal-body">
+        <div class="modal-form-group">
+          <label>Agent Custom Name</label>
+          <input type="text" id="editAgentName">
+        </div>
+        <div class="modal-form-group">
+          <label>Model Engine</label>
+          <select id="editAgentModel">
+            <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet (Anthropic)</option>
+            <option value="deepseek-r1">DeepSeek R1 (DeepSeek)</option>
+            <option value="gpt-4o">GPT-4o (OpenAI)</option>
+            <option value="gemini-2.0-flash-thinking">Gemini 2.0 Flash Thinking (Google)</option>
+            <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Google)</option>
+            <option value="claude-3-5-haiku">Claude 3.5 Haiku (Anthropic)</option>
+          </select>
+        </div>
+        <div class="modal-form-group">
+          <label>Effort Level</label>
+          <select id="editAgentEffort">
+            <option value="Extreme">Extreme</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <div class="modal-form-group">
+          <label>System Prompt Override</label>
+          <textarea id="editAgentPrompt" rows="3" placeholder="Custom instructions or behavioral guidelines..."></textarea>
+        </div>
+      </div>
+      <div class="modal-btn-row">
+        <button class="btn-secondary" onclick="closeModal('agentEditModal')">Cancel</button>
+        <button class="btn-primary" onclick="saveAgentEdits()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Company Knowledge Base Modal -->
+  <div class="modal-backdrop" id="knowledgeBaseModal">
+    <div class="modal-box" style="max-width:680px;">
+      <div class="modal-title">
+        <span><i class="fa-solid fa-brain" style="color:var(--cyan);"></i> Company Knowledge Base (Senior Analyst)</span>
+        <i class="fa-solid fa-xmark" style="cursor:pointer;" onclick="closeModal('knowledgeBaseModal')"></i>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="kbSearchInput" placeholder="Search architectural decisions, schemas, topics..." oninput="filterKnowledgeBase(this.value)" style="flex:1;background:var(--bg-card);border:1px solid var(--border);padding:8px;border-radius:6px;color:#fff;font-size:12px;">
+          <button class="btn-primary" onclick="triggerSeniorAnalystAudit()"><i class="fa-solid fa-arrows-rotate"></i> Run Analyst Now</button>
+        </div>
+        <div id="kbTopicsList" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;"></div>
+      </div>
+      <div class="modal-btn-row">
+        <button class="btn-secondary" onclick="closeModal('knowledgeBaseModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Marshall Sentinel Priority Audit Modal -->
+  <div class="modal-backdrop" id="marshallAuditModal">
+    <div class="modal-box" style="max-width:620px;">
+      <div class="modal-title">
+        <span><i class="fa-solid fa-shield-halved" style="color:var(--cyan);"></i> Marshall Sentinel — Context Window Priority Audit</span>
+        <i class="fa-solid fa-xmark" style="cursor:pointer;" onclick="closeModal('marshallAuditModal')"></i>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:11px;color:var(--text-muted);">
+          The Marshall Sentinel scans agents every 5 minutes and ranks active specialists by context consumption. Any agent nearing >90% context triggers automated handover synthesis.
+        </p>
+        <div id="marshallPriorityList" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;"></div>
+      </div>
+      <div class="modal-btn-row">
+        <button class="btn-secondary" onclick="closeModal('marshallAuditModal')">Close</button>
+        <button class="btn-primary" onclick="triggerMarshallCheck()"><i class="fa-solid fa-bolt"></i> Run Audit Now</button>
       </div>
     </div>
   </div>
@@ -1303,18 +1784,23 @@
     const BACKEND_URL = window.location.origin;
 
     // State
-    let currentAgentId = 'project-alpha-manager-bard';
+    let currentAgentId = 'ceo-warlock';
     let currentProjectId = 'project-alpha';
     let allAgents = {};
     let globalAgents = {};
     let projectAgents = {};
     let agentThoughts = {};
+    let projectConfigs = {};
+    let knowledgeBaseData = {};
+    let isDrawerCollapsed = false;
 
-    // Archetype Roles Config
+    // Role Archetypes Visual Configuration
     const ROLE_CONFIGS = {
       'ceo-warlock': { icon: '👑', color: '#9b59b6', hat: 'crown', tool: 'scepter', cloth: '#552277', hair: '#111111', pants: '#331144' },
       'hr-mind-flayer': { icon: '🦑', color: '#8e44ad', hat: 'tentacles', tool: 'orb', cloth: '#441166', skin: '#7d669e', pants: '#220033' },
       'staff-engineer-paladin': { icon: '⚔️', color: '#f1c40f', hat: 'helm', tool: 'sword', cloth: '#e67e22', hair: '#e0e0e0', pants: '#7f8c8d' },
+      'senior-analyst-diviner': { icon: '🔮', color: '#9c27b0', hat: 'hood', tool: 'orb', cloth: '#4a148c', hair: '#9575cd', pants: '#311b92' },
+      'marshall-agent-system-inspector': { icon: '🛡️', color: '#00bcd4', hat: 'visor', tool: 'badge', cloth: '#0097a7', hair: '#cfd8dc', pants: '#006064' },
       'manager-bard': { icon: '🧝', color: '#e67e22', hat: 'feather', tool: 'lute', cloth: '#dd6633', hair: '#f39c12', pants: '#5a3825' },
       'solution-architect-wizard': { icon: '🧙‍♂️', color: '#3498db', hat: 'pointed', tool: 'staff', cloth: '#2980b9', hair: '#ecf0f1', pants: '#1a5276' },
       'backend-dev-cleric': { icon: '✝️', color: '#1abc9c', hat: 'halo', tool: 'hammer', cloth: '#16a085', hair: '#7f8c8d', pants: '#117a65' },
@@ -1333,26 +1819,11 @@
       'cleaner-facilities-barbarian': { icon: '🪓', color: '#e74c3c', hat: 'horns', tool: 'axe', cloth: '#922b21', hair: '#641e16', pants: '#4a235a' },
       'excel-admin-druid': { icon: '📊', color: '#2ecc71', hat: 'wreath', tool: 'staff', cloth: '#229954', hair: '#196f3d', pants: '#145a32' },
       'consultants-vampires': { icon: '🧛', color: '#8e44ad', hat: 'cape', tool: 'chalice', cloth: '#5b2c6f', hair: '#17202a', pants: '#4a235a' },
-      'interns-kobolds-goblins': { icon: '🦎', color: '#27ae60', hat: 'none', tool: 'wrench', cloth: '#1e8449', hair: '#145a32', pants: '#239b56' },
-      'marshall-agent-system-inspector': { icon: '🛡️', color: '#00bcd4', hat: 'visor', tool: 'badge', cloth: '#0097a7', hair: '#cfd8dc', pants: '#006064' }
+      'interns-kobolds-goblins': { icon: '🦎', color: '#27ae60', hat: 'none', tool: 'wrench', cloth: '#1e8449', hair: '#145a32', pants: '#239b56' }
     };
 
-    // Realistic AI thoughts pool for speech bubbles
-    const AI_THOUGHT_SNIPPETS = [
-      "Marinating on the spec...",
-      "Pondering type safety...",
-      "Brewing async queries...",
-      "Consulting arcane doc scrolls...",
-      "Tuning story points in Jira...",
-      "Channeling UI aesthetic vibes...",
-      "Stabbing edge cases in shadows...",
-      "Inspecting clean code invariants...",
-      "Optimizing token throughput...",
-      "Synthesizing modular components..."
-    ];
-
     // ============================================================
-    // CANVAS ENGINE & LANDSCAPE RENDERING
+    // CANVAS ENGINE, LANDSCAPE & STRICT BOUNDARY CLAMPING
     // ============================================================
     const canvas = document.getElementById('landscapeCanvas');
     const ctx = canvas.getContext('2d');
@@ -1363,16 +1834,16 @@
     let landscapeChars = [];
     let sceneryProps = [];
     let particles = [];
-    let waterRipples = [];
+    let flyingCouriers = [];
 
     function resizeCanvas() {
       const container = document.getElementById('playArea');
       W = canvas.width = container.clientWidth;
       H = canvas.height = container.clientHeight;
       buildWorldLandscape();
+      clampCameraBounds();
     }
 
-    // World Building
     const worldCv = document.createElement('canvas');
     function buildWorldLandscape() {
       worldCv.width = Math.max(1600, W);
@@ -1383,60 +1854,59 @@
 
       // 1. Lush grass gradient
       const grassGrad = g.createLinearGradient(0, 0, ww, wh);
-      grassGrad.addColorStop(0, '#2d5e2a');
-      grassGrad.addColorStop(0.5, '#3b7a38');
-      grassGrad.addColorStop(1, '#2c5929');
+      grassGrad.addColorStop(0, '#244d21');
+      grassGrad.addColorStop(0.5, '#2e662b');
+      grassGrad.addColorStop(1, '#1e441b');
       g.fillStyle = grassGrad;
       g.fillRect(0, 0, ww, wh);
 
       // Noise & Grass Tufts
-      for (let i = 0; i < 2000; i++) {
-        g.fillStyle = Math.random() < 0.5 ? '#244d21' : '#479443';
+      for (let i = 0; i < 2400; i++) {
+        g.fillStyle = Math.random() < 0.5 ? '#1b3d18' : '#3d8339';
         g.fillRect(Math.random() * ww, Math.random() * wh, 3, 3);
       }
 
-      // 2. Winding Cobblestone Road
+      // 2. Cobblestone Pathways connecting Workstations
       g.fillStyle = '#7a6f5d';
       for (let px = 0; px < ww; px += 6) {
-        const py = wh * 0.42 + Math.sin(px / 160) * 80 + Math.cos(px / 280) * 40;
+        const py = wh * 0.52 + Math.sin(px / 180) * 90 + Math.cos(px / 320) * 40;
         g.beginPath();
-        g.ellipse(px, py, 42, 28, 0, 0, Math.PI * 2);
+        g.ellipse(px, py, 45, 30, 0, 0, Math.PI * 2);
         g.fill();
       }
-      // Path Stones texture
-      for (let i = 0; i < 600; i++) {
+      for (let i = 0; i < 800; i++) {
         const px = Math.random() * ww;
-        const py = wh * 0.42 + Math.sin(px / 160) * 80 + Math.cos(px / 280) * 40 + (Math.random() - 0.5) * 40;
+        const py = wh * 0.52 + Math.sin(px / 180) * 90 + Math.cos(px / 320) * 40 + (Math.random() - 0.5) * 45;
         g.fillStyle = Math.random() < 0.5 ? '#5d5547' : '#968974';
         g.fillRect(px, py, 4, 3);
       }
 
-      // 3. Glowing Mana Spring / Pond
-      const pondX = ww * 0.76;
-      const pondY = wh * 0.68;
-      const pondGrad = g.createRadialGradient(pondX, pondY, 10, pondX, pondY, 110);
+      // 3. Glowing Crystal Mana Pond
+      const pondX = ww * 0.78;
+      const pondY = wh * 0.72;
+      const pondGrad = g.createRadialGradient(pondX, pondY, 10, pondX, pondY, 120);
       pondGrad.addColorStop(0, '#00e5ff');
       pondGrad.addColorStop(0.4, '#0091ea');
       pondGrad.addColorStop(1, '#0d47a1');
       g.fillStyle = pondGrad;
       g.beginPath();
-      g.ellipse(pondX, pondY, 110, 65, 0.1, 0, Math.PI * 2);
+      g.ellipse(pondX, pondY, 120, 70, 0.1, 0, Math.PI * 2);
       g.fill();
       g.strokeStyle = '#80deea';
       g.lineWidth = 3;
       g.stroke();
 
       // Lily pads
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 6; i++) {
         g.fillStyle = '#2e7d32';
         g.beginPath();
-        g.arc(pondX - 50 + i * 25, pondY - 20 + (i % 2) * 25, 10, 0, Math.PI * 1.8);
+        g.arc(pondX - 60 + i * 24, pondY - 20 + (i % 2) * 28, 11, 0, Math.PI * 1.8);
         g.fill();
       }
 
       // 4. Flowers
       const flowerColors = ['#ff5252', '#ffeb3b', '#e040fb', '#ffffff', '#ffab40'];
-      for (let i = 0; i < 120; i++) {
+      for (let i = 0; i < 150; i++) {
         const fx = Math.random() * ww;
         const fy = Math.random() * wh;
         g.fillStyle = flowerColors[i % flowerColors.length];
@@ -1445,374 +1915,379 @@
         g.fill();
       }
 
-      // 5. Scenery Objects (Trees, Workstations, Campfires)
-      sceneryProps.length = 0;
-
-      // Workstation: Agile Pavilion Table
-      sceneryProps.push({
-        x: ww * 0.28,
-        y: wh * 0.38,
-        type: 'table',
-        name: 'Agile Strategy Desk'
-      });
-
-      // Workstation: Blueprint Monolith
-      sceneryProps.push({
-        x: ww * 0.52,
-        y: wh * 0.32,
-        type: 'monolith',
-        name: 'Rune Architecture Monolith'
-      });
-
-      // Workstation: Campfire Forge
-      sceneryProps.push({
-        x: ww * 0.40,
-        y: wh * 0.72,
-        type: 'campfire',
-        name: 'DevOps Forge'
-      });
-
-      // Trees
-      for (let i = 0; i < 18; i++) {
-        const tx = 60 + Math.random() * (ww - 120);
-        const ty = 60 + Math.random() * (wh - 120);
-        // Avoid pond center
-        if (Math.hypot(tx - pondX, ty - pondY) > 130) {
-          sceneryProps.push({
-            x: tx,
-            y: ty,
-            type: 'tree',
-            scale: 0.9 + Math.random() * 0.3
-          });
-        }
-      }
+      // 5. Scenery Objects Setup
+      buildSceneryProps(ww, wh);
     }
 
-    // Pixel Character Class for Landscape
+    function buildSceneryProps(ww, wh) {
+      sceneryProps = [
+        // Overseer Sky Balcony / Top Dais (for Global Executive Layer)
+        { type: 'overseer-balcony', x: ww * 0.5, y: wh * 0.18 },
+        // Marshall Sentry Watchtower
+        { type: 'watchtower', x: ww * 0.15, y: wh * 0.35 },
+        // Senior Analyst Astrolabe Library
+        { type: 'astrolabe-library', x: ww * 0.85, y: wh * 0.35 },
+        // Workstations for project teams
+        { type: 'blueprint-monolith', x: ww * 0.32, y: wh * 0.52 },
+        { type: 'backend-cathedral', x: ww * 0.50, y: wh * 0.52 },
+        { type: 'frontend-crystal', x: ww * 0.68, y: wh * 0.52 },
+        { type: 'qa-tent', x: ww * 0.38, y: wh * 0.75 },
+        { type: 'devops-forge', x: ww * 0.60, y: wh * 0.75 },
+        // Decorative trees
+        { type: 'tree', x: ww * 0.08, y: wh * 0.2, scale: 1.2 },
+        { type: 'tree', x: ww * 0.92, y: wh * 0.2, scale: 1.1 },
+        { type: 'tree', x: ww * 0.20, y: wh * 0.85, scale: 1.3 },
+        { type: 'tree', x: ww * 0.88, y: wh * 0.85, scale: 1.2 },
+        { type: 'campfire', x: ww * 0.48, y: wh * 0.68 }
+      ];
+    }
+
+    // Camera Clamping (Prevents zooming out below 1.0 & prevents void areas)
+    function clampCameraBounds() {
+      // Zoom restricted to [1.0, 2.5]
+      camera.zoom = Math.min(Math.max(camera.zoom, 1.0), 2.5);
+
+      if (camera.zoom === 1.0) {
+        camera.x = 0;
+        camera.y = 0;
+        return;
+      }
+
+      const worldW = worldCv.width * camera.zoom;
+      const worldH = worldCv.height * camera.zoom;
+
+      const minX = W - worldW;
+      const minY = H - worldH;
+
+      camera.x = Math.min(0, Math.max(minX, camera.x));
+      camera.y = Math.min(0, Math.max(minY, camera.y));
+    }
+
+    // ============================================================
+    // LANDSCAPE AGENT TOKEN CLASS
+    // ============================================================
     class LandscapeAgent {
-      constructor(agentId, agentData, x, y) {
-        this.id = agentId;
-        this.agent = agentData;
-        this.name = agentData.name || agentId;
-        this.role = agentData.role || 'manager-bard';
-        this.config = ROLE_CONFIGS[this.role] || ROLE_CONFIGS['manager-bard'];
+      constructor(id, data, x, y) {
+        this.id = id;
+        this.data = data;
         this.x = x;
         this.y = y;
-        this.target = { x, y };
-        this.dir = 1;
-        this.speed = 35 + Math.random() * 20;
-        this.walkT = 0;
-        this.frame = 0;
-        this.bubble = null;
-        this.bubblePop = 0;
-        this.sayT = 2 + Math.random() * 4;
-        this.actT = 3 + Math.random() * 5;
-        this.toolAngle = 0;
-        this.scale = 2.8;
-        this.state = 'IDLE'; // IDLE | WALKING | WORKING
-        this.pickNewTarget();
+        this.targetX = x;
+        this.targetY = y;
+        this.facing = 1;
+        this.animTimer = Math.random() * 10;
+        this.bubbleText = null;
+        this.bubbleTimer = 0;
       }
 
-      pickNewTarget() {
-        const ww = worldCv.width || 1200;
-        const wh = worldCv.height || 800;
-        // 60% chance to visit a workstation
-        if (Math.random() < 0.6 && sceneryProps.length > 0) {
-          const prop = sceneryProps[Math.floor(Math.random() * Math.min(3, sceneryProps.length))];
-          this.target = { x: prop.x + (Math.random() - 0.5) * 60, y: prop.y + (Math.random() - 0.5) * 40 };
-        } else {
-          this.target = { x: 100 + Math.random() * (ww - 200), y: 100 + Math.random() * (wh - 200) };
-        }
-      }
-
-      say(text) {
-        this.bubble = { text, t: 4.5 };
-        this.bubblePop = 0;
-        anime({
-          targets: this,
-          bubblePop: [0, 1],
-          duration: 320,
-          easing: 'easeOutBack'
-        });
+      say(text, duration = 4.5) {
+        this.bubbleText = text;
+        this.bubbleTimer = duration;
       }
 
       update(dt) {
-        const dx = this.target.x - this.x;
-        const dy = this.target.y - this.y;
+        this.animTimer += dt;
+        if (this.bubbleTimer > 0) {
+          this.bubbleTimer -= dt;
+          if (this.bubbleTimer <= 0) this.bubbleText = null;
+        }
+
+        // Slight natural idle wandering
+        if (Math.random() < 0.005 && this.data.status !== 'paused' && this.data.status !== 'awaiting-confirmation') {
+          this.targetX = this.x + (Math.random() - 0.5) * 60;
+          this.targetY = this.y + (Math.random() - 0.5) * 40;
+        }
+
+        const dx = this.targetX - this.x;
+        const dy = this.targetY - this.y;
         const dist = Math.hypot(dx, dy);
 
-        if (dist < 10) {
-          this.state = 'WORKING';
-          this.walkT = 0;
-          this.frame = 0;
-          this.actT -= dt;
-          if (this.actT <= 0) {
-            this.actT = 4 + Math.random() * 6;
-            this.doAction();
-            this.pickNewTarget();
-          }
-        } else {
-          this.state = 'WALKING';
-          this.x += (dx / dist) * this.speed * dt;
-          this.y += (dy / dist) * this.speed * dt;
-          this.dir = dx >= 0 ? 1 : -1;
-          this.walkT += dt * 6;
-          this.frame = Math.floor(this.walkT) % 2;
-        }
-
-        // Live Thought Say Timer
-        this.sayT -= dt;
-        if (this.sayT <= 0) {
-          this.sayT = 6 + Math.random() * 8;
-          const liveThought = agentThoughts[this.id]?.currentThought;
-          const fallback = AI_THOUGHT_SNIPPETS[Math.floor(Math.random() * AI_THOUGHT_SNIPPETS.length)];
-          this.say(liveThought || fallback);
-        }
-
-        // Bubble countdown
-        if (this.bubble) {
-          this.bubble.t -= dt;
-          if (this.bubble.t <= 0) this.bubble = null;
-        }
-      }
-
-      doAction() {
-        const self = this;
-        // Animate tool & emit particles
-        anime({
-          targets: self,
-          toolAngle: [0, 1.2 * self.dir, 0],
-          duration: 600,
-          easing: 'easeInOutQuad'
-        });
-
-        // Spawn role particles
-        if (this.role.includes('bard')) {
-          for (let i = 0; i < 3; i++) {
-            setTimeout(() => {
-              particles.push({
-                x: self.x + 12 * self.dir,
-                y: self.y - 15,
-                txt: '♪',
-                a: 1,
-                vx: (Math.random() - 0.5) * 30,
-                vy: -30 - Math.random() * 20
-              });
-            }, i * 200);
-          }
-        } else if (this.role.includes('wizard') || this.role.includes('sorcerer')) {
-          for (let i = 0; i < 8; i++) {
-            particles.push({
-              x: self.x + (Math.random() - 0.5) * 20,
-              y: self.y - 10,
-              c: Math.random() < 0.5 ? '#00e5ff' : '#e040fb',
-              r: 2 + Math.random() * 3,
-              a: 1,
-              vx: (Math.random() - 0.5) * 40,
-              vy: -25 - Math.random() * 35
-            });
-          }
-        } else if (this.role.includes('rogue')) {
-          for (let i = 0; i < 6; i++) {
-            particles.push({
-              x: self.x + (Math.random() - 0.5) * 20,
-              y: self.y + 10,
-              c: '#757575',
-              r: 3 + Math.random() * 4,
-              a: 0.8,
-              vx: (Math.random() - 0.5) * 30,
-              vy: -20 - Math.random() * 20
-            });
-          }
-        } else {
-          for (let i = 0; i < 5; i++) {
-            particles.push({
-              x: self.x + (Math.random() - 0.5) * 20,
-              y: self.y - 5,
-              c: '#f39c12',
-              r: 2.5,
-              a: 1,
-              vx: (Math.random() - 0.5) * 30,
-              vy: -25 - Math.random() * 20
-            });
-          }
+        if (dist > 2) {
+          this.x += (dx / dist) * Math.min(dist, 40 * dt);
+          this.y += (dy / dist) * Math.min(dist, 40 * dt);
+          this.facing = dx >= 0 ? 1 : -1;
         }
       }
 
       draw() {
-        const s = this.scale;
-        const px = this.x;
-        const py = this.y;
+        const conf = ROLE_CONFIGS[this.data.role] || ROLE_CONFIGS['manager-bard'];
         const isSelected = currentAgentId === this.id;
+        const isAwaiting = this.data.status === 'awaiting-confirmation';
+        const isPaused = this.data.status === 'paused';
 
         ctx.save();
+        ctx.translate(this.x, this.y);
 
-        // 1. Selection Aura
+        // 1. Awaiting Confirmation / Arcane Summoning Circle
+        if (isAwaiting) {
+          const t = this.animTimer;
+          ctx.save();
+          ctx.strokeStyle = '#00bcd4';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 32 + Math.sin(t * 3) * 3, 16 + Math.sin(t * 3) * 2, 0, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Orbiting arcane runes / blue embers
+          for (let i = 0; i < 4; i++) {
+            const angle = t * 2 + (i * Math.PI / 2);
+            const rx = Math.cos(angle) * 32;
+            const ry = Math.sin(angle) * 16;
+            ctx.fillStyle = '#80deea';
+            ctx.beginPath();
+            ctx.arc(rx, ry, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        // 2. Selection Ring
         if (isSelected) {
           ctx.strokeStyle = '#f39c12';
           ctx.lineWidth = 2.5;
           ctx.beginPath();
-          ctx.ellipse(px, py + 12 * s, 16 * s, 6 * s, 0, 0, Math.PI * 2);
+          ctx.ellipse(0, 0, 24, 12, 0, 0, Math.PI * 2);
           ctx.stroke();
-
-          ctx.fillStyle = 'rgba(243, 156, 18, 0.2)';
-          ctx.fill();
         }
 
-        // 2. Ground Shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        // 3. Character Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
         ctx.beginPath();
-        ctx.ellipse(px, py + 11 * s, 12 * s, 4 * s, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 16, 7, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // 3. Body rendering (Pixel Art Map)
-        const bounce = Math.abs(Math.sin(this.walkT)) * -2;
-        const flip = this.dir < 0;
+        // 4. Character Sprite Body
+        ctx.scale(this.facing, 1);
+        const bob = Math.sin(this.animTimer * 4) * 2;
 
-        // Draw Pixel Character
-        const map = [
-          "..hhhh..",
-          ".hhhhhh.",
-          ".hssssh.",
-          ".hsese..",
-          "..ssss..",
-          ".cccccc.",
-          "sccccct.",
-          "scccccc.",
-          ".bbbbbb.",
-          ".pppppp.",
-          this.frame === 0 ? ".pp..pp." : "..ppp...",
-          this.frame === 0 ? ".oo..oo." : "..oo.o.."
-        ];
-
-        const pal = {
-          h: this.config.hair || '#4a3728',
-          s: this.config.skin || '#f0c090',
-          e: '#1a1a24',
-          c: this.config.cloth || '#9b59b6',
-          b: '#5a3a1e',
-          p: this.config.pants || '#333344',
-          o: '#221810',
-          t: null
-        };
-
-        const charOffsetX = px - 4 * s;
-        const charOffsetY = py + bounce;
-
-        for (let r = 0; r < map.length; r++) {
-          const row = map[r];
-          for (let c = 0; c < row.length; c++) {
-            const col = pal[row[c]];
-            if (!col) continue;
-            ctx.fillStyle = col;
-            const rx = flip ? charOffsetX + (row.length - 1 - c) * s : charOffsetX + c * s;
-            ctx.fillRect(rx, charOffsetY + r * s, s, s);
-          }
+        // Paused Rune Ice Overlay
+        if (isPaused) {
+          ctx.fillStyle = 'rgba(231, 76, 60, 0.25)';
+          ctx.beginPath();
+          ctx.arc(0, -18 + bob, 22, 0, Math.PI * 2);
+          ctx.fill();
         }
 
-        // Tool / Weapon
-        const toolHandX = flip ? px - 7 * s : px + 7 * s;
-        const toolHandY = charOffsetY + 6 * s;
-        this.drawTool(toolHandX, toolHandY, this.toolAngle);
+        // Body / Robe
+        ctx.fillStyle = conf.cloth || '#3498db';
+        ctx.fillRect(-8, -26 + bob, 16, 20);
 
-        // Name Tag
-        ctx.font = 'bold 11px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-        ctx.strokeText(this.name, px, py - 10);
-        ctx.fillStyle = isSelected ? '#f39c12' : '#ffffff';
-        ctx.fillText(this.name, px, py - 10);
+        // Head
+        ctx.fillStyle = conf.skin || '#ffcc80';
+        ctx.beginPath();
+        ctx.arc(0, -32 + bob, 9, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Role Icon Tag
-        ctx.font = '10px sans-serif';
-        ctx.fillStyle = '#8892b0';
-        ctx.fillText(`${this.config.icon} ${this.role.split('-').slice(0, 2).join(' ')}`, px, py + 16 * s);
-
-        // Speech Bubble
-        if (this.bubble && this.bubblePop > 0.05) {
-          const pop = this.bubblePop;
-          ctx.font = 'bold 11px sans-serif';
-          const text = this.bubble.text;
-          const tw = ctx.measureText(text).width;
-          const bw = (tw + 20) * pop;
-          const bh = 26 * pop;
-          const bx = px - bw / 2;
-          const by = py - 38 - bh;
-
-          // Bubble background
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-          ctx.strokeStyle = '#1e1e2f';
-          ctx.lineWidth = 1.5;
+        // Hat / Hair / Accessories
+        if (conf.hat === 'crown') {
+          ctx.fillStyle = '#f39c12';
           ctx.beginPath();
-          if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 6);
-          else ctx.rect(bx, by, bw, bh);
-          ctx.fill();
-          ctx.stroke();
-
-          // Bubble tail
-          ctx.beginPath();
-          ctx.moveTo(px - 5, by + bh);
-          ctx.lineTo(px + 5, by + bh);
-          ctx.lineTo(px, by + bh + 6);
+          ctx.moveTo(-7, -39 + bob);
+          ctx.lineTo(-5, -45 + bob);
+          ctx.lineTo(0, -41 + bob);
+          ctx.lineTo(5, -45 + bob);
+          ctx.lineTo(7, -39 + bob);
           ctx.closePath();
           ctx.fill();
+        } else if (conf.hat === 'pointed') {
+          ctx.fillStyle = '#2980b9';
+          ctx.beginPath();
+          ctx.moveTo(-10, -37 + bob);
+          ctx.lineTo(0, -56 + bob);
+          ctx.lineTo(10, -37 + bob);
+          ctx.closePath();
+          ctx.fill();
+        } else if (conf.hat === 'halo') {
+          ctx.strokeStyle = '#ffeb3b';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(0, -43 + bob, 10, 4, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
 
-          // Bubble text
-          ctx.fillStyle = '#111119';
-          ctx.textAlign = 'center';
-          ctx.fillText(text, px, by + 17, tw);
+        // Tool
+        ctx.fillStyle = '#cfd8dc';
+        if (conf.tool === 'lute') {
+          ctx.fillStyle = '#d35400';
+          ctx.fillRect(8, -24 + bob, 4, 16);
+          ctx.beginPath(); ctx.arc(10, -12 + bob, 7, 0, Math.PI * 2); ctx.fill();
+        } else if (conf.tool === 'sword') {
+          ctx.fillRect(7, -32 + bob, 3, 22);
+          ctx.fillRect(4, -20 + bob, 9, 3);
+        } else if (conf.tool === 'staff') {
+          ctx.fillStyle = '#5d4037';
+          ctx.fillRect(8, -42 + bob, 3, 36);
+          ctx.fillStyle = conf.color;
+          ctx.beginPath(); ctx.arc(9.5, -44 + bob, 5, 0, Math.PI * 2); ctx.fill();
         }
 
         ctx.restore();
+
+        // 5. Name Label & Status Tag
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.font = 'bold 10px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#000000';
+        ctx.shadowBlur = 4;
+        ctx.fillText(this.data.name || this.id, 0, 14);
+
+        if (isAwaiting) {
+          ctx.font = 'bold 9px Segoe UI, sans-serif';
+          ctx.fillStyle = '#00e5ff';
+          ctx.fillText('Awaiting Confirmation', 0, 26);
+        }
+        ctx.restore();
+
+        // 6. Floating Thought Bubble
+        const thought = this.bubbleText || (agentThoughts[this.id]?.currentThought);
+        if (thought && !isPaused) {
+          this.drawSpeechBubble(thought);
+        }
       }
 
-      drawTool(x, y, angle) {
+      drawSpeechBubble(text) {
         ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angle);
-        const tool = this.config.tool || 'staff';
+        ctx.translate(this.x, this.y - 54);
+        ctx.font = '10px Segoe UI, sans-serif';
+        const metrics = ctx.measureText(text);
+        const bw = Math.min(Math.max(metrics.width + 16, 60), 180);
+        const bh = 22;
 
-        if (tool === 'lute') {
-          ctx.fillStyle = '#a06a3a';
-          ctx.beginPath();
-          ctx.ellipse(0, -12, 6, 8, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#5c3a1e';
-          ctx.fillRect(-1.5, -6, 3, 10);
-        } else if (tool === 'sword') {
-          ctx.fillStyle = '#e0e0e0';
-          ctx.fillRect(-1.5, -20, 3, 18);
-          ctx.fillStyle = '#f39c12';
-          ctx.fillRect(-4, -3, 8, 2.5);
-        } else if (tool === 'staff') {
-          ctx.fillStyle = '#6d4c41';
-          ctx.fillRect(-1.5, -24, 3, 26);
-          ctx.fillStyle = '#00e5ff';
-          ctx.beginPath();
-          ctx.arc(0, -26, 4, 0, Math.PI * 2);
-          ctx.fill();
-        } else if (tool === 'hammer') {
-          ctx.fillStyle = '#5d4037';
-          ctx.fillRect(-1.5, -18, 3, 20);
-          ctx.fillStyle = '#90a4ae';
-          ctx.fillRect(-5, -22, 10, 6);
-        } else if (tool === 'daggers') {
-          ctx.fillStyle = '#cfd8dc';
-          ctx.fillRect(-2, -14, 2, 12);
-          ctx.fillRect(4, -14, 2, 12);
-        } else {
-          // Orb / Magic
-          ctx.fillStyle = '#e040fb';
-          ctx.beginPath();
-          ctx.arc(0, -10, 5, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        ctx.fillStyle = 'rgba(16, 16, 26, 0.92)';
+        ctx.strokeStyle = 'rgba(155, 89, 182, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(-bw / 2, -bh, bw, bh, 6) : ctx.rect(-bw / 2, -bh, bw, bh);
+        ctx.fill();
+        ctx.stroke();
+
+        // Tail
+        ctx.beginPath();
+        ctx.moveTo(-4, 0); ctx.lineTo(0, 5); ctx.lineTo(4, 0); ctx.closePath();
+        ctx.fill(); ctx.stroke();
+
+        ctx.fillStyle = '#f0f3f8';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const displayTxt = text.length > 26 ? text.slice(0, 24) + '...' : text;
+        ctx.fillText(displayTxt, 0, -bh / 2);
         ctx.restore();
       }
     }
 
-    // Render Loop
+    // ============================================================
+    // CANVAS SCENERY PROPS DRAWING
+    // ============================================================
+    function drawSceneryProp(prop, now) {
+      ctx.save();
+      const x = prop.x;
+      const y = prop.y;
+
+      if (prop.type === 'overseer-balcony') {
+        // Gilded Top Terrace for Global Executives
+        ctx.fillStyle = '#1e1b2e';
+        ctx.strokeStyle = '#f39c12';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(x - 320, y - 50, 640, 70, 10) : ctx.rect(x - 320, y - 50, 640, 70);
+        ctx.fill();
+        ctx.stroke();
+
+        // Pillars & Velvet Banners
+        ctx.fillStyle = '#f39c12';
+        ctx.font = 'bold 11px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('👑 HIGH EXECUTIVE SKY BALCONY — OVERSEERS OF ALL REALMS', x, y - 28);
+      } else if (prop.type === 'watchtower') {
+        // Marshall Sentry Tower
+        ctx.fillStyle = '#263238';
+        ctx.fillRect(x - 22, y - 80, 44, 80);
+        ctx.fillStyle = '#00bcd4';
+        ctx.beginPath(); ctx.arc(x, y - 88, 14, 0, Math.PI * 2); ctx.fill();
+
+        // Pulsing Radar / Sonar Beam
+        const rot = (now / 600) % (Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0, 188, 212, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 88);
+        ctx.lineTo(x + Math.cos(rot) * 60, y - 88 + Math.sin(rot) * 30);
+        ctx.stroke();
+
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🛡️ Marshall Watchtower', x, y + 14);
+      } else if (prop.type === 'astrolabe-library') {
+        // Senior Analyst Astrolabe Library
+        ctx.fillStyle = '#311b92';
+        ctx.fillRect(x - 24, y - 70, 48, 70);
+        ctx.strokeStyle = '#9c27b0';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x, y - 80, 16, 0, Math.PI * 2); ctx.stroke();
+
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🔮 Knowledge Chrono-Dome', x, y + 14);
+      } else if (prop.type === 'blueprint-monolith') {
+        ctx.fillStyle = '#1565c0';
+        ctx.fillRect(x - 20, y - 55, 40, 55);
+        ctx.fillStyle = '#80d8ff';
+        ctx.fillRect(x - 14, y - 45, 28, 20); // Holographic spec
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 9px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('🧙 Architecture Monolith', x, y + 14);
+      } else if (prop.type === 'backend-cathedral') {
+        ctx.fillStyle = '#004d40';
+        ctx.fillRect(x - 24, y - 60, 48, 60);
+        ctx.fillStyle = '#64ffda';
+        ctx.beginPath(); ctx.arc(x, y - 40, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 9px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('✝️ SQL Persistence Altar', x, y + 14);
+      } else if (prop.type === 'frontend-crystal') {
+        ctx.fillStyle = '#880e4f';
+        ctx.fillRect(x - 20, y - 50, 40, 50);
+        const glow = 0.5 + Math.sin(now / 300) * 0.4;
+        ctx.fillStyle = `rgba(233, 30, 99, ${glow})`;
+        ctx.beginPath(); ctx.arc(x, y - 35, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 9px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('✨ UI Crystal Anvil', x, y + 14);
+      } else if (prop.type === 'qa-tent') {
+        ctx.fillStyle = '#1b5e20';
+        ctx.beginPath(); ctx.moveTo(x - 25, y); ctx.lineTo(x, y - 45); ctx.lineTo(x + 25, y); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 9px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('🗡️ QA Infiltration Tent', x, y + 14);
+      } else if (prop.type === 'devops-forge') {
+        ctx.fillStyle = '#b71c1c';
+        ctx.fillRect(x - 22, y - 45, 44, 45);
+        ctx.fillStyle = '#ff9800';
+        ctx.beginPath(); ctx.arc(x, y - 22, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 9px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('🐉 CI/CD Fortress Forge', x, y + 14);
+      } else if (prop.type === 'tree') {
+        const s = prop.scale || 1.0;
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.beginPath(); ctx.ellipse(x, y, 22 * s, 8 * s, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#5d4037'; ctx.fillRect(x - 5 * s, y - 28 * s, 10 * s, 28 * s);
+        ctx.fillStyle = '#1b5e20'; ctx.beginPath(); ctx.arc(x, y - 36 * s, 24 * s, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#2e7d32'; ctx.beginPath(); ctx.arc(x, y - 48 * s, 20 * s, 0, Math.PI * 2); ctx.fill();
+      } else if (prop.type === 'campfire') {
+        ctx.fillStyle = '#546e7a';
+        for (let a = 0; a < 6; a++) {
+          ctx.beginPath(); ctx.arc(x + Math.cos(a) * 12, y + Math.sin(a) * 7, 3.5, 0, Math.PI * 2); ctx.fill();
+        }
+        const fH = 14 + Math.sin(now / 150) * 5;
+        ctx.fillStyle = '#ff5722';
+        ctx.beginPath(); ctx.moveTo(x - 7, y); ctx.lineTo(x, y - fH); ctx.lineTo(x + 7, y); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // ============================================================
+    // RENDER LOOP WITH PARTICLES & FLYING POSTAL COURIERS
+    // ============================================================
     let lastTime = performance.now();
     function landscapeLoop(now) {
       const dt = Math.min((now - lastTime) / 1000, 0.05);
@@ -1821,238 +2296,229 @@
       ctx.save();
       ctx.clearRect(0, 0, W, H);
 
-      // Camera Transform (Pan & Zoom)
+      // Camera Pan & Zoom Transform
       ctx.translate(camera.x, camera.y);
       ctx.scale(camera.zoom, camera.zoom);
 
-      // 1. Draw World Background
+      // 1. Draw World Map
       ctx.drawImage(worldCv, 0, 0);
 
-      // 2. Water Ripples on Pond
-      const pondX = worldCv.width * 0.76;
-      const pondY = worldCv.height * 0.68;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-      ctx.lineWidth = 1.5;
-      const wave = (now / 1000) % 3;
-      ctx.beginPath();
-      ctx.ellipse(pondX, pondY, 30 + wave * 25, 18 + wave * 14, 0.1, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // 3. Draw Scenery & Agents with Depth Sort (Y-sorting)
+      // 2. Y-sorted Renderables (Scenery & Characters)
       const renderables = [];
-
-      sceneryProps.forEach(p => {
-        renderables.push({
-          y: p.y,
-          draw: () => drawSceneryProp(p, now)
-        });
-      });
-
-      landscapeChars.forEach(c => {
-        renderables.push({
-          y: c.y,
-          draw: () => c.draw()
-        });
-      });
-
+      sceneryProps.forEach(p => renderables.push({ y: p.y, draw: () => drawSceneryProp(p, now) }));
+      landscapeChars.forEach(c => renderables.push({ y: c.y, draw: () => c.draw() }));
       renderables.sort((a, b) => a.y - b.y);
       renderables.forEach(r => r.draw());
 
-      // 4. Particle Systems
-      particles.forEach((p, idx) => {
+      // 3. Flying Postal Couriers (Inter-Agent Messaging Animation)
+      for (let i = flyingCouriers.length - 1; i >= 0; i--) {
+        const fc = flyingCouriers[i];
+        fc.progress += dt * fc.speed;
+        const t = Math.min(fc.progress, 1.0);
+
+        // Quadratic Bezier Flight Path with arc
+        const curX = (1 - t) * (1 - t) * fc.startX + 2 * (1 - t) * t * fc.ctrlX + t * t * fc.targetX;
+        const curY = (1 - t) * (1 - t) * fc.startY + 2 * (1 - t) * t * fc.ctrlY + t * t * fc.targetY;
+
+        ctx.save();
+        ctx.translate(curX, curY);
+
+        // Golden Winged Letter Courier
+        ctx.fillStyle = '#ffeb3b';
+        ctx.fillRect(-8, -6, 16, 12);
+        ctx.strokeStyle = '#f39c12';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-8, -6, 16, 12);
+
+        // Wings
+        const wingFlap = Math.sin(now / 80) * 8;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(-8, -3); ctx.lineTo(-18, -10 + wingFlap); ctx.lineTo(-8, 3); ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(8, -3); ctx.lineTo(18, -10 + wingFlap); ctx.lineTo(8, 3); ctx.closePath(); ctx.fill();
+
+        ctx.restore();
+
+        // Trail spark
+        if (Math.random() < 0.6) {
+          particles.push({
+            x: curX,
+            y: curY,
+            c: '#ffeb3b',
+            r: 2,
+            a: 0.8,
+            vx: (Math.random() - 0.5) * 15,
+            vy: (Math.random() - 0.5) * 15
+          });
+        }
+
+        if (t >= 1.0) {
+          // Explode arrival stars
+          for (let p = 0; p < 14; p++) {
+            particles.push({
+              x: fc.targetX,
+              y: fc.targetY,
+              c: '#f1c40f',
+              r: 3.5,
+              a: 1,
+              vx: (Math.random() - 0.5) * 80,
+              vy: (Math.random() - 0.5) * 80
+            });
+          }
+          flyingCouriers.splice(i, 1);
+        }
+      }
+
+      // 4. Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
         p.x += (p.vx || 0) * dt;
         p.y += (p.vy || 0) * dt;
         p.a -= dt * 0.8;
-
-        ctx.globalAlpha = Math.max(0, p.a);
-        if (p.txt) {
-          ctx.font = 'bold 15px monospace';
-          ctx.fillStyle = '#ffeb3b';
-          ctx.fillText(p.txt, p.x, p.y);
-        } else {
-          ctx.fillStyle = p.c || '#ffffff';
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r || 3, 0, Math.PI * 2);
-          ctx.fill();
+        if (p.a <= 0) {
+          particles.splice(i, 1);
+          continue;
         }
-        ctx.globalAlpha = 1;
-      });
-
-      for (let i = particles.length - 1; i >= 0; i--) {
-        if (particles[i].a <= 0) particles.splice(i, 1);
+        ctx.globalAlpha = Math.max(0, p.a);
+        ctx.fillStyle = p.c || '#ffffff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r || 3, 0, Math.PI * 2);
+        ctx.fill();
       }
+      ctx.globalAlpha = 1;
 
       ctx.restore();
 
-      // Update character logic
+      // Update characters
       landscapeChars.forEach(c => c.update(dt));
-
       requestAnimationFrame(landscapeLoop);
     }
 
-    function drawSceneryProp(prop, now) {
-      ctx.save();
-      const x = prop.x;
-      const y = prop.y;
+    // Trigger Postal Courier Flight
+    function launchPostalCourier(fromAgentId, toAgentId) {
+      const fromChar = landscapeChars.find(c => c.id === fromAgentId);
+      const toChar = landscapeChars.find(c => c.id === toAgentId);
 
-      if (prop.type === 'tree') {
-        const s = prop.scale || 1.0;
-        // Tree Shadow
-        ctx.fillStyle = 'rgba(0,0,0,0.28)';
-        ctx.beginPath();
-        ctx.ellipse(x, y, 22 * s, 8 * s, 0, 0, Math.PI * 2);
-        ctx.fill();
+      const startX = fromChar ? fromChar.x : (worldCv.width * 0.5);
+      const startY = fromChar ? fromChar.y : (worldCv.height * 0.2);
+      const targetX = toChar ? toChar.x : (worldCv.width * 0.5);
+      const targetY = toChar ? toChar.y : (worldCv.height * 0.5);
 
-        // Trunk
-        ctx.fillStyle = '#5d4037';
-        ctx.fillRect(x - 5 * s, y - 28 * s, 10 * s, 28 * s);
+      const midX = (startX + targetX) / 2;
+      const midY = Math.min(startY, targetY) - 80;
 
-        // Foliage Layers
-        ctx.fillStyle = '#1b5e20';
-        ctx.beginPath();
-        ctx.arc(x, y - 36 * s, 24 * s, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#2e7d32';
-        ctx.beginPath();
-        ctx.arc(x, y - 48 * s, 20 * s, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#43a047';
-        ctx.beginPath();
-        ctx.arc(x, y - 58 * s, 14 * s, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (prop.type === 'table') {
-        // Wooden Table
-        ctx.fillStyle = '#4e342e';
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(x - 30, y - 16, 60, 32, 6) : ctx.rect(x - 30, y - 16, 60, 32);
-        ctx.fill();
-        ctx.fillStyle = '#fff9c4';
-        ctx.fillRect(x - 18, y - 10, 20, 14); // Map scroll
-        ctx.fillStyle = '#00bcd4';
-        ctx.beginPath();
-        ctx.arc(x + 14, y - 4, 4, 0, Math.PI * 2); // Coffee/potion mug
-        ctx.fill();
-      } else if (prop.type === 'monolith') {
-        // Rune Monolith
-        ctx.fillStyle = '#263238';
-        ctx.beginPath();
-        ctx.moveTo(x - 14, y);
-        ctx.lineTo(x - 8, y - 50);
-        ctx.lineTo(x + 8, y - 50);
-        ctx.lineTo(x + 14, y);
-        ctx.closePath();
-        ctx.fill();
-        // Glowing Rune
-        const glow = 0.5 + Math.sin(now / 400) * 0.4;
-        ctx.fillStyle = `rgba(0, 229, 255, ${glow})`;
-        ctx.fillRect(x - 2, y - 38, 4, 20);
-      } else if (prop.type === 'campfire') {
-        // Stones
-        ctx.fillStyle = '#546e7a';
-        for (let a = 0; a < 6; a++) {
-          const rx = x + Math.cos(a) * 12;
-          const ry = y + Math.sin(a) * 7;
-          ctx.beginPath(); ctx.arc(rx, ry, 3.5, 0, Math.PI * 2); ctx.fill();
-        }
-        // Flame
-        const fH = 14 + Math.sin(now / 150) * 5;
-        ctx.fillStyle = '#ff5722';
-        ctx.beginPath();
-        ctx.moveTo(x - 7, y);
-        ctx.lineTo(x, y - fH);
-        ctx.lineTo(x + 7, y);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = '#ffeb3b';
-        ctx.beginPath();
-        ctx.moveTo(x - 3, y);
-        ctx.lineTo(x, y - fH * 0.7);
-        ctx.lineTo(x + 3, y);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      ctx.restore();
+      flyingCouriers.push({
+        startX, startY,
+        targetX, targetY,
+        ctrlX: midX, ctrlY: midY,
+        progress: 0,
+        speed: 0.9
+      });
     }
 
-    // Canvas Mouse Interaction (Pan & Click)
+    // ============================================================
+    // MOUSE & ZOOM INTERACTION (STRICTLY CLAMPED [1.0x–2.5x])
+    // ============================================================
     canvas.addEventListener('mousedown', (e) => {
-      isDragging = true;
-      dragStart = { x: e.clientX - camera.x, y: e.clientY - camera.y };
+      // Panning allowed ONLY when zoomed in
+      if (camera.zoom > 1.001) {
+        isDragging = true;
+        dragStart = { x: e.clientX - camera.x, y: e.clientY - camera.y };
+      }
     });
 
     window.addEventListener('mousemove', (e) => {
-      if (isDragging) {
+      if (isDragging && camera.zoom > 1.001) {
         camera.x = e.clientX - dragStart.x;
         camera.y = e.clientY - dragStart.y;
+        clampCameraBounds();
       }
     });
 
-    window.addEventListener('mouseup', (e) => {
-      if (!isDragging) return;
-      isDragging = false;
-    });
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.15 : 0.85;
+      zoomLandscape(factor);
+    }, { passive: false });
+
+    function zoomLandscape(factor) {
+      const newZoom = camera.zoom * factor;
+      camera.zoom = Math.min(Math.max(newZoom, 1.0), 2.5);
+      clampCameraBounds();
+    }
+
+    function resetLandscapeView() {
+      camera.zoom = 1.0;
+      camera.x = 0;
+      camera.y = 0;
+    }
 
     canvas.addEventListener('click', (e) => {
       const rect = canvas.getBoundingClientRect();
       const clickX = (e.clientX - rect.left - camera.x) / camera.zoom;
       const clickY = (e.clientY - rect.top - camera.y) / camera.zoom;
 
-      // Check if clicked any agent
       for (const char of landscapeChars) {
         const d = Math.hypot(clickX - char.x, clickY - char.y);
         if (d < 30) {
           selectAgent(char.id);
-          char.say("Reporting for duty!");
+          char.say("Ready for orders!");
           return;
         }
       }
     });
 
-    canvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const factor = e.deltaY < 0 ? 1.1 : 0.9;
-      zoomLandscape(factor);
-    });
+    // ============================================================
+    // DRAWER TOGGLE & CANVAS RESIZING
+    // ============================================================
+    function toggleDrawer() {
+      isDrawerCollapsed = !isDrawerCollapsed;
+      document.body.classList.toggle('drawer-collapsed', isDrawerCollapsed);
+      const icon = document.getElementById('drawerToggleIcon');
+      icon.className = isDrawerCollapsed ? 'fa-solid fa-chevron-left' : 'fa-solid fa-chevron-right';
 
-    function zoomLandscape(factor) {
-      camera.zoom = Math.min(Math.max(camera.zoom * factor, 0.5), 2.2);
-    }
-
-    function resetLandscapeView() {
-      camera.x = 0;
-      camera.y = 0;
-      camera.zoom = 1.0;
+      setTimeout(() => {
+        resizeCanvas();
+        if (threeRenderer) {
+          const container = document.getElementById('brainCanvasContainer');
+          if (container) {
+            threeRenderer.setSize(container.clientWidth, container.clientHeight);
+            threeCamera.aspect = container.clientWidth / container.clientHeight;
+            threeCamera.updateProjectionMatrix();
+          }
+        }
+      }, 320);
     }
 
     // ============================================================
-    // EXECUTIVE OUTER LAYER (CEO, HR, STAFF PALADIN)
+    // EXECUTIVE OUTER LAYER & LANDSCAPE SYNC
     // ============================================================
     function renderExecutiveOuterLayer() {
       const container = document.getElementById('executiveRoster');
       if (!container) return;
 
-      const globalIds = ['ceo-warlock', 'hr-mind-flayer', 'staff-engineer-paladin'];
+      const overseerIds = ['ceo-warlock', 'hr-mind-flayer', 'staff-engineer-paladin', 'senior-analyst-diviner', 'marshall-agent-system-inspector'];
       let html = '';
 
-      globalIds.forEach(id => {
-        const agent = allAgents[id] || { name: id, role: id, stats: { level: 20 } };
+      overseerIds.forEach(id => {
+        const agent = allAgents[id] || { name: id, role: id, stats: { level: 16 } };
         const conf = ROLE_CONFIGS[agent.role] || ROLE_CONFIGS['ceo-warlock'];
         const isSelected = currentAgentId === id;
-        const thought = agentThoughts[id]?.currentThought || "Directing enterprise strategy...";
+        const thought = agentThoughts[id]?.currentThought || "Overseeing enterprise system health...";
 
         html += `
           <div class="exec-agent-card ${isSelected ? 'selected' : ''}" onclick="selectAgent('${id}')">
             <div class="exec-avatar-token" style="border-color:${conf.color};">
               <span>${conf.icon}</span>
-              <div class="level-badge">${agent.stats?.level || 15}</div>
+              <div class="level-badge">${agent.stats?.level || 16}</div>
             </div>
             <div class="exec-info">
               <div class="exec-name-row">
                 <div class="exec-name">${agent.name || id}</div>
-                <div class="exec-role-title">${agent.role.split('-').slice(0, 2).join(' ').toUpperCase()}</div>
+                <div class="exec-role-title">${agent.role.split('-').slice(0, 2).join(' ')}</div>
               </div>
               <div class="exec-thought-preview">
                 <i class="fa-solid fa-brain"></i><span>${thought}</span>
@@ -2065,9 +2531,6 @@
       container.innerHTML = html;
     }
 
-    // ============================================================
-    // AGENT LIFECYCLE & PROJECT SYNC
-    // ============================================================
     async function loadAgentsAndRender() {
       const res = await fetch(`${BACKEND_URL}/api/agents`);
       if (!res.ok) return;
@@ -2081,66 +2544,95 @@
         agentThoughts = tData.thoughts || {};
       }
 
-      // 1. Separate Global vs Project Agents
+      // Separate Global Overseers vs Project Agents
       globalAgents = {};
       projectAgents = {};
 
       for (const [id, agent] of Object.entries(allAgents)) {
-        if (agent.project === 'global' || id === 'ceo-warlock' || id === 'hr-mind-flayer' || id === 'staff-engineer-paladin') {
+        if (agent.project === 'global' || ['ceo-warlock', 'hr-mind-flayer', 'staff-engineer-paladin', 'senior-analyst-diviner', 'marshall-agent-system-inspector'].includes(id)) {
           globalAgents[id] = agent;
         } else if (agent.project === currentProjectId) {
           projectAgents[id] = agent;
         }
       }
 
-      // 2. Render Top Outer Layer
       renderExecutiveOuterLayer();
+      syncLandscapeAgents(projectAgents, globalAgents);
 
-      // 3. Render Landscape Playground Canvas with current project agents
-      syncLandscapeAgents(projectAgents);
-
-      // 4. Update title badge
+      // Title badge & budget
+      const pCfg = projectConfigs[currentProjectId] || { budgetUsd: 50.00 };
       document.getElementById('canvasProjectTitle').innerText = `${currentProjectId.toUpperCase()} Playground (${Object.keys(projectAgents).length} active agent${Object.keys(projectAgents).length === 1 ? '' : 's'})`;
+      document.getElementById('canvasBudgetPill').innerText = `$${(pCfg.budgetUsd || 50).toFixed(2)} Budget`;
 
       // Select default agent if needed
       if (!allAgents[currentAgentId]) {
-        const firstProjAgent = Object.keys(projectAgents)[0];
-        currentAgentId = firstProjAgent || 'ceo-warlock';
+        currentAgentId = Object.keys(projectAgents)[0] || 'ceo-warlock';
       }
       loadAgentDrawer(currentAgentId);
     }
 
-    function syncLandscapeAgents(projectAgentsMap) {
+    function syncLandscapeAgents(projectAgentsMap, globalAgentsMap) {
       const existingIds = new Set(landscapeChars.map(c => c.id));
-      const targetIds = new Set(Object.keys(projectAgentsMap));
+      const targetMap = { ...globalAgentsMap, ...projectAgentsMap };
+      const targetIds = new Set(Object.keys(targetMap));
 
-      // Remove agents not in current project
+      // Remove agents not in target
       landscapeChars = landscapeChars.filter(c => targetIds.has(c.id));
 
-      // Add newly spawned agents
-      const ww = worldCv.width || 1200;
-      const wh = worldCv.height || 800;
+      const ww = worldCv.width || 1600;
+      const wh = worldCv.height || 1200;
 
+      // Position Global Overseers along the High Sky Balcony
+      const overseerPositions = {
+        'ceo-warlock': { x: ww * 0.40, y: wh * 0.17 },
+        'hr-mind-flayer': { x: ww * 0.46, y: wh * 0.17 },
+        'staff-engineer-paladin': { x: ww * 0.52, y: wh * 0.17 },
+        'senior-analyst-diviner': { x: ww * 0.58, y: wh * 0.17 },
+        'marshall-agent-system-inspector': { x: ww * 0.15, y: wh * 0.40 }
+      };
+
+      for (const [id, agent] of Object.entries(globalAgentsMap)) {
+        if (!existingIds.has(id)) {
+          const pos = overseerPositions[id] || { x: ww * 0.5, y: wh * 0.17 };
+          landscapeChars.push(new LandscapeAgent(id, agent, pos.x, pos.y));
+        } else {
+          const char = landscapeChars.find(c => c.id === id);
+          if (char) char.data = agent;
+        }
+      }
+
+      // Position Project Specialist Agents near their themed workstations
       let idx = 0;
       for (const [id, agent] of Object.entries(projectAgentsMap)) {
         if (!existingIds.has(id)) {
-          const spawnX = ww * 0.35 + (idx % 3) * 120 + (Math.random() - 0.5) * 40;
-          const spawnY = wh * 0.45 + Math.floor(idx / 3) * 80 + (Math.random() - 0.5) * 40;
+          let spawnX = ww * 0.35 + (idx % 4) * 110 + (Math.random() - 0.5) * 30;
+          let spawnY = wh * 0.52 + Math.floor(idx / 4) * 90 + (Math.random() - 0.5) * 30;
+
+          if (agent.role.includes('manager')) { spawnX = ww * 0.48; spawnY = wh * 0.62; }
+          else if (agent.role.includes('wizard')) { spawnX = ww * 0.32; spawnY = wh * 0.58; }
+          else if (agent.role.includes('cleric')) { spawnX = ww * 0.50; spawnY = wh * 0.58; }
+          else if (agent.role.includes('sorcerer')) { spawnX = ww * 0.68; spawnY = wh * 0.58; }
+          else if (agent.role.includes('rogue')) { spawnX = ww * 0.38; spawnY = wh * 0.78; }
+          else if (agent.role.includes('warmage')) { spawnX = ww * 0.60; spawnY = wh * 0.78; }
+
           const newChar = new LandscapeAgent(id, agent, spawnX, spawnY);
           landscapeChars.push(newChar);
 
-          // Poof animation
+          // Poof spawn stars
           for (let p = 0; p < 12; p++) {
             particles.push({
               x: spawnX + (Math.random() - 0.5) * 30,
               y: spawnY + (Math.random() - 0.5) * 20,
-              c: '#f39c12',
-              r: 3,
+              c: '#00e5ff',
+              r: 3.5,
               a: 1,
-              vx: (Math.random() - 0.5) * 50,
-              vy: -30 - Math.random() * 30
+              vx: (Math.random() - 0.5) * 60,
+              vy: -20 - Math.random() * 40
             });
           }
+        } else {
+          const char = landscapeChars.find(c => c.id === id);
+          if (char) char.data = agent;
         }
         idx++;
       }
@@ -2167,15 +2659,37 @@
       const conf = ROLE_CONFIGS[agent.role] || ROLE_CONFIGS['manager-bard'];
 
       // Header
-      document.getElementById('drawerName').innerText = agent.name || agentId;
+      document.getElementById('drawerName').innerHTML = `${agent.name || agentId} <span class="status-badge ${agent.status || 'active'}" id="drawerStatusBadge">${agent.status || 'Active'}</span>`;
       document.getElementById('drawerClass').innerText = agent.stats?.class || `Role: ${agent.role}`;
       document.getElementById('drawerAvatar').innerText = conf.icon;
       document.getElementById('drawerAvatar').style.borderColor = conf.color;
 
+      // Pause button state
+      const pauseBtn = document.getElementById('btnPauseAgent');
+      if (agent.status === 'paused') {
+        pauseBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+        pauseBtn.classList.remove('pause-btn');
+        pauseBtn.title = 'Resume Agent';
+      } else {
+        pauseBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        pauseBtn.classList.add('pause-btn');
+        pauseBtn.title = 'Pause Agent';
+      }
+
+      // Summoning banner if awaiting confirmation
+      const confirmBanner = document.getElementById('summonConfirmationBanner');
+      if (agent.status === 'awaiting-confirmation') {
+        confirmBanner.style.display = 'block';
+        const cost = agent.costEstimation || { estCostUsd: 0.015, estTotalTokens: 4500 };
+        document.getElementById('summonBannerCost').innerText = `Est. Cost: $${cost.estCostUsd} • Tokens: ${cost.estTotalTokens} • Effort: ${agent.effortLevel || 'High'}`;
+      } else {
+        confirmBanner.style.display = 'none';
+      }
+
       // Tab 1: Chat
       renderChatMessages(data.messages || []);
 
-      // Tab 2: Stats
+      // Tab 2: Stats & AI Capabilities
       renderStatsSheet(agent);
 
       // Tab 3: Thoughts
@@ -2193,7 +2707,7 @@
       if (!box) return;
       let html = '';
       if (messages.length === 0) {
-        html = '<div class="msg-bubble system">No messages recorded yet. Type a directive below to instruct this agent.</div>';
+        html = '<div class="msg-bubble system">No messages recorded yet. Instruct this agent below.</div>';
       } else {
         messages.forEach(m => {
           const roleCls = m.role === 'user' ? 'user' : (m.role === 'system' ? 'system' : 'agent');
@@ -2201,7 +2715,7 @@
           html += `
             <div class="msg-bubble ${roleCls}">
               <div class="msg-header">
-                <strong>${m.from || 'Agent'}</strong>
+                <strong>${escapeHtml(m.from || 'Agent')}</strong>
                 <span>${time}</span>
               </div>
               <div>${escapeHtml(m.request || '')}</div>
@@ -2219,6 +2733,15 @@
       document.getElementById('statHp').innerText = `${stats.hp || 100} / ${stats.maxHp || 100}`;
       document.getElementById('statLevel').innerText = stats.level || 10;
 
+      // AI Capabilities Card
+      document.getElementById('capModel').innerText = agent.model || stats.defaultModel || 'Claude 3.7 Sonnet';
+      document.getElementById('capEffort').innerText = agent.effortLevel || stats.effortLevel || 'High (Thinking)';
+      document.getElementById('capContext').innerText = `${((agent.context_len || 128000) / 1000).toFixed(0)}k Tokens`;
+      document.getElementById('capLatency').innerText = `${stats.tokensPerSec || 90} tokens/sec`;
+      document.getElementById('capBench').innerText = stats.sweBenchScore || '68.5%';
+      document.getElementById('capAlignment').innerText = stats.instructionAlignment || '98.8%';
+
+      // Ability Scores
       const abilityGrid = document.getElementById('abilityGrid');
       const scores = stats.stats || { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 };
       let abilityHtml = '';
@@ -2235,6 +2758,7 @@
       }
       abilityGrid.innerHTML = abilityHtml;
 
+      // Spells
       const spellsList = document.getElementById('spellsList');
       const spells = stats.spells || [{ name: 'Execute Directive', dice: '2d8', desc: 'Performs assigned project task.' }];
       let spellsHtml = '';
@@ -2242,15 +2766,16 @@
         spellsHtml += `
           <div class="spell-card">
             <div class="spell-head">
-              <span>${s.name}</span>
-              <span class="spell-dice">${s.dice}</span>
+              <span>${escapeHtml(s.name)}</span>
+              <span class="spell-dice">${escapeHtml(s.dice)}</span>
             </div>
-            <div class="spell-desc">${s.desc}</div>
+            <div class="spell-desc">${escapeHtml(s.desc)}</div>
           </div>
         `;
       });
       spellsList.innerHTML = spellsHtml;
 
+      // Inventory
       const invList = document.getElementById('inventoryList');
       const items = stats.inventory || ['Company Keycard', 'Terminal Access'];
       invList.innerText = items.join(' • ');
@@ -2284,9 +2809,9 @@
 
       const tree = document.getElementById('fileTree');
       const files = context.files || ['README.md'];
-      let treeHtml = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Path: ${context.projectFolder || 'projects/global'}</div>`;
+      let treeHtml = `<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;word-break:break-all;"><i class="fa-solid fa-folder"></i> ${context.projectFolder || 'projects/global'}</div>`;
       files.forEach(f => {
-        treeHtml += `<div class="file-item"><i class="fa-solid fa-file-code"></i> <span>${f}</span></div>`;
+        treeHtml += `<div class="file-item"><i class="fa-solid fa-file-code"></i> <span>${escapeHtml(f)}</span></div>`;
       });
       tree.innerHTML = treeHtml;
     }
@@ -2299,27 +2824,179 @@
         const conf = ROLE_CONFIGS[agent.role] || ROLE_CONFIGS['manager-bard'];
         html += `
           <div class="network-card" onclick="selectAgent('${id}')">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <span style="font-size:18px;">${conf.icon}</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:16px;">${conf.icon}</span>
               <div>
-                <div style="font-size:13px;font-weight:700;color:#fff;">${agent.name || id}</div>
-                <div style="font-size:11px;color:var(--text-muted);">${agent.project || 'global'}</div>
+                <div style="font-size:12px;font-weight:700;color:#fff;">${escapeHtml(agent.name || id)}</div>
+                <div style="font-size:10px;color:var(--text-muted);">${agent.project || 'global'} • ${agent.model || 'Claude 3.7'}</div>
               </div>
             </div>
-            <span style="font-size:11px;color:var(--gold);"><i class="fa-solid fa-bolt"></i> Telepathic Link</span>
+            <span style="font-size:10px;color:var(--gold);"><i class="fa-solid fa-bolt"></i> Telepathic Link</span>
           </div>
         `;
       }
       list.innerHTML = html;
     }
 
+    // Context View Switcher (Files vs 3D Synaptic Brain)
+    function switchContextView(view) {
+      const btnFiles = document.getElementById('btnContextFiles');
+      const btnBrain = document.getElementById('btnContextBrain');
+      const viewFiles = document.getElementById('contextFilesView');
+      const viewBrain = document.getElementById('contextBrainView');
+
+      if (view === 'brain') {
+        btnBrain.classList.add('active');
+        btnFiles.classList.remove('active');
+        viewBrain.style.display = 'flex';
+        viewFiles.style.display = 'none';
+        initThreeBrain();
+      } else {
+        btnFiles.classList.add('active');
+        btnBrain.classList.remove('active');
+        viewFiles.style.display = 'block';
+        viewBrain.style.display = 'none';
+      }
+    }
+
     // ============================================================
-    // API CALLS & ACTIONS
+    // THREE.JS 3D CONTEXT VECTORS / SYNAPTIC BRAIN
+    // ============================================================
+    let threeScene, threeCamera, threeRenderer, threeBrainGroup;
+    let brainInitialized = false;
+
+    function initThreeBrain() {
+      const container = document.getElementById('brainCanvasContainer');
+      if (!container || brainInitialized) return;
+      brainInitialized = true;
+
+      const width = container.clientWidth || 440;
+      const height = container.clientHeight || 260;
+
+      threeScene = new THREE.Scene();
+      threeCamera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+      threeCamera.position.z = 45;
+
+      threeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      threeRenderer.setSize(width, height);
+      threeRenderer.setClearColor(0x080812, 1);
+      container.appendChild(threeRenderer.domElement);
+
+      threeBrainGroup = new THREE.Group();
+      threeScene.add(threeBrainGroup);
+
+      // 1. Neural Node Particles
+      const particleCount = 180;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(particleCount * 3);
+      const colors = new Float32Array(particleCount * 3);
+
+      const colorPalette = [
+        new THREE.Color(0x00e5ff), // prompt embeddings
+        new THREE.Color(0x9b59b6), // thought lore
+        new THREE.Color(0xf39c12), // code files
+        new THREE.Color(0x2ecc71)  // attention weights
+      ];
+
+      for (let i = 0; i < particleCount; i++) {
+        const u = Math.random();
+        const v = Math.random();
+        const theta = u * 2.0 * Math.PI;
+        const phi = Math.acos(2.0 * v - 1.0);
+        const r = 18 * Math.cbrt(Math.random());
+
+        const x = r * Math.sin(phi) * Math.cos(theta);
+        const y = r * Math.sin(phi) * Math.sin(theta) * 0.8;
+        const z = r * Math.cos(phi);
+
+        positions[i * 3] = x;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = z;
+
+        const c = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const particleMaterial = new THREE.PointsMaterial({
+        size: 1.8,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.9
+      });
+
+      const particleSystem = new THREE.Points(geometry, particleMaterial);
+      threeBrainGroup.add(particleSystem);
+
+      // 2. Synaptic Neural Connections
+      const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0x9b59b6,
+        transparent: true,
+        opacity: 0.25
+      });
+
+      const lineGeo = new THREE.BufferGeometry();
+      const linePositions = [];
+
+      for (let i = 0; i < particleCount; i += 2) {
+        for (let j = i + 1; j < Math.min(i + 5, particleCount); j++) {
+          const dx = positions[i * 3] - positions[j * 3];
+          const dy = positions[i * 3 + 1] - positions[j * 3 + 1];
+          const dz = positions[i * 3 + 2] - positions[j * 3 + 2];
+          const dist = Math.hypot(dx, dy, dz);
+          if (dist < 10) {
+            linePositions.push(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+            linePositions.push(positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]);
+          }
+        }
+      }
+
+      lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+      const lineSystem = new THREE.LineSegments(lineGeo, lineMaterial);
+      threeBrainGroup.add(lineSystem);
+
+      // Interactive Mouse Orbit
+      let isBrainDragging = false;
+      let prevMousePos = { x: 0, y: 0 };
+
+      container.addEventListener('mousedown', (e) => {
+        isBrainDragging = true;
+        prevMousePos = { x: e.clientX, y: e.clientY };
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!isBrainDragging) return;
+        const deltaX = e.clientX - prevMousePos.x;
+        const deltaY = e.clientY - prevMousePos.y;
+        threeBrainGroup.rotation.y += deltaX * 0.01;
+        threeBrainGroup.rotation.x += deltaY * 0.01;
+        prevMousePos = { x: e.clientX, y: e.clientY };
+      });
+      window.addEventListener('mouseup', () => { isBrainDragging = false; });
+
+      function animateBrain() {
+        requestAnimationFrame(animateBrain);
+        if (!isBrainDragging) {
+          threeBrainGroup.rotation.y += 0.004;
+          threeBrainGroup.rotation.x += 0.001;
+        }
+        threeRenderer.render(threeScene, threeCamera);
+      }
+      animateBrain();
+    }
+
+    // ============================================================
+    // API ACTIONS & MESSAGING
     // ============================================================
     async function loadProjects() {
       const res = await fetch(`${BACKEND_URL}/api/projects`);
       if (!res.ok) return;
       const data = await res.json();
+      projectConfigs = data.config || {};
+
       const tabs = document.getElementById('projectTabs');
       const spawnProjSel = document.getElementById('spawnProjectSelect');
       let html = '';
@@ -2331,7 +3008,7 @@
         optHtml += `<option value="${p}">${p}</option>`;
       });
 
-      html += `<button class="new-project-btn" onclick="openNewProjectModal()"><i class="fa-solid fa-plus"></i> New Project</button>`;
+      html += `<button class="nav-btn" onclick="openNewProjectModal()"><i class="fa-solid fa-plus"></i> New</button>`;
       tabs.innerHTML = html;
       spawnProjSel.innerHTML = optHtml;
     }
@@ -2350,7 +3027,7 @@
       input.value = '';
       const harness = document.getElementById('harnessSelect').value;
 
-      // Optimistically append user message
+      // Optimistically show user message
       const box = document.getElementById('chatMessages');
       box.innerHTML += `
         <div class="msg-bubble user">
@@ -2360,9 +3037,11 @@
       `;
       box.scrollTop = box.scrollHeight;
 
-      // Find character in landscape and trigger speaking animation
+      // Animated Postal Courier flight to target agent!
+      launchPostalCourier('user', currentAgentId);
+
       const char = landscapeChars.find(c => c.id === currentAgentId);
-      if (char) char.say("Marinating on prompt...");
+      if (char) char.say("Processing directive...");
 
       const res = await fetch(`${BACKEND_URL}/handleSendMessage`, {
         method: 'POST',
@@ -2386,6 +3065,39 @@
       sendChatMessage();
     }
 
+    // Toggle Pause/Resume Agent
+    async function togglePauseAgent() {
+      const agent = allAgents[currentAgentId];
+      if (!agent) return;
+      const targetStatus = agent.status === 'paused' ? 'active' : 'paused';
+
+      const res = await fetch(`${BACKEND_URL}/api/agents/set-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: currentAgentId, status: targetStatus })
+      });
+
+      if (res.ok) {
+        await loadAgentsAndRender();
+        await loadAgentDrawer(currentAgentId);
+      }
+    }
+
+    // Confirm Current Agent Summoning
+    async function confirmCurrentAgentSummon() {
+      const res = await fetch(`${BACKEND_URL}/api/agents/confirm-summon`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: currentAgentId })
+      });
+
+      if (res.ok) {
+        await loadAgentsAndRender();
+        await loadAgentDrawer(currentAgentId);
+      }
+    }
+
+    // D20 Rolls
     function rollD20() {
       const roll = Math.floor(Math.random() * 20) + 1;
       const total = roll + 4;
@@ -2403,27 +3115,42 @@
       badge.innerText = `🎲 ${total} (${roll}${modStr})`;
     }
 
-    async function triggerMarshallCheck() {
-      const res = await fetch(`${BACKEND_URL}/api/marshall/run`, { method: 'POST' });
-      if (res.ok) {
-        alert('🛡️ Marshall Agent completed 5-minute health check. System healthy!');
-        loadAgentsAndRender();
-      }
+    // ============================================================
+    // MODALS HANDLING
+    // ============================================================
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    function openNewProjectModal() { openModal('newProjectModal'); }
+    function openSpawnAgentModal() {
+      updateSpawnCostPreview();
+      openModal('spawnAgentModal');
     }
 
-    // Modal Helpers
-    function openNewProjectModal() { document.getElementById('newProjectModal').classList.add('active'); }
-    function openSpawnAgentModal() { document.getElementById('spawnAgentModal').classList.add('active'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    function updateSpawnCostPreview() {
+      const role = document.getElementById('spawnRoleSelect').value;
+      const model = document.getElementById('spawnModelSelect').value;
+      const effort = document.getElementById('spawnEffortSelect').value;
+
+      let multiplier = effort === 'Extreme' ? 3.0 : (effort === 'High' ? 1.5 : (effort === 'Low' ? 0.5 : 1.0));
+      let rate = model.includes('haiku') || model.includes('flash') ? 0.001 : 0.003;
+      let estTokens = Math.round(4500 * multiplier);
+      let estCost = (estTokens / 1000 * rate * 3.5).toFixed(4);
+
+      document.getElementById('costEstTokens').innerText = `${estTokens.toLocaleString()} Tokens`;
+      document.getElementById('costEstUsd').innerText = `$${estCost} USD`;
+    }
 
     async function submitNewProject() {
       const pId = document.getElementById('newProjectId').value.trim();
+      const customPath = document.getElementById('newProjectCustomPath').value.trim();
+      const budget = document.getElementById('newProjectBudget').value;
       if (!pId) return;
 
       const res = await fetch(`${BACKEND_URL}/handleStartProject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: pId, initialAgentRole: 'manager-bard' })
+        body: JSON.stringify({ projectId: pId, customPath: customPath || null, budgetUsd: Number(budget) || 50 })
       });
 
       if (res.ok) {
@@ -2433,14 +3160,49 @@
       }
     }
 
-    async function submitSpawnAgent() {
-      const role = document.getElementById('spawnRoleSelect').value;
-      const proj = document.getElementById('spawnProjectSelect').value;
+    function openProjectSettingsModal() {
+      document.getElementById('settingProjectId').value = currentProjectId;
+      const cfg = projectConfigs[currentProjectId] || {};
+      document.getElementById('settingProjectPath').value = cfg.path || '';
+      document.getElementById('settingProjectBudget').value = cfg.budgetUsd || 50;
+      document.getElementById('settingProjectTokens').value = cfg.maxTokens || 1000000;
+      openModal('projectSettingsModal');
+    }
 
-      const res = await fetch(`${BACKEND_URL}/api/agents/spawn`, {
+    async function saveProjectSettings() {
+      const pId = document.getElementById('settingProjectId').value;
+      const pathVal = document.getElementById('settingProjectPath').value.trim();
+      const budget = document.getElementById('settingProjectBudget').value;
+      const tokens = document.getElementById('settingProjectTokens').value;
+
+      const res = await fetch(`${BACKEND_URL}/api/projects/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role, projectId: proj })
+        body: JSON.stringify({
+          projectId: pId,
+          customPath: pathVal || null,
+          budgetUsd: Number(budget),
+          maxTokens: Number(tokens)
+        })
+      });
+
+      if (res.ok) {
+        closeModal('projectSettingsModal');
+        await loadProjects();
+        await loadAgentsAndRender();
+      }
+    }
+
+    async function submitRequestSummon() {
+      const role = document.getElementById('spawnRoleSelect').value;
+      const model = document.getElementById('spawnModelSelect').value;
+      const effort = document.getElementById('spawnEffortSelect').value;
+      const proj = document.getElementById('spawnProjectSelect').value;
+
+      const res = await fetch(`${BACKEND_URL}/api/agents/request-summon`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, projectId: proj, model, effortLevel: effort })
       });
 
       if (res.ok) {
@@ -2451,12 +3213,130 @@
       }
     }
 
-    function escapeHtml(text) {
-      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-      return text.replace(/[&<>"']/g, m => map[m]);
+    function openAgentEditModal() {
+      const agent = allAgents[currentAgentId];
+      if (!agent) return;
+
+      document.getElementById('editAgentName').value = agent.name || '';
+      document.getElementById('editAgentModel').value = agent.model || 'claude-3-7-sonnet-20250219';
+      document.getElementById('editAgentEffort').value = agent.effortLevel || 'High';
+      document.getElementById('editAgentPrompt').value = agent.promptOverride || '';
+      openModal('agentEditModal');
     }
 
-    // Initialize
+    async function saveAgentEdits() {
+      const name = document.getElementById('editAgentName').value.trim();
+      const model = document.getElementById('editAgentModel').value;
+      const effortLevel = document.getElementById('editAgentEffort').value;
+      const promptOverride = document.getElementById('editAgentPrompt').value.trim();
+
+      const res = await fetch(`${BACKEND_URL}/api/agents/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: currentAgentId,
+          updates: { name, model, effortLevel, promptOverride }
+        })
+      });
+
+      if (res.ok) {
+        closeModal('agentEditModal');
+        await loadAgentsAndRender();
+        await loadAgentDrawer(currentAgentId);
+      }
+    }
+
+    // Company Knowledge Base Modal
+    async function openKnowledgeBaseModal() {
+      const res = await fetch(`${BACKEND_URL}/api/knowledge-base`);
+      if (res.ok) {
+        const data = await res.json();
+        knowledgeBaseData = data.knowledgeBase || {};
+        renderKnowledgeBaseTopics(knowledgeBaseData.topics || []);
+      }
+      openModal('knowledgeBaseModal');
+    }
+
+    function renderKnowledgeBaseTopics(topics) {
+      const container = document.getElementById('kbTopicsList');
+      if (!container) return;
+      let html = '';
+      topics.forEach(t => {
+        html += `
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;font-weight:700;color:var(--cyan);">${escapeHtml(t.title)}</span>
+              <span style="font-size:9px;background:rgba(0,188,212,0.15);color:var(--cyan);padding:2px 6px;border-radius:4px;">${escapeHtml(t.category)}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text);margin-top:4px;">${escapeHtml(t.summary)}</div>
+            <div style="font-size:9px;color:var(--text-muted);margin-top:6px;"><i class="fa-solid fa-feather"></i> ${escapeHtml(t.author)}</div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function filterKnowledgeBase(query) {
+      const lower = query.toLowerCase();
+      const topics = (knowledgeBaseData.topics || []).filter(t =>
+        t.title.toLowerCase().includes(lower) ||
+        t.summary.toLowerCase().includes(lower) ||
+        (t.tags || []).some(tag => tag.toLowerCase().includes(lower))
+      );
+      renderKnowledgeBaseTopics(topics);
+    }
+
+    async function triggerSeniorAnalystAudit() {
+      const res = await fetch(`${BACKEND_URL}/api/knowledge-base/run-analyst`, { method: 'POST' });
+      if (res.ok) {
+        await openKnowledgeBaseModal();
+        alert('🔮 Senior Analyst Diviner completed cross-project knowledge synthesis!');
+      }
+    }
+
+    // Marshall Priority Audit Modal
+    async function openMarshallAuditModal() {
+      const res = await fetch(`${BACKEND_URL}/api/marshall/audit`);
+      if (res.ok) {
+        const data = await res.json();
+        const queue = data.audit?.priorityQueue || [];
+        const container = document.getElementById('marshallPriorityList');
+        let html = '';
+
+        queue.forEach((item, idx) => {
+          const color = item.percentUsed >= 90 ? 'var(--accent)' : (item.percentUsed >= 50 ? 'var(--gold)' : 'var(--green)');
+          html += `
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#fff;">#${idx + 1} ${escapeHtml(item.name)} <span style="font-size:9px;color:var(--text-muted);">(${item.project})</span></div>
+                <div style="font-size:10px;color:var(--text-muted);">${item.context_used.toLocaleString()} / ${item.context_len.toLocaleString()} tokens</div>
+              </div>
+              <div style="font-size:12px;font-weight:800;color:${color};">${item.percentUsed}% Used</div>
+            </div>
+          `;
+        });
+        container.innerHTML = html || '<div style="font-size:11px;color:var(--text-muted);">No active agents registered.</div>';
+      }
+      openModal('marshallAuditModal');
+    }
+
+    async function triggerMarshallCheck() {
+      const res = await fetch(`${BACKEND_URL}/api/marshall/run`, { method: 'POST' });
+      if (res.ok) {
+        await openMarshallAuditModal();
+        loadAgentsAndRender();
+      }
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+      return String(text).replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
     document.addEventListener('DOMContentLoaded', () => {
       resizeCanvas();
       window.addEventListener('resize', resizeCanvas);
@@ -2478,7 +3358,7 @@
       loadAgentsAndRender();
       requestAnimationFrame(landscapeLoop);
 
-      // Periodically refresh agent thoughts
+      // Periodically refresh agent thoughts & events
       setInterval(async () => {
         const thoughtsRes = await fetch(`${BACKEND_URL}/api/agent-thoughts`);
         if (thoughtsRes.ok) {
@@ -2486,7 +3366,7 @@
           agentThoughts = tData.thoughts || {};
           renderExecutiveOuterLayer();
         }
-      }, 8000);
+      }, 6000);
     });
   </script>
 </body>

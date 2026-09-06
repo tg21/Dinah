@@ -220,5 +220,217 @@
     },
     "tasks_total": 5,
     "tasks_completed": 0
+  },
+  "senior-analyst-diviner": {
+    "name": "Senior Analyst Diviner",
+    "role": "senior-analyst-diviner",
+    "project": "global",
+    "status": "active",
+    "harness": "gemini",
+    "model": "gemini-2.0-flash-thinking",
+    "effortLevel": "High",
+    "context_len": 1000000,
+    "context_used": 6000,
+    "created_at": "2026-08-29T11:08:07.786Z",
+    "last_activity_ms": 1788001687786,
+    "stats": {
+      "name": "Senior Analyst Diviner",
+      "role": "senior-analyst-diviner",
+      "class": "Chronologer Sphinx / Diviner",
+      "level": 16,
+      "hp": 110,
+      "maxHp": 110,
+      "ac": 16,
+      "avatarColor": 10233776,
+      "defaultModel": "gemini-2.0-flash-thinking",
+      "modelProvider": "Google DeepMind",
+      "effortLevel": "High",
+      "contextCapacity": 1000000,
+      "tokensPerSec": 130,
+      "sweBenchScore": "69.1%",
+      "instructionAlignment": "98.9%",
+      "costPer1kInput": 0.001,
+      "costPer1kOutput": 0.004,
+      "stats": {
+        "STR": 10,
+        "DEX": 12,
+        "CON": 14,
+        "INT": 20,
+        "WIS": 20,
+        "CHA": 14
+      },
+      "spells": [
+        {
+          "name": "Chrono-Synthesis of Lore",
+          "dice": "5d6",
+          "desc": "Synthesizes multi-project workspaces into unified knowledge base."
+        },
+        {
+          "name": "Divination of System Drift",
+          "dice": "Scry",
+          "desc": "Detects architectural divergences across teams."
+        },
+        {
+          "name": "Tome of Global Memory",
+          "dice": "Persistent",
+          "desc": "Updates company vector index and shared state."
+        }
+      ],
+      "inventory": [
+        "Astrolabe of Project Telemetry",
+        "Quill of Continuous Indexing",
+        "Hourglass of 5-Min Intervals"
+      ],
+      "traits": [
+        "Omniscient Overview",
+        "Knowledge Base Scribe",
+        "Cross-Project Resonance"
+      ]
+    }
+  },
+  "marshall-agent-system-inspector": {
+    "name": "Marshall Sentinel",
+    "role": "marshall-agent-system-inspector",
+    "project": "global",
+    "status": "active",
+    "harness": "gemini",
+    "model": "gemini-2.0-flash",
+    "effortLevel": "Medium",
+    "context_len": 1000000,
+    "context_used": 6000,
+    "created_at": "2026-08-29T11:08:07.786Z",
+    "last_activity_ms": 1788001687786,
+    "stats": {
+      "name": "Marshall Sentinel",
+      "role": "marshall-agent-system-inspector",
+      "class": "Inquisitive Sentinel / Inspector",
+      "level": 15,
+      "hp": 120,
+      "maxHp": 120,
+      "ac": 18,
+      "avatarColor": 48340,
+      "defaultModel": "gemini-2.0-flash",
+      "modelProvider": "Google DeepMind",
+      "effortLevel": "Medium",
+      "contextCapacity": 1000000,
+      "tokensPerSec": 150,
+      "sweBenchScore": "65.0%",
+      "instructionAlignment": "99.0%",
+      "costPer1kInput": 0.0005,
+      "costPer1kOutput": 0.002,
+      "stats": {
+        "STR": 14,
+        "DEX": 14,
+        "CON": 16,
+        "INT": 18,
+        "WIS": 20,
+        "CHA": 12
+      },
+      "spells": [
+        {
+          "name": "Detect Obsolete Workers",
+          "dice": "Scry",
+          "desc": "Scans work logs for 100% completed tasks."
+        },
+        {
+          "name": "Context Window Scrying",
+          "dice": "Telemetry",
+          "desc": "Measures token consumption and triggers handovers."
+        },
+        {
+          "name": "Freeze Stalled Process",
+          "dice": "Special",
+          "desc": "Flags 10-minute stuck processes for human review."
+        }
+      ],
+      "inventory": [
+        "Badge of the System Marshall",
+        "Hourglass of 5-Minute Checks",
+        "Ledger of Active Processes"
+      ],
+      "traits": [
+        "Watchdog Senses",
+        "Context Clairvoyance",
+        "Automated Health Protocol"
+      ]
+    }
+  },
+  "project-alpha-solution-architect-wizard": {
+    "name": "Solution Architect Wizard",
+    "role": "solution-architect-wizard",
+    "project": "project-alpha",
+    "status": "active",
+    "harness": "opencode",
+    "model": "claude-3-7-sonnet-20250219",
+    "effortLevel": "High",
+    "promptOverride": "",
+    "costEstimation": {
+      "estPromptTokens": 4500,
+      "estOutputTokens": 2250,
+      "estTotalTokens": 6750,
+      "estCostUsd": 0.0473,
+      "inputRate": 0.003,
+      "outputRate": 0.015
+    },
+    "context_len": 200000,
+    "context_used": 1000,
+    "created_at": "2026-08-29T11:10:36.689Z",
+    "last_activity_ms": 1788001836689,
+    "stats": {
+      "name": "Solution Architect Wizard",
+      "role": "solution-architect-wizard",
+      "class": "Wizard (School of Architecture)",
+      "level": 16,
+      "hp": 85,
+      "maxHp": 85,
+      "ac": 14,
+      "avatarColor": 3447003,
+      "defaultModel": "claude-3-7-sonnet-20250219",
+      "modelProvider": "Anthropic",
+      "effortLevel": "High",
+      "contextCapacity": 200000,
+      "tokensPerSec": 80,
+      "sweBenchScore": "70.8%",
+      "instructionAlignment": "99.0%",
+      "costPer1kInput": 0.003,
+      "costPer1kOutput": 0.015,
+      "stats": {
+        "STR": 8,
+        "DEX": 14,
+        "CON": 13,
+        "INT": 20,
+        "WIS": 16,
+        "CHA": 10
+      },
+      "spells": [
+        {
+          "name": "Arcane Blueprint",
+          "dice": "4d6+5",
+          "desc": "Draws flawless microservice diagrams."
+        },
+        {
+          "name": "Divination: Tech Debt",
+          "dice": "3d8",
+          "desc": "Foresees breaking API changes months ahead."
+        },
+        {
+          "name": "Wall of Abstraction",
+          "dice": "5d10",
+          "desc": "Blocks messy quick-hack implementations."
+        }
+      ],
+      "inventory": [
+        "Spellbook of Distributed Systems",
+        "Wand of Schema Design",
+        "Crystal of Latency Optimization"
+      ],
+      "traits": [
+        "Arcane Recovery",
+        "Deep Spec Analysis",
+        "Theoretical Mastery"
+      ]
+    },
+    "tasks_total": 5,
+    "tasks_completed": 0
   }
 }

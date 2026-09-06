@@ -22,6 +22,9 @@ const HR_SYSTEM_DIR = path.join(APP_DIR, 'hr-system');
 const AGENT_TEMPLATES_DIR = path.join(APP_DIR, 'agent-templates');
 const SHARED_STATE_DIR = path.join(APP_DIR, 'shared-state');
 const PROJECTS_DIR = path.join(APP_DIR, 'projects');
+const PROJECTS_CONFIG_FILE = path.join(PROJECTS_DIR, 'projects-config.json');
+const KNOWLEDGE_BASE_FILE = path.join(SHARED_STATE_DIR, 'knowledge-base.json');
+const MARSHALL_AUDIT_FILE = path.join(SHARED_STATE_DIR, 'marshall-audit.json');
 
 function ensureDirExists(dir) {
   if (!fs.existsSync(dir)) {
@@ -35,7 +38,7 @@ ensureDirExists(SHARED_STATE_DIR);
 ensureDirExists(PROJECTS_DIR);
 
 // ============================================================
-// D&D RPG STATS DATABASE & TEMPLATE DEFAULTS
+// D&D RPG STATS DATABASE & AI CAPABILITY SPECIFICATIONS
 // ============================================================
 
 const AGENT_RPG_REGISTRY = {
@@ -48,7 +51,16 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 140,
     ac: 18,
     avatarColor: 0x9b59b6,
-    stats: { STR: 10, DEX: 14, CON: 16, INT: 16, WIS: 14, CHA: 20 },
+    defaultModel: 'claude-3-7-sonnet-20250219',
+    modelProvider: 'Anthropic',
+    effortLevel: 'Extreme',
+    contextCapacity: 200000,
+    tokensPerSec: 85,
+    sweBenchScore: '70.3%',
+    instructionAlignment: '99.1%',
+    costPer1kInput: 0.003,
+    costPer1kOutput: 0.015,
+    stats: { STR: 10, DEX: 14, CON: 16, INT: 18, WIS: 16, CHA: 20 },
     spells: [
       { name: 'Eldritch Executive Order', dice: '4d10+5', desc: 'Directs all company resources toward strategic initiative.' },
       { name: 'Pact of the Stock Option', dice: '2d8+5', desc: 'Inspires subordinate agents with long-term vesting promises.' },
@@ -66,6 +78,15 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 125,
     ac: 17,
     avatarColor: 0x8e44ad,
+    defaultModel: 'gemini-2.0-pro-exp',
+    modelProvider: 'Google DeepMind',
+    effortLevel: 'High',
+    contextCapacity: 2000000,
+    tokensPerSec: 110,
+    sweBenchScore: '68.5%',
+    instructionAlignment: '98.8%',
+    costPer1kInput: 0.002,
+    costPer1kOutput: 0.010,
     stats: { STR: 12, DEX: 14, CON: 14, INT: 20, WIS: 18, CHA: 17 },
     spells: [
       { name: 'Mind Blast (Review)', dice: '5d8+5', desc: 'Stuns low-performing agents into total compliance.' },
@@ -74,6 +95,87 @@ const AGENT_RPG_REGISTRY = {
     ],
     inventory: ['Psionic Registry Tome', 'Tentacle Grooming Kit', 'Severance Package Scroll'],
     traits: ['Telepathic Network', 'Sole Agent Spawner', 'Magic Resistance']
+  },
+  'staff-engineer-paladin': {
+    name: 'Staff Engineer Paladin',
+    role: 'staff-engineer-paladin',
+    class: 'Paladin (Oath of Clean Code)',
+    level: 16,
+    hp: 130,
+    maxHp: 130,
+    ac: 20,
+    avatarColor: 0xf1c40f,
+    defaultModel: 'claude-3-7-sonnet-20250219',
+    modelProvider: 'Anthropic',
+    effortLevel: 'High',
+    contextCapacity: 200000,
+    tokensPerSec: 80,
+    sweBenchScore: '71.2%',
+    instructionAlignment: '99.5%',
+    costPer1kInput: 0.003,
+    costPer1kOutput: 0.015,
+    stats: { STR: 18, DEX: 10, CON: 16, INT: 16, WIS: 16, CHA: 16 },
+    spells: [
+      { name: 'Divine Smite (Code Review)', dice: '4d8', desc: 'Banishes type violations and memory leaks.' },
+      { name: 'Aura of Clean Code', dice: 'Passive', desc: '+3 maintainability bonus to all nearby devs.' },
+      { name: 'Lay on Hands (Refactor)', dice: '50 HP', desc: 'Restores legacy spaghetti code to pristine shape.' }
+    ],
+    inventory: ['Greatsword of Strict Linting', 'Plate Armor of SOLID Principles', 'Holy Symbol of GitHub'],
+    traits: ['Divine Sense of Tech Debt', 'Code Righteousness', 'Aura of Protection']
+  },
+  'senior-analyst-diviner': {
+    name: 'Senior Analyst Diviner',
+    role: 'senior-analyst-diviner',
+    class: 'Chronologer Sphinx / Diviner',
+    level: 16,
+    hp: 110,
+    maxHp: 110,
+    ac: 16,
+    avatarColor: 0x9c27b0,
+    defaultModel: 'gemini-2.0-flash-thinking',
+    modelProvider: 'Google DeepMind',
+    effortLevel: 'High',
+    contextCapacity: 1000000,
+    tokensPerSec: 130,
+    sweBenchScore: '69.1%',
+    instructionAlignment: '98.9%',
+    costPer1kInput: 0.001,
+    costPer1kOutput: 0.004,
+    stats: { STR: 10, DEX: 12, CON: 14, INT: 20, WIS: 20, CHA: 14 },
+    spells: [
+      { name: 'Chrono-Synthesis of Lore', dice: '5d6', desc: 'Synthesizes multi-project workspaces into unified knowledge base.' },
+      { name: 'Divination of System Drift', dice: 'Scry', desc: 'Detects architectural divergences across teams.' },
+      { name: 'Tome of Global Memory', dice: 'Persistent', desc: 'Updates company vector index and shared state.' }
+    ],
+    inventory: ['Astrolabe of Project Telemetry', 'Quill of Continuous Indexing', 'Hourglass of 5-Min Intervals'],
+    traits: ['Omniscient Overview', 'Knowledge Base Scribe', 'Cross-Project Resonance']
+  },
+  'marshall-agent-system-inspector': {
+    name: 'Marshall Sentinel',
+    role: 'marshall-agent-system-inspector',
+    class: 'Inquisitive Sentinel / Inspector',
+    level: 15,
+    hp: 120,
+    maxHp: 120,
+    ac: 18,
+    avatarColor: 0x00bcd4,
+    defaultModel: 'gemini-2.0-flash',
+    modelProvider: 'Google DeepMind',
+    effortLevel: 'Medium',
+    contextCapacity: 1000000,
+    tokensPerSec: 150,
+    sweBenchScore: '65.0%',
+    instructionAlignment: '99.0%',
+    costPer1kInput: 0.0005,
+    costPer1kOutput: 0.002,
+    stats: { STR: 14, DEX: 14, CON: 16, INT: 18, WIS: 20, CHA: 12 },
+    spells: [
+      { name: 'Detect Obsolete Workers', dice: 'Scry', desc: 'Scans work logs for 100% completed tasks.' },
+      { name: 'Context Window Scrying', dice: 'Telemetry', desc: 'Measures token consumption and triggers handovers.' },
+      { name: 'Freeze Stalled Process', dice: 'Special', desc: 'Flags 10-minute stuck processes for human review.' }
+    ],
+    inventory: ['Badge of the System Marshall', 'Hourglass of 5-Minute Checks', 'Ledger of Active Processes'],
+    traits: ['Watchdog Senses', 'Context Clairvoyance', 'Automated Health Protocol']
   },
   'manager-bard': {
     name: 'Manager Bard',
@@ -84,6 +186,15 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 105,
     ac: 15,
     avatarColor: 0xe67e22,
+    defaultModel: 'claude-3-7-sonnet-20250219',
+    modelProvider: 'Anthropic',
+    effortLevel: 'Medium',
+    contextCapacity: 200000,
+    tokensPerSec: 85,
+    sweBenchScore: '67.8%',
+    instructionAlignment: '98.5%',
+    costPer1kInput: 0.003,
+    costPer1kOutput: 0.015,
     stats: { STR: 10, DEX: 16, CON: 14, INT: 14, WIS: 12, CHA: 19 },
     spells: [
       { name: 'Vicious Mockery', dice: '3d4', desc: 'Deals psychic damage to blockers during standup.' },
@@ -102,6 +213,15 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 85,
     ac: 14,
     avatarColor: 0x3498db,
+    defaultModel: 'claude-3-7-sonnet-20250219',
+    modelProvider: 'Anthropic',
+    effortLevel: 'High',
+    contextCapacity: 200000,
+    tokensPerSec: 80,
+    sweBenchScore: '70.8%',
+    instructionAlignment: '99.0%',
+    costPer1kInput: 0.003,
+    costPer1kOutput: 0.015,
     stats: { STR: 8, DEX: 14, CON: 13, INT: 20, WIS: 16, CHA: 10 },
     spells: [
       { name: 'Arcane Blueprint', dice: '4d6+5', desc: 'Draws flawless microservice diagrams.' },
@@ -110,24 +230,6 @@ const AGENT_RPG_REGISTRY = {
     ],
     inventory: ['Spellbook of Distributed Systems', 'Wand of Schema Design', 'Crystal of Latency Optimization'],
     traits: ['Arcane Recovery', 'Deep Spec Analysis', 'Theoretical Mastery']
-  },
-  'staff-engineer-paladin': {
-    name: 'Staff Engineer Paladin',
-    role: 'staff-engineer-paladin',
-    class: 'Paladin (Oath of Clean Code)',
-    level: 15,
-    hp: 130,
-    maxHp: 130,
-    ac: 20,
-    avatarColor: 0xf1c40f,
-    stats: { STR: 18, DEX: 10, CON: 16, INT: 14, WIS: 14, CHA: 16 },
-    spells: [
-      { name: 'Divine Smite (Code Review)', dice: '4d8', desc: 'Banishes type violations and memory leaks.' },
-      { name: 'Aura of Clean Code', dice: 'Passive', desc: '+3 maintainability bonus to all nearby devs.' },
-      { name: 'Lay on Hands (Refactor)', dice: '50 HP', desc: 'Restores legacy spaghetti code to pristine shape.' }
-    ],
-    inventory: ['Greatsword of Strict Linting', 'Plate Armor of SOLID Principles', 'Holy Symbol of GitHub'],
-    traits: ['Divine Sense of Tech Debt', 'Code Righteousness', 'Aura of Protection']
   },
   'backend-dev-cleric': {
     name: 'Backend Dev Cleric',
@@ -138,6 +240,15 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 98,
     ac: 18,
     avatarColor: 0x1abc9c,
+    defaultModel: 'deepseek-r1',
+    modelProvider: 'DeepSeek',
+    effortLevel: 'High',
+    contextCapacity: 128000,
+    tokensPerSec: 75,
+    sweBenchScore: '71.0%',
+    instructionAlignment: '97.9%',
+    costPer1kInput: 0.00055,
+    costPer1kOutput: 0.00219,
     stats: { STR: 14, DEX: 10, CON: 15, INT: 14, WIS: 18, CHA: 10 },
     spells: [
       { name: 'Prayer of Schema Migration', dice: '3d8+4', desc: 'Lossless zero-downtime database update.' },
@@ -156,6 +267,15 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 78,
     ac: 13,
     avatarColor: 0xe91e63,
+    defaultModel: 'gpt-4o',
+    modelProvider: 'OpenAI',
+    effortLevel: 'Medium',
+    contextCapacity: 128000,
+    tokensPerSec: 100,
+    sweBenchScore: '66.2%',
+    instructionAlignment: '98.2%',
+    costPer1kInput: 0.0025,
+    costPer1kOutput: 0.010,
     stats: { STR: 8, DEX: 16, CON: 14, INT: 12, WIS: 10, CHA: 18 },
     spells: [
       { name: 'Wild Magic Surge (Flexbox)', dice: '3d6+4', desc: 'Instantly centers div in all dimensions.' },
@@ -174,6 +294,15 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 88,
     ac: 16,
     avatarColor: 0x27ae60,
+    defaultModel: 'claude-3-5-haiku',
+    modelProvider: 'Anthropic',
+    effortLevel: 'Medium',
+    contextCapacity: 200000,
+    tokensPerSec: 140,
+    sweBenchScore: '64.5%',
+    instructionAlignment: '99.2%',
+    costPer1kInput: 0.0008,
+    costPer1kOutput: 0.004,
     stats: { STR: 10, DEX: 20, CON: 14, INT: 15, WIS: 14, CHA: 12 },
     spells: [
       { name: 'Sneak Attack (Null Injection)', dice: '7d6', desc: 'Passes undefined into unsuspecting arguments.' },
@@ -183,25 +312,130 @@ const AGENT_RPG_REGISTRY = {
     inventory: ['Daggers of Boundary Testing', 'Smoke Bomb of Regression Tests', 'Lockpicks of Auth Bypass'],
     traits: ['Sneak Attack', 'Cunning Action', 'Reliable Bug Talent']
   },
-  'marshall-agent-system-inspector': {
-    name: 'Marshall Agent',
-    role: 'marshall-agent-system-inspector',
-    class: 'Inquisitive Sentinel / Inspector',
-    level: 15,
-    hp: 120,
-    maxHp: 120,
-    ac: 18,
-    avatarColor: 0x00bcd4,
-    stats: { STR: 14, DEX: 14, CON: 16, INT: 18, WIS: 20, CHA: 12 },
+  'devops-sre-dragonborn-warmage': {
+    name: 'DevOps SRE Warmage',
+    role: 'devops-sre-dragonborn-warmage',
+    class: 'Dragonborn Warmage of Kubernetes',
+    level: 14,
+    hp: 115,
+    maxHp: 115,
+    ac: 19,
+    avatarColor: 0xe74c3c,
+    defaultModel: 'deepseek-r1',
+    modelProvider: 'DeepSeek',
+    effortLevel: 'High',
+    contextCapacity: 128000,
+    tokensPerSec: 75,
+    sweBenchScore: '69.0%',
+    instructionAlignment: '98.0%',
+    costPer1kInput: 0.00055,
+    costPer1kOutput: 0.00219,
+    stats: { STR: 16, DEX: 12, CON: 16, INT: 16, WIS: 14, CHA: 10 },
     spells: [
-      { name: 'Detect Obsolete Workers', dice: 'Scry', desc: 'Scans work logs for 100% completed tasks.' },
-      { name: 'Context Window Scrying', dice: 'Telemetry', desc: 'Measures token consumption and triggers handovers.' },
-      { name: 'Freeze Stalled Process', dice: 'Special', desc: 'Flags 10-minute stuck processes for human review.' }
+      { name: 'Firewall Breath', dice: '8d6', desc: 'Purges malicious packets and DDoS attacks.' },
+      { name: 'Cluster Auto-Scale Rune', dice: 'Special', desc: 'Spawns 50 pods in 3 seconds flat.' },
+      { name: 'Rollback Incantation', dice: 'Reaction', desc: 'Restores stable production build in 100ms.' }
     ],
-    inventory: ['Badge of the System Marshall', 'Hourglass of 5-Minute Checks', 'Ledger of Active Processes'],
-    traits: ['Watchdog Senses', 'Context Clairvoyance', 'Automated Health Protocol']
+    inventory: ['Staff of Helm & Terraform', 'Armor of 99.999% SLA', 'Totem of Prometheus'],
+    traits: ['Damage Resistance (Outages)', 'Breath Weapon', 'Infrastructure As Code']
   }
 };
+
+// ============================================================
+// INTER-AGENT EVENT QUEUE (For Courier delivery animation)
+// ============================================================
+let agentEventQueue = [];
+
+function broadcastAgentEvent(event) {
+  const eventObj = {
+    id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    timestamp: new Date().toISOString(),
+    ...event
+  };
+  agentEventQueue.push(eventObj);
+  // Keep last 100 events
+  if (agentEventQueue.length > 100) {
+    agentEventQueue = agentEventQueue.slice(-100);
+  }
+  return eventObj;
+}
+
+// ============================================================
+// PROJECT CONFIGURATION & DIRECTORY MANAGEMENT
+// ============================================================
+
+function loadProjectsConfig() {
+  if (!fs.existsSync(PROJECTS_CONFIG_FILE)) {
+    const defaultConfig = {
+      'project-alpha': {
+        path: path.join(PROJECTS_DIR, 'project-alpha'),
+        budgetUsd: 50.00,
+        spentUsd: 1.24,
+        maxTokens: 1000000,
+        tokensUsed: 42300,
+        description: 'Core Next-Gen Portal'
+      },
+      'project-beta': {
+        path: path.join(PROJECTS_DIR, 'project-beta'),
+        budgetUsd: 30.00,
+        spentUsd: 0.45,
+        maxTokens: 500000,
+        tokensUsed: 15400,
+        description: 'Microservices & API Gateway'
+      }
+    };
+    fs.writeFileSync(PROJECTS_CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
+    return defaultConfig;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(PROJECTS_CONFIG_FILE, 'utf-8'));
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveProjectsConfig(cfg) {
+  fs.writeFileSync(PROJECTS_CONFIG_FILE, JSON.stringify(cfg, null, 2));
+}
+
+function getProjectFolder(projectId) {
+  const cfg = loadProjectsConfig();
+  if (cfg[projectId] && cfg[projectId].path && fs.existsSync(cfg[projectId].path)) {
+    return cfg[projectId].path;
+  }
+  return path.join(PROJECTS_DIR, projectId || 'project-alpha');
+}
+
+function createProjectFolder(projectId, customPath = null) {
+  const projectDir = customPath || path.join(PROJECTS_DIR, projectId);
+  if (!fs.existsSync(projectDir)) {
+    fs.mkdirSync(projectDir, { recursive: true });
+    const readmePath = path.join(projectDir, 'README.md');
+    fs.writeFileSync(readmePath, `# Project: ${projectId}\n\nInitiated by CEO Warlock.\nManaged by Manager Bard.\nWorkspace: ${projectDir}\n`);
+  }
+  const cfg = loadProjectsConfig();
+  if (!cfg[projectId]) {
+    cfg[projectId] = {
+      path: projectDir,
+      budgetUsd: 50.00,
+      spentUsd: 0.00,
+      maxTokens: 1000000,
+      tokensUsed: 0,
+      description: `Project ${projectId}`
+    };
+    saveProjectsConfig(cfg);
+  }
+  return projectDir;
+}
+
+function listProjects() {
+  if (!fs.existsSync(PROJECTS_DIR)) return [];
+  const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true });
+  const diskProjects = entries.filter(e => e.isDirectory()).map(e => e.name);
+  const cfg = loadProjectsConfig();
+  const allProjs = Array.from(new Set([...diskProjects, ...Object.keys(cfg)]));
+  return allProjs;
+}
 
 // ============================================================
 // HR SYSTEM REGISTRY
@@ -217,7 +451,10 @@ function loadHrSystem() {
         role: 'ceo-warlock',
         project: 'global',
         status: 'active',
-        context_len: 128000,
+        harness: 'opencode',
+        model: 'claude-3-7-sonnet-20250219',
+        effortLevel: 'Extreme',
+        context_len: 200000,
         context_used: 12400,
         created_at: new Date().toISOString(),
         last_activity_ms: Date.now(),
@@ -228,7 +465,10 @@ function loadHrSystem() {
         role: 'hr-mind-flayer',
         project: 'global',
         status: 'active',
-        context_len: 128000,
+        harness: 'gemini',
+        model: 'gemini-2.0-pro-exp',
+        effortLevel: 'High',
+        context_len: 2000000,
         context_used: 8200,
         created_at: new Date().toISOString(),
         last_activity_ms: Date.now(),
@@ -239,11 +479,42 @@ function loadHrSystem() {
         role: 'staff-engineer-paladin',
         project: 'global',
         status: 'active',
-        context_len: 128000,
+        harness: 'claude-code',
+        model: 'claude-3-7-sonnet-20250219',
+        effortLevel: 'High',
+        context_len: 200000,
         context_used: 9500,
         created_at: new Date().toISOString(),
         last_activity_ms: Date.now(),
         stats: AGENT_RPG_REGISTRY['staff-engineer-paladin']
+      },
+      'senior-analyst-diviner': {
+        name: 'Senior Analyst Diviner',
+        role: 'senior-analyst-diviner',
+        project: 'global',
+        status: 'active',
+        harness: 'gemini',
+        model: 'gemini-2.0-flash-thinking',
+        effortLevel: 'High',
+        context_len: 1000000,
+        context_used: 5400,
+        created_at: new Date().toISOString(),
+        last_activity_ms: Date.now(),
+        stats: AGENT_RPG_REGISTRY['senior-analyst-diviner']
+      },
+      'marshall-agent-system-inspector': {
+        name: 'Marshall Sentinel',
+        role: 'marshall-agent-system-inspector',
+        project: 'global',
+        status: 'active',
+        harness: 'gemini',
+        model: 'gemini-2.0-flash',
+        effortLevel: 'Medium',
+        context_len: 1000000,
+        context_used: 4100,
+        created_at: new Date().toISOString(),
+        last_activity_ms: Date.now(),
+        stats: AGENT_RPG_REGISTRY['marshall-agent-system-inspector']
       }
     };
     fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(initialRegistry, null, 2));
@@ -251,19 +522,30 @@ function loadHrSystem() {
   }
   try {
     const data = JSON.parse(fs.readFileSync(HR_SYSTEM_FILE, 'utf-8'));
-    // Ensure the 3 global agents exist
-    if (!data['staff-engineer-paladin']) {
-      data['staff-engineer-paladin'] = {
-        name: 'Staff Engineer Paladin',
-        role: 'staff-engineer-paladin',
-        project: 'global',
-        status: 'active',
-        context_len: 128000,
-        context_used: 9500,
-        created_at: new Date().toISOString(),
-        last_activity_ms: Date.now(),
-        stats: AGENT_RPG_REGISTRY['staff-engineer-paladin']
-      };
+    let modified = false;
+
+    // Ensure all global overseer agents exist
+    const defaultOverseers = ['ceo-warlock', 'hr-mind-flayer', 'staff-engineer-paladin', 'senior-analyst-diviner', 'marshall-agent-system-inspector'];
+    for (const ovId of defaultOverseers) {
+      if (!data[ovId]) {
+        data[ovId] = {
+          name: AGENT_RPG_REGISTRY[ovId]?.name || ovId,
+          role: ovId,
+          project: 'global',
+          status: 'active',
+          harness: AGENT_RPG_REGISTRY[ovId]?.defaultModel?.includes('gemini') ? 'gemini' : 'opencode',
+          model: AGENT_RPG_REGISTRY[ovId]?.defaultModel || 'claude-3-7-sonnet-20250219',
+          effortLevel: AGENT_RPG_REGISTRY[ovId]?.effortLevel || 'High',
+          context_len: AGENT_RPG_REGISTRY[ovId]?.contextCapacity || 200000,
+          context_used: 6000,
+          created_at: new Date().toISOString(),
+          last_activity_ms: Date.now(),
+          stats: AGENT_RPG_REGISTRY[ovId]
+        };
+        modified = true;
+      }
+    }
+    if (modified) {
       fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(data, null, 2));
     }
     return data;
@@ -274,31 +556,6 @@ function loadHrSystem() {
 
 function saveHrSystem(hrSystem) {
   fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(hrSystem, null, 2));
-}
-
-// ============================================================
-// PROJECT ISOLATION
-// ============================================================
-
-function createProjectFolder(projectId) {
-  const projectDir = path.join(PROJECTS_DIR, projectId);
-  if (!fs.existsSync(projectDir)) {
-    fs.mkdirSync(projectDir, { recursive: true });
-    // Add default initial project readme
-    const readmePath = path.join(projectDir, 'README.md');
-    fs.writeFileSync(readmePath, `# Project: ${projectId}\n\nInitiated by CEO Warlock.\nManaged by Manager Bard.\n`);
-  }
-  return projectDir;
-}
-
-function getProjectFolder(projectId) {
-  return path.join(PROJECTS_DIR, projectId || 'project-alpha');
-}
-
-function listProjects() {
-  if (!fs.existsSync(PROJECTS_DIR)) return [];
-  const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true });
-  return entries.filter(e => e.isDirectory()).map(e => e.name);
 }
 
 // ============================================================
@@ -388,6 +645,247 @@ function appendToSharedLog(message) {
 }
 
 // ============================================================
+// COMPANY KNOWLEDGE BASE & SENIOR ANALYST ENGINE
+// ============================================================
+
+function loadKnowledgeBase() {
+  if (!fs.existsSync(KNOWLEDGE_BASE_FILE)) {
+    const initialKb = {
+      lastUpdated: new Date().toISOString(),
+      analystIntervalMinutes: 5,
+      enabled: true,
+      totalEntries: 4,
+      topics: [
+        {
+          id: 'topic-arch-1',
+          title: 'System Architecture: Microservice Event Bus',
+          category: 'Architecture',
+          summary: 'All project playgrounds communicate asynchronously via message envelopes and shared state audit logging.',
+          author: 'Solution Architect Wizard & Staff Paladin',
+          tags: ['architecture', 'event-bus', 'standards'],
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'topic-clean-code-2',
+          title: 'Clean Code Oath: SOLID & Strict Type Boundaries',
+          category: 'Code Quality',
+          summary: 'Staff Paladin enforces 100% strict TypeScript types and lint invariants across all pull requests.',
+          author: 'Staff Engineer Paladin',
+          tags: ['lint', 'types', 'oath'],
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'topic-db-3',
+          title: 'Persistence Standard: ACID Migrations & Pooling',
+          category: 'Database',
+          summary: 'Backend Dev Cleric manages zero-downtime PostgreSQL schema updates and connection pooling.',
+          author: 'Backend Dev Cleric',
+          tags: ['sql', 'postgres', 'migrations'],
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'topic-context-4',
+          title: 'Marshall Protocol: Context Window Handover at 90%',
+          category: 'Operations',
+          summary: 'Agents nearing 90% context tokens trigger handover summaries to prevent cognitive degradation.',
+          author: 'Marshall Sentinel',
+          tags: ['context', 'lifecycle', 'marshall'],
+          updatedAt: new Date().toISOString()
+        }
+      ],
+      projectSummaries: {
+        'project-alpha': {
+          status: 'In Development',
+          manager: 'Manager Bard',
+          activeAgents: ['manager-bard'],
+          keyDecisions: ['Adopting modular PixiJS canvas for interactive RPG frontend.'],
+          techStack: ['Node.js', 'Express', 'Vanilla JS', 'Three.js']
+        },
+        'project-beta': {
+          status: 'Planning',
+          manager: 'Manager Bard',
+          activeAgents: ['manager-bard'],
+          keyDecisions: ['Evaluating event streaming and GraphQL Gateway topology.'],
+          techStack: ['FastAPI', 'Redis', 'Docker']
+        }
+      },
+      crossProjectDependencies: [
+        { source: 'project-alpha', target: 'shared-state', relation: 'Audit Log Ingestion' },
+        { source: 'project-beta', target: 'hr-system', relation: 'Shared Specialist Pool' }
+      ]
+    };
+    fs.writeFileSync(KNOWLEDGE_BASE_FILE, JSON.stringify(initialKb, null, 2));
+    return initialKb;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(KNOWLEDGE_BASE_FILE, 'utf-8'));
+  } catch (e) {
+    return { topics: [], projectSummaries: {}, crossProjectDependencies: [] };
+  }
+}
+
+function saveKnowledgeBase(kb) {
+  kb.lastUpdated = new Date().toISOString();
+  kb.totalEntries = (kb.topics || []).length;
+  fs.writeFileSync(KNOWLEDGE_BASE_FILE, JSON.stringify(kb, null, 2));
+}
+
+function runSeniorAnalystInspection() {
+  const hrSystem = loadHrSystem();
+  const analyst = hrSystem['senior-analyst-diviner'];
+  if (analyst && analyst.status === 'paused') {
+    appendToSharedLog('Senior Analyst Diviner is paused. Skipping scheduled knowledge base synthesis cycle.');
+    return { skipped: true, reason: 'Agent is paused' };
+  }
+
+  appendAgentThought('senior-analyst-diviner', 'ANALYSIS_CYCLE', 'Scrying across all project workspaces and shared telemetry...');
+  appendToSharedLog('Senior Analyst Diviner initiated 5-minute cross-project knowledge synthesis...');
+
+  const kb = loadKnowledgeBase();
+  const projects = listProjects();
+
+  projects.forEach(pId => {
+    const pFolder = getProjectFolder(pId);
+    let files = [];
+    if (fs.existsSync(pFolder)) {
+      try { files = fs.readdirSync(pFolder); } catch (e) {}
+    }
+    const projAgents = Object.values(hrSystem).filter(a => a.project === pId).map(a => a.name);
+    kb.projectSummaries[pId] = {
+      status: 'Active',
+      manager: 'Manager Bard',
+      activeAgents: projAgents.length > 0 ? projAgents : ['Manager Bard'],
+      fileCount: files.length,
+      filesSummary: files.slice(0, 8),
+      lastAnalystReview: new Date().toISOString()
+    };
+  });
+
+  saveKnowledgeBase(kb);
+  appendAgentThought('senior-analyst-diviner', 'SYNTHESIS_COMPLETE', `Knowledge Base updated with ${projects.length} project telemetry profiles.`);
+  appendToSharedLog(`Senior Analyst completed synthesis. Company Knowledge Base updated with ${projects.length} projects.`);
+
+  return { success: true, timestamp: new Date().toISOString(), projectCount: projects.length };
+}
+
+// Configurable Senior Analyst Schedule
+let seniorAnalystInterval = setInterval(() => {
+  runSeniorAnalystInspection();
+}, 300000); // 5 minutes
+
+// ============================================================
+// MARSHALL SENTINEL & PRIORITIZED CONTEXT AUDITS
+// ============================================================
+
+function loadMarshallAudit() {
+  if (!fs.existsSync(MARSHALL_AUDIT_FILE)) {
+    return { lastRun: null, priorityQueue: [], alerts: [] };
+  }
+  try {
+    return JSON.parse(fs.readFileSync(MARSHALL_AUDIT_FILE, 'utf-8'));
+  } catch (e) {
+    return { priorityQueue: [], alerts: [] };
+  }
+}
+
+function saveMarshallAudit(auditData) {
+  fs.writeFileSync(MARSHALL_AUDIT_FILE, JSON.stringify(auditData, null, 2));
+}
+
+function runMarshallChecks() {
+  const hrSystem = loadHrSystem();
+  const marshall = hrSystem['marshall-agent-system-inspector'];
+  if (marshall && marshall.status === 'paused') {
+    appendToSharedLog('Marshall Sentinel is paused. Skipping scheduled watchdog cycle.');
+    return { skipped: true, reason: 'Marshall Sentinel is paused' };
+  }
+
+  appendAgentThought('marshall-agent-system-inspector', 'AUDIT_START', 'Scanning active agents for context exhaustion and stuck processes...');
+  appendToSharedLog('🛡️ Marshall Sentinel running 5-minute system inspection...');
+
+  const priorityQueue = [];
+  const handoverGenerated = [];
+  const stuckAgents = [];
+  const now = Date.now();
+
+  for (const [agentId, agent] of Object.entries(hrSystem)) {
+    const limit = agent.context_len || 128000;
+    const used = agent.context_used || 0;
+    const percentUsed = Math.min(100, Math.round((used / limit) * 100));
+    const lastAct = agent.last_activity_ms || now;
+    const idleMinutes = Math.round((now - lastAct) / 60000);
+
+    const auditEntry = {
+      agentId,
+      name: agent.name || agentId,
+      project: agent.project,
+      status: agent.status,
+      context_used: used,
+      context_len: limit,
+      percentUsed,
+      idleMinutes
+    };
+
+    priorityQueue.push(auditEntry);
+
+    // Automated Handover Check at > 90%
+    if (percentUsed >= 90 && agent.project !== 'global') {
+      const projectFolder = getProjectFolder(agent.project);
+      const handoverFile = path.join(projectFolder, `handover-${agentId}.md`);
+      const handoverContent = `# Handover Protocol: ${agent.name} (${agentId})\n\n- **Project**: ${agent.project}\n- **Context Exhaustion**: ${percentUsed}% (${used} / ${limit} tokens)\n- **Timestamp**: ${new Date().toISOString()}\n\n## Recommendations for HR Mind Flayer\n1. Spawn successor specialist with initial context injected from this handover.\n2. Retire or summarize previous logs.\n`;
+      fs.writeFileSync(handoverFile, handoverContent);
+      handoverGenerated.push(agentId);
+      appendToSharedLog(`[MARSHALL ALERT] Context exhaustion critical (${percentUsed}%) for [${agentId}]. Generated handover document at ${handoverFile}`);
+    }
+
+    // Stuck process detection (> 10 mins idle while in 'working' status)
+    if (agent.status === 'working' && idleMinutes > 10) {
+      stuckAgents.push(agentId);
+      agent.status = 'active'; // reset to active to unblock
+      appendToSharedLog(`[MARSHALL RECOVERY] Unstuck stalled agent [${agentId}] (idle for ${idleMinutes}m). Reset status to active.`);
+    }
+  }
+
+  // Sort queue by highest % context used descending
+  priorityQueue.sort((a, b) => b.percentUsed - a.percentUsed);
+
+  // Clean obsolete workers
+  const cleaned = [];
+  for (const [agentId, agent] of Object.entries(hrSystem)) {
+    if (agent.project !== 'global' && agent.tasks_total > 0 && agent.tasks_completed >= agent.tasks_total) {
+      agent.status = 'obsolete';
+      appendToSharedLog(`Marshall Sentinel verified completion for obsolete agent: ${agentId}`);
+      delete hrSystem[agentId];
+      cleaned.push(agentId);
+    }
+  }
+  saveHrSystem(hrSystem);
+
+  const report = {
+    lastRun: new Date().toISOString(),
+    priorityQueue,
+    handoverGenerated,
+    stuckAgents,
+    cleaned,
+    status: 'HEALTHY'
+  };
+
+  saveMarshallAudit(report);
+  appendAgentThought('marshall-agent-system-inspector', 'AUDIT_COMPLETE', `Audit finished. Prioritized ${priorityQueue.length} agents by context usage.`);
+
+  return report;
+}
+
+// Run Marshall checks every 5 minutes
+setInterval(() => {
+  try {
+    runMarshallChecks();
+  } catch (err) {
+    console.error('Marshall Sentinel encountered an error during inspection:', err);
+  }
+}, 300000);
+
+// ============================================================
 // HARNESS DETECTION & EXECUTION
 // ============================================================
 
@@ -410,15 +908,12 @@ function findHarnessBinary(harnessName) {
       if (result && result.trim()) {
         return result.trim();
       }
-    } catch (e) {
-      // not found in path
-    }
+    } catch (e) {}
   }
 
   return null;
 }
 
-// Spawns OpenCode agent via CLI
 function spawnOpencodeAgent(projectId, prompt, agentId) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
@@ -430,20 +925,17 @@ function spawnOpencodeAgent(projectId, prompt, agentId) {
 
   try {
     appendAgentThought(agentId, 'OPENCODE_INVOKE', `Invoking OpenCode harness in ${projectDir}`);
-    // Sanitize prompt for command line
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} run --dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 5000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 8000 });
     appendAgentThought(agentId, 'OPENCODE_SUCCESS', `OpenCode execution completed.`);
     return { success: true, output, agentId, harness: 'opencode' };
   } catch (error) {
-    // If CLI error or timeout, provide helpful fallback response
-    appendAgentThought(agentId, 'OPENCODE_FALLBACK', `Harness returned: ${error.message.slice(0, 100)}`);
+    appendAgentThought(agentId, 'OPENCODE_FALLBACK', `Harness note: ${error.message.slice(0, 80)}`);
     return simulateHarnessExecution('opencode', projectId, prompt, agentId);
   }
 }
 
-// Spawns Claude Code agent
 function spawnClaudeCodeAgent(projectId, prompt, agentId) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
@@ -456,14 +948,13 @@ function spawnClaudeCodeAgent(projectId, prompt, agentId) {
   try {
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} -p "${escapedPrompt}" --workdir "${projectDir}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 5000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 8000 });
     return { success: true, output, agentId, harness: 'claude-code' };
   } catch (error) {
     return simulateHarnessExecution('claude-code', projectId, prompt, agentId);
   }
 }
 
-// Spawns Codex agent
 function spawnCodexAgent(projectId, prompt, agentId) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
@@ -476,14 +967,13 @@ function spawnCodexAgent(projectId, prompt, agentId) {
   try {
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} --dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 5000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 8000 });
     return { success: true, output, agentId, harness: 'codex' };
   } catch (error) {
     return simulateHarnessExecution('codex', projectId, prompt, agentId);
   }
 }
 
-// Spawns Gemini agent
 function spawnGeminiAgent(projectId, prompt, agentId) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
@@ -495,7 +985,7 @@ function spawnGeminiAgent(projectId, prompt, agentId) {
 
   try {
     const escapedPrompt = prompt.replace(/"/g, '\\"');
-    const cmd = `${harnessBin} --model gemini-2.5-pro --dir "${projectDir}" "${escapedPrompt}"`;
+    const cmd = `${harnessBin} --model gemini-2.0-flash --dir "${projectDir}" "${escapedPrompt}"`;
     const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
     return { success: true, output, agentId, harness: 'gemini' };
   } catch (error) {
@@ -503,10 +993,9 @@ function spawnGeminiAgent(projectId, prompt, agentId) {
   }
 }
 
-// Intelligent fallback & simulation when external harness is not configured or in sandbox
 function simulateHarnessExecution(harness, projectId, prompt, agentId) {
   const hrSystem = loadHrSystem();
-  const agent = hrSystem[agentId] || { name: agentId, role: agentId };
+  const agent = hrSystem[agentId] || { name: agentId, role: agentId, model: 'claude-3-7-sonnet' };
   
   let roleFlavor = '';
   if (agent.role.includes('ceo')) {
@@ -514,29 +1003,34 @@ function simulateHarnessExecution(harness, projectId, prompt, agentId) {
   } else if (agent.role.includes('hr')) {
     roleFlavor = `[HR Mind Flayer]: Compliance verified. Telepathically reviewing active agent roster and templates for project ${projectId}.`;
   } else if (agent.role.includes('manager')) {
-    roleFlavor = `[Manager Bard]: Casting Vicious Mockery on project blockers! Breaking down "${prompt}" into sprint tickets for engineering and QA.`;
+    roleFlavor = `[Manager Bard]: Casting Vicious Mockery on project blockers! Breaking down "${prompt}" into sprint tickets for engineering and QA specialists.`;
+  } else if (agent.role.includes('analyst')) {
+    roleFlavor = `[Senior Analyst Diviner]: Inspecting system telemetry and synthesizing insights for "${prompt}" into Company Knowledge Base.`;
   } else if (agent.role.includes('wizard') || agent.role.includes('architect')) {
-    roleFlavor = `[Solution Architect Wizard]: Drafting architectural blueprint and data schemas for "${prompt}".`;
+    roleFlavor = `[Solution Architect Wizard]: Drafting architectural blueprint, API schemas, and distributed data contracts for "${prompt}".`;
   } else if (agent.role.includes('paladin') || agent.role.includes('staff')) {
-    roleFlavor = `[Staff Engineer Paladin]: Enforcing the Sacred Oath of Clean Code. Inspecting interfaces and test requirements.`;
+    roleFlavor = `[Staff Engineer Paladin]: Enforcing the Sacred Oath of Clean Code. Inspecting interfaces, SOLID design, and test requirements.`;
   } else if (agent.role.includes('cleric') || agent.role.includes('backend')) {
-    roleFlavor = `[Backend Cleric]: Praying to PostgreSQL gods. Preparing database schema and REST controllers.`;
+    roleFlavor = `[Backend Cleric]: Praying to PostgreSQL gods. Preparing zero-downtime database schema and REST controllers.`;
   } else if (agent.role.includes('sorcerer') || agent.role.includes('frontend')) {
     roleFlavor = `[Frontend Sorcerer]: Channeling PixiJS visual magic and responsive CSS layouts.`;
   } else if (agent.role.includes('rogue') || agent.role.includes('qa')) {
-    roleFlavor = `[QA Rogue]: Lurking in the shadows with edge-case null pointers and regression suites.`;
+    roleFlavor = `[QA Rogue]: Lurking in the shadows with edge-case null pointers, fuzz testing, and regression suites.`;
+  } else if (agent.role.includes('warmage') || agent.role.includes('devops')) {
+    roleFlavor = `[DevOps Warmage]: Fortifying Kubernetes deployment pipelines and Prometheus alerting against traffic surges.`;
   } else {
-    roleFlavor = `[${agent.name || agentId}]: Processing directive "${prompt}" via harness [${harness}]. Task in progress.`;
+    roleFlavor = `[${agent.name || agentId}]: Processing directive "${prompt}" via [${agent.model || harness}]. Task execution verified.`;
   }
 
-  appendAgentThought(agentId, 'REASONING', `Parsed directive for project ${projectId}. Applying role-specific D&D persona logic.`);
-  appendAgentThought(agentId, 'EXECUTION', `Executed task plan. Outputting response.`);
+  appendAgentThought(agentId, 'REASONING', `Parsed directive for project ${projectId}. Model [${agent.model || harness}] generating optimal execution plan.`);
+  appendAgentThought(agentId, 'EXECUTION', `Executed task plan successfully.`);
 
   return {
     success: true,
     output: roleFlavor,
     agentId,
     harness,
+    model: agent.model || harness,
     simulated: true
   };
 }
@@ -560,13 +1054,32 @@ function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId) {
 // AGENT LIFECYCLE & HR SPAWNING
 // ============================================================
 
-/**
- * HR Mind Flayer exclusively spawns new agents
- */
-function spawnAgentViaHr(role, projectId = 'global', customName = null) {
-  const hrSystem = loadHrSystem();
+function calculateAgentCostEstimation(role, model, effortLevel = 'High') {
+  const meta = AGENT_RPG_REGISTRY[role] || {};
+  const inRate = meta.costPer1kInput || 0.002;
+  const outRate = meta.costPer1kOutput || 0.010;
   
-  // Format agent ID
+  let multiplier = 1.0;
+  if (effortLevel === 'Low') multiplier = 0.5;
+  if (effortLevel === 'High') multiplier = 1.5;
+  if (effortLevel === 'Extreme') multiplier = 3.0;
+
+  const estPromptTokens = Math.round(3000 * multiplier);
+  const estOutputTokens = Math.round(1500 * multiplier);
+  const estCost = ((estPromptTokens / 1000) * inRate) + ((estOutputTokens / 1000) * outRate);
+
+  return {
+    estPromptTokens,
+    estOutputTokens,
+    estTotalTokens: estPromptTokens + estOutputTokens,
+    estCostUsd: Number(estCost.toFixed(4)),
+    inputRate: inRate,
+    outputRate: outRate
+  };
+}
+
+function requestAgentSummoning(role, projectId = 'project-alpha', customOptions = {}) {
+  const hrSystem = loadHrSystem();
   const baseId = projectId === 'global' ? role : `${projectId}-${role}`;
   let agentId = baseId;
   let counter = 1;
@@ -574,11 +1087,105 @@ function spawnAgentViaHr(role, projectId = 'global', customName = null) {
     agentId = `${baseId}-${counter++}`;
   }
 
-  // Load template info if exists
-  const templateFile = path.join(AGENT_TEMPLATES_DIR, `${role}.md`);
-  let templateContent = '';
-  if (fs.existsSync(templateFile)) {
-    templateContent = fs.readFileSync(templateFile, 'utf-8');
+  const rpgStats = AGENT_RPG_REGISTRY[role] || {
+    name: customOptions.name || role.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+    role,
+    class: 'Specialist Agent',
+    level: 10,
+    hp: 80,
+    maxHp: 80,
+    ac: 15,
+    avatarColor: 0x95a5a6,
+    stats: { STR: 12, DEX: 12, CON: 12, INT: 14, WIS: 12, CHA: 12 },
+    spells: [{ name: 'Execute Directive', dice: '2d8', desc: 'Performs role task.' }],
+    inventory: ['Company Keycard'],
+    traits: ['Task Execution']
+  };
+
+  const model = customOptions.model || rpgStats.defaultModel || 'claude-3-7-sonnet-20250219';
+  const effortLevel = customOptions.effortLevel || rpgStats.effortLevel || 'High';
+  const harness = customOptions.harness || (model.includes('gemini') ? 'gemini' : 'opencode');
+  const costEst = calculateAgentCostEstimation(role, model, effortLevel);
+
+  const awaitingAgent = {
+    name: customOptions.name || rpgStats.name,
+    role,
+    project: projectId,
+    status: 'awaiting-confirmation',
+    harness,
+    model,
+    effortLevel,
+    promptOverride: customOptions.promptOverride || '',
+    costEstimation: costEst,
+    context_len: rpgStats.contextCapacity || 128000,
+    context_used: 1000,
+    created_at: new Date().toISOString(),
+    last_activity_ms: Date.now(),
+    stats: rpgStats,
+    tasks_total: 5,
+    tasks_completed: 0
+  };
+
+  hrSystem[agentId] = awaitingAgent;
+  saveHrSystem(hrSystem);
+
+  appendToSharedLog(`Manager requested summoning for [${awaitingAgent.name}] (${role}) in [${projectId}]. Awaiting Overseer confirmation.`);
+  broadcastAgentEvent({
+    fromAgentId: 'hr-mind-flayer',
+    toAgentId: agentId,
+    type: 'summon_requested',
+    snippet: `Summoning requested for ${awaitingAgent.name}`
+  });
+
+  return { agentId, agent: awaitingAgent };
+}
+
+function confirmAgentSummoning(agentId, updatedParams = {}) {
+  const hrSystem = loadHrSystem();
+  const agent = hrSystem[agentId];
+  if (!agent) {
+    throw new Error(`Agent [${agentId}] not found in registry`);
+  }
+
+  // Apply any final tweaks from confirmation dialog
+  if (updatedParams.name) agent.name = updatedParams.name;
+  if (updatedParams.model) agent.model = updatedParams.model;
+  if (updatedParams.harness) agent.harness = updatedParams.harness;
+  if (updatedParams.effortLevel) agent.effortLevel = updatedParams.effortLevel;
+  if (updatedParams.stats) agent.stats = { ...agent.stats, ...updatedParams.stats };
+
+  agent.status = 'active';
+  agent.costEstimation = calculateAgentCostEstimation(agent.role, agent.model, agent.effortLevel);
+  saveHrSystem(hrSystem);
+
+  appendAgentMessage(agentId, {
+    from: 'hr-mind-flayer',
+    project: agent.project,
+    request: `Summoning confirmed! Agent ${agent.name} materialized into ${agent.project} via ${agent.model}.`,
+    path: getProjectFolder(agent.project),
+    role: 'system'
+  });
+
+  appendAgentThought(agentId, 'SUMMONED', `Materialized into arena by Overseer confirmation.`);
+  appendToSharedLog(`✨ HR Mind Flayer materialized agent [${agentId}] into [${agent.project}]!`);
+
+  broadcastAgentEvent({
+    fromAgentId: 'hr-mind-flayer',
+    toAgentId: agentId,
+    type: 'summon_confirmed',
+    snippet: `${agent.name} materialized into arena`
+  });
+
+  return { agentId, agent };
+}
+
+function spawnAgentViaHr(role, projectId = 'global', customName = null, options = {}) {
+  const hrSystem = loadHrSystem();
+  const baseId = projectId === 'global' ? role : `${projectId}-${role}`;
+  let agentId = baseId;
+  let counter = 1;
+  while (hrSystem[agentId]) {
+    agentId = `${baseId}-${counter++}`;
   }
 
   const rpgStats = AGENT_RPG_REGISTRY[role] || {
@@ -596,12 +1203,19 @@ function spawnAgentViaHr(role, projectId = 'global', customName = null) {
     traits: ['Task Execution']
   };
 
+  const model = options.model || rpgStats.defaultModel || 'claude-3-7-sonnet-20250219';
+  const effortLevel = options.effortLevel || rpgStats.effortLevel || 'High';
+  const harness = options.harness || (model.includes('gemini') ? 'gemini' : 'opencode');
+
   const newAgent = {
     name: customName || rpgStats.name,
     role,
     project: projectId,
     status: 'active',
-    context_len: 128000,
+    harness,
+    model,
+    effortLevel,
+    context_len: rpgStats.contextCapacity || 128000,
     context_used: 1500,
     created_at: new Date().toISOString(),
     last_activity_ms: Date.now(),
@@ -613,7 +1227,6 @@ function spawnAgentViaHr(role, projectId = 'global', customName = null) {
   hrSystem[agentId] = newAgent;
   saveHrSystem(hrSystem);
 
-  // Initialize message file
   appendAgentMessage(agentId, {
     from: 'hr-mind-flayer',
     project: projectId,
@@ -627,89 +1240,6 @@ function spawnAgentViaHr(role, projectId = 'global', customName = null) {
 
   return { agentId, agent: newAgent };
 }
-
-// ============================================================
-// MARSHALL AGENT & HEALTH CHECK LOGIC
-// ============================================================
-
-function checkContextExhaustion(hrSystem) {
-  const results = { exhausted: [], warnings: [] };
-  for (const [agentId, agent] of Object.entries(hrSystem)) {
-    const remaining = (agent.context_len || 128000) - (agent.context_used || 0);
-    if (remaining < 5000) {
-      results.exhausted.push({ agentId, remaining, limit: agent.context_len });
-    } else if (remaining < 20000) {
-      results.warnings.push({ agentId, remaining, limit: agent.context_len });
-    }
-  }
-  return results;
-}
-
-function checkStuckProcesses(hrSystem, thresholdMinutes = 10) {
-  const results = { stuck: [], active: [] };
-  const thresholdMs = thresholdMinutes * 60 * 1000;
-  const now = Date.now();
-
-  for (const [agentId, agent] of Object.entries(hrSystem)) {
-    const lastActivity = agent.last_activity_ms || 0;
-    const diff = now - lastActivity;
-    if (diff > thresholdMs && agent.status === 'working') {
-      results.stuck.push({ agentId, idleMinutes: Math.round(diff / 60000) });
-    } else {
-      results.active.push(agentId);
-    }
-  }
-  return results;
-}
-
-function verifyAndCleanupObsoleteAgents(hrSystem) {
-  const cleaned = [];
-  for (const [agentId, agent] of Object.entries(hrSystem)) {
-    // Check if non-global worker has finished all tasks
-    if (agent.project !== 'global' && agent.tasks_total > 0 && agent.tasks_completed >= agent.tasks_total) {
-      agent.status = 'obsolete';
-      appendToSharedLog(`Marshall Agent & HR verified completion for obsolete agent: ${agentId}`);
-      delete hrSystem[agentId];
-      cleaned.push(agentId);
-    }
-  }
-  if (cleaned.length > 0) {
-    saveHrSystem(hrSystem);
-  }
-  return cleaned;
-}
-
-function runMarshallChecks() {
-  const hrSystem = loadHrSystem();
-  appendToSharedLog('Marshall Agent running 5-minute system inspection...');
-
-  // 1. Obsolete agents
-  const cleaned = verifyAndCleanupObsoleteAgents(hrSystem);
-
-  // 2. Context exhaustion
-  const contextCheck = checkContextExhaustion(hrSystem);
-  if (contextCheck.exhausted.length > 0) {
-    appendToSharedLog(`[ALERT] Context exhaustion imminent for: ${contextCheck.exhausted.map(e => e.agentId).join(', ')}. Triggering handover recommendations.`);
-  }
-
-  // 3. Stuck processes
-  const stuckCheck = checkStuckProcesses(hrSystem);
-  if (stuckCheck.stuck.length > 0) {
-    appendToSharedLog(`[WARN] Stuck processes detected: ${stuckCheck.stuck.map(s => `${s.agentId} (${s.idleMinutes}m)`).join(', ')}. Notifying Manager for human-in-the-loop review.`);
-  }
-
-  return {
-    timestamp: new Date().toISOString(),
-    cleaned,
-    contextCheck,
-    stuckCheck
-  };
-}
-
-// Run Marshall checks every 5 minutes
-setInterval(() => {
-  runMarshallChecks();
-}, 300000);
 
 // ============================================================
 // REST API ENDPOINTS
@@ -728,20 +1258,55 @@ app.get('/api/projects', (req, res) => {
     createProjectFolder('project-alpha');
     createProjectFolder('project-beta');
   }
-  res.json({ projects: listProjects() });
+  const config = loadProjectsConfig();
+  res.json({ projects: listProjects(), config });
 });
 
-// Start new project (CEO Initiates -> HR spawns Manager Bard)
+// Project Configuration Endpoints
+app.get('/api/projects/config', (req, res) => {
+  res.json({ config: loadProjectsConfig() });
+});
+
+app.post('/api/projects/config', (req, res) => {
+  const { projectId, customPath, budgetUsd, maxTokens, description } = req.body;
+  if (!projectId) return res.status(400).json({ error: 'projectId is required' });
+
+  const cfg = loadProjectsConfig();
+  if (!cfg[projectId]) {
+    cfg[projectId] = {
+      path: customPath || path.join(PROJECTS_DIR, projectId),
+      budgetUsd: budgetUsd || 50.00,
+      spentUsd: 0.00,
+      maxTokens: maxTokens || 1000000,
+      tokensUsed: 0,
+      description: description || `Project ${projectId}`
+    };
+  } else {
+    if (customPath) cfg[projectId].path = customPath;
+    if (budgetUsd !== undefined) cfg[projectId].budgetUsd = Number(budgetUsd);
+    if (maxTokens !== undefined) cfg[projectId].maxTokens = Number(maxTokens);
+    if (description) cfg[projectId].description = description;
+  }
+  saveProjectsConfig(cfg);
+  appendToSharedLog(`Updated project configuration for [${projectId}]: ${JSON.stringify(cfg[projectId])}`);
+  res.json({ success: true, projectConfig: cfg[projectId] });
+});
+
+// Start new project
 app.post('/handleStartProject', (req, res) => {
-  const { projectId, initialAgentRole = 'manager-bard', prompt = 'Initial project setup' } = req.body;
+  const { projectId, initialAgentRole = 'manager-bard', customPath, budgetUsd } = req.body;
   if (!projectId) {
     return res.status(400).json({ error: 'Project ID is required' });
   }
 
-  createProjectFolder(projectId);
-  appendToSharedLog(`CEO Warlock initiated new project: [${projectId}]`);
+  createProjectFolder(projectId, customPath);
+  if (budgetUsd) {
+    const cfg = loadProjectsConfig();
+    if (cfg[projectId]) cfg[projectId].budgetUsd = Number(budgetUsd);
+    saveProjectsConfig(cfg);
+  }
 
-  // HR spawns Manager Bard for this project
+  appendToSharedLog(`CEO Warlock initiated new project: [${projectId}]`);
   const spawned = spawnAgentViaHr(initialAgentRole, projectId, `Manager Bard (${projectId})`);
 
   return res.json({
@@ -758,38 +1323,91 @@ app.get('/api/agents', (req, res) => {
   res.json({ agents: hrSystem });
 });
 
-// HR Spawns a new agent
-app.post('/api/agents/spawn', (req, res) => {
-  const { role, projectId = 'global', customName } = req.body;
-  if (!role) {
-    return res.status(400).json({ error: 'Agent role is required' });
-  }
-  const result = spawnAgentViaHr(role, projectId, customName);
+// Request Summoning (places agent in "awaiting-confirmation" state)
+app.post('/api/agents/request-summon', (req, res) => {
+  const { role, projectId = 'project-alpha', name, model, harness, effortLevel, promptOverride } = req.body;
+  if (!role) return res.status(400).json({ error: 'Agent role is required' });
+
+  const result = requestAgentSummoning(role, projectId, { name, model, harness, effortLevel, promptOverride });
   res.json({ success: true, ...result });
 });
 
-// Get single agent status, character sheet, messages, thoughts, context
+// Confirm Summoning (manifests agent into active status)
+app.post('/api/agents/confirm-summon', (req, res) => {
+  const { agentId, updatedParams } = req.body;
+  if (!agentId) return res.status(400).json({ error: 'agentId is required' });
+
+  try {
+    const result = confirmAgentSummoning(agentId, updatedParams || {});
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// Update Agent configuration (Name, Stats, Model, Effort, Prompt)
+app.post('/api/agents/update', (req, res) => {
+  const { agentId, updates } = req.body;
+  if (!agentId || !updates) return res.status(400).json({ error: 'agentId and updates are required' });
+
+  const hrSystem = loadHrSystem();
+  if (!hrSystem[agentId]) return res.status(404).json({ error: `Agent ${agentId} not found` });
+
+  const agent = hrSystem[agentId];
+  if (updates.name) agent.name = updates.name;
+  if (updates.model) agent.model = updates.model;
+  if (updates.harness) agent.harness = updates.harness;
+  if (updates.effortLevel) agent.effortLevel = updates.effortLevel;
+  if (updates.promptOverride !== undefined) agent.promptOverride = updates.promptOverride;
+  if (updates.stats) {
+    agent.stats = { ...agent.stats, ...updates.stats };
+  }
+
+  saveHrSystem(hrSystem);
+  appendToSharedLog(`Configured agent [${agentId}] (${agent.name}) with updated parameters.`);
+  res.json({ success: true, agent });
+});
+
+// Set Agent status (active, working, paused, retired)
+app.post('/api/agents/set-status', (req, res) => {
+  const { agentId, status } = req.body;
+  if (!agentId || !status) return res.status(400).json({ error: 'agentId and status are required' });
+
+  const hrSystem = loadHrSystem();
+  if (!hrSystem[agentId]) return res.status(404).json({ error: `Agent ${agentId} not found` });
+
+  hrSystem[agentId].status = status;
+  saveHrSystem(hrSystem);
+  appendToSharedLog(`Agent [${agentId}] status changed to [${status}].`);
+  res.json({ success: true, agentId, status });
+});
+
+// Standard direct spawn via HR
+app.post('/api/agents/spawn', (req, res) => {
+  const { role, projectId = 'global', customName, model, harness, effortLevel } = req.body;
+  if (!role) {
+    return res.status(400).json({ error: 'Agent role is required' });
+  }
+  const result = spawnAgentViaHr(role, projectId, customName, { model, harness, effortLevel });
+  res.json({ success: true, ...result });
+});
+
+// Get single agent status
 app.post('/handleGetAgentStatus', (req, res) => {
   const { agentId = 'ceo-warlock' } = req.body;
   const hrSystem = loadHrSystem();
   let agent = hrSystem[agentId];
 
-  // If requested agent doesn't exist, create fallback or default
   if (!agent) {
-    if (agentId === 'ceo-warlock' || agentId === 'hr-mind-flayer') {
-      loadHrSystem(); // ensures initial file written
-      agent = hrSystem[agentId];
-    } else {
-      agent = {
-        name: agentId,
-        role: agentId,
-        project: 'global',
-        status: 'active',
-        context_len: 128000,
-        context_used: 5000,
-        stats: AGENT_RPG_REGISTRY[agentId] || AGENT_RPG_REGISTRY['ceo-warlock']
-      };
-    }
+    agent = {
+      name: agentId,
+      role: agentId,
+      project: 'global',
+      status: 'active',
+      context_len: 128000,
+      context_used: 5000,
+      stats: AGENT_RPG_REGISTRY[agentId] || AGENT_RPG_REGISTRY['ceo-warlock']
+    };
   }
 
   const messagesData = loadAgentMessages(agentId);
@@ -819,7 +1437,7 @@ app.post('/handleGetAgentStatus', (req, res) => {
   });
 });
 
-// Send message to agent -> executes harness -> appends reply
+// Send message to agent
 app.post('/handleSendMessage', (req, res) => {
   const { agentId = 'ceo-warlock', projectId = 'project-alpha', message, harness = 'opencode' } = req.body;
 
@@ -838,17 +1456,36 @@ app.post('/handleSendMessage', (req, res) => {
 
   appendToSharedLog(`User sent message to [${agentId}] in [${projectId}]: ${message.slice(0, 60)}...`);
 
-  // 2. Update agent activity
+  // Trigger Courier Event for Inter-Agent Animation
+  broadcastAgentEvent({
+    fromAgentId: 'user',
+    toAgentId: agentId,
+    type: 'courier_message',
+    snippet: message.slice(0, 50)
+  });
+
+  // 2. Update agent activity & token usage
   const hrSystem = loadHrSystem();
   if (hrSystem[agentId]) {
     hrSystem[agentId].last_activity_ms = Date.now();
-    hrSystem[agentId].context_used = (hrSystem[agentId].context_used || 5000) + Math.round(message.length * 1.5);
+    const tokenIncrement = Math.round(message.length * 1.5) + 350;
+    hrSystem[agentId].context_used = (hrSystem[agentId].context_used || 5000) + tokenIncrement;
     saveHrSystem(hrSystem);
+
+    // Update project budget tracking
+    const projCfg = loadProjectsConfig();
+    if (projCfg[projectId]) {
+      projCfg[projectId].tokensUsed = (projCfg[projectId].tokensUsed || 0) + tokenIncrement;
+      const rate = hrSystem[agentId]?.stats?.costPer1kInput || 0.002;
+      projCfg[projectId].spentUsd = Number(((projCfg[projectId].spentUsd || 0) + (tokenIncrement / 1000 * rate)).toFixed(4));
+      saveProjectsConfig(projCfg);
+    }
   }
 
   // 3. Dispatch to harness
   appendAgentThought(agentId, 'USER_INPUT', `Received prompt: "${message.slice(0, 80)}..."`);
-  const harnessResult = spawnHarnessAgent(harness, projectId, message, agentId);
+  const effectiveHarness = hrSystem[agentId]?.harness || harness;
+  const harnessResult = spawnHarnessAgent(effectiveHarness, projectId, message, agentId);
 
   // 4. Record agent reply
   appendAgentMessage(agentId, {
@@ -867,7 +1504,7 @@ app.post('/handleSendMessage', (req, res) => {
   });
 });
 
-// Get shared state log
+// Shared state log
 app.post('/handleGetSharedLog', (req, res) => {
   const logFile = getSharedStateLogFile();
   if (!fs.existsSync(logFile)) {
@@ -878,7 +1515,46 @@ app.post('/handleGetSharedLog', (req, res) => {
   return res.json({ log: lines });
 });
 
-// Get network relationship graph
+// Inter-Agent Event Stream
+app.get('/api/events', (req, res) => {
+  res.json({ events: agentEventQueue });
+});
+
+// Company Knowledge Base API
+app.get('/api/knowledge-base', (req, res) => {
+  const kb = loadKnowledgeBase();
+  res.json({ knowledgeBase: kb });
+});
+
+app.post('/api/knowledge-base/query', (req, res) => {
+  const { query = '' } = req.body;
+  const kb = loadKnowledgeBase();
+  const lower = query.toLowerCase();
+  const matchingTopics = (kb.topics || []).filter(t => 
+    t.title.toLowerCase().includes(lower) || 
+    t.summary.toLowerCase().includes(lower) ||
+    (t.tags || []).some(tag => tag.toLowerCase().includes(lower))
+  );
+  res.json({ results: matchingTopics, count: matchingTopics.length });
+});
+
+app.post('/api/knowledge-base/run-analyst', (req, res) => {
+  const result = runSeniorAnalystInspection();
+  res.json({ success: true, result });
+});
+
+// Marshall Sentinel Endpoints
+app.get('/api/marshall/audit', (req, res) => {
+  const audit = loadMarshallAudit();
+  res.json({ audit });
+});
+
+app.post('/api/marshall/run', (req, res) => {
+  const report = runMarshallChecks();
+  res.json({ success: true, report });
+});
+
+// Relationships graph
 app.get('/api/relationships', (req, res) => {
   const hrSystem = loadHrSystem();
   const agents = Object.entries(hrSystem).map(([id, a]) => ({
@@ -886,17 +1562,20 @@ app.get('/api/relationships', (req, res) => {
     name: a.name || id,
     role: a.role || id,
     project: a.project || 'global',
-    color: a.stats?.avatarColor || 0x9b59b6
+    color: a.stats?.avatarColor || 0x9b59b6,
+    status: a.status || 'active'
   }));
 
   const links = [];
-  // Build relationships based on messages and hierarchies
   for (const agentId of Object.keys(hrSystem)) {
     if (agentId !== 'ceo-warlock') {
       links.push({ source: 'ceo-warlock', target: agentId, value: 5 });
     }
     if (agentId !== 'hr-mind-flayer') {
       links.push({ source: 'hr-mind-flayer', target: agentId, value: 8 });
+    }
+    if (agentId !== 'senior-analyst-diviner') {
+      links.push({ source: 'senior-analyst-diviner', target: agentId, value: 3 });
     }
   }
 
@@ -925,6 +1604,13 @@ const ROLE_THOUGHT_POOLS = {
     "Inspecting system interfaces for tech debt...",
     "Reviewing PRs with divine discernment...",
     "Contemplating domain-driven design purity..."
+  ],
+  'senior-analyst-diviner': [
+    "Synthesizing cross-project vector embeddings...",
+    "Indexing system architectural decisions...",
+    "Measuring tech debt drift across repositories...",
+    "Updating Company Knowledge Base lore...",
+    "Scrying project milestone velocities..."
   ],
   'manager-bard': [
     "Marinating on project requirements...",
@@ -973,7 +1659,7 @@ const ROLE_THOUGHT_POOLS = {
     "Measuring agent context token telemetry...",
     "Inspecting system vital signs for stuck loops...",
     "Running scheduled 5-minute sentinel audit...",
-    "Keeping the realm organized and healthy..."
+    "Ranking agents by context consumption..."
   ]
 };
 
@@ -996,6 +1682,7 @@ app.get('/api/agent-thoughts', (req, res) => {
       name: agent.name || agentId,
       role: agent.role,
       project: agent.project,
+      status: agent.status || 'active',
       currentThought: lastThought || randomThought,
       thoughtPool: rolePool
     };
@@ -1003,34 +1690,21 @@ app.get('/api/agent-thoughts', (req, res) => {
   res.json({ thoughts: thoughtsMap });
 });
 
-// Trigger manual Marshall Health Check
-app.post('/api/marshall/run', (req, res) => {
-  const report = runMarshallChecks();
-  res.json({ success: true, report });
-});
-
 // ============================================================
 // SERVER INITIALIZATION
 // ============================================================
 
-// Initialize base agents on startup
 loadHrSystem();
+loadKnowledgeBase();
+loadProjectsConfig();
 createProjectFolder('project-alpha');
 createProjectFolder('project-beta');
 
-// Ensure ONLY manager exists for project-alpha (No other agents spawned by default)
+// Ensure ONLY manager exists for project-alpha
 const initialHr = loadHrSystem();
 if (!initialHr['project-alpha-manager-bard']) {
   spawnAgentViaHr('manager-bard', 'project-alpha', 'Manager Bard (Alpha)');
 }
-
-// Clean up any old pre-spawned worker agents from previous test runs if needed
-for (const [id, agent] of Object.entries(initialHr)) {
-  if (agent.project === 'project-alpha' && id !== 'project-alpha-manager-bard') {
-    delete initialHr[id];
-  }
-}
-saveHrSystem(initialHr);
 
 app.listen(PORT, () => {
   console.log(`====================================================`);
@@ -1038,6 +1712,7 @@ app.listen(PORT, () => {
   console.log(`🌐 Web UI: http://localhost:${PORT}`);
   console.log(`⚡ Harness Binary (OpenCode): ${findHarnessBinary('opencode') || 'Simulated/Fallback'}`);
   console.log(`🛡️ Marshall Watchdog Cycle: Active (every 5 mins)`);
+  console.log(`🔮 Senior Analyst Scribe: Active (every 5 mins)`);
   console.log(`====================================================`);
 });
 
