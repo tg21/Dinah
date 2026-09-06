@@ -4,6 +4,14 @@ import fs from 'fs';
 import path from 'path';
 import { exec, execSync } from 'child_process';
 import os from 'os';
+import {
+  initializeHarnessesAndModels,
+  getAvailableModels,
+  getDetectedHarnesses,
+  getModelById,
+  selectBestModelForRole,
+  findHarnessBinary
+} from './harnessRegistry.js';
 
 // ============================================================
 // EXPRESS APP & DIRECTORY CONFIGURATION
@@ -51,8 +59,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 140,
     ac: 18,
     avatarColor: 0x9b59b6,
-    defaultModel: 'claude-3-7-sonnet-20250219',
-    modelProvider: 'Anthropic',
+    requiredCapabilities: ['thinking', 'tools'],
+    roleFocus: 'executive-strategy',
     effortLevel: 'Extreme',
     contextCapacity: 200000,
     tokensPerSec: 85,
@@ -78,8 +86,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 125,
     ac: 17,
     avatarColor: 0x8e44ad,
-    defaultModel: 'gemini-2.0-pro-exp',
-    modelProvider: 'Google DeepMind',
+    requiredCapabilities: ['tools'],
+    roleFocus: 'hr-orchestration',
     effortLevel: 'High',
     contextCapacity: 2000000,
     tokensPerSec: 110,
@@ -105,8 +113,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 130,
     ac: 20,
     avatarColor: 0xf1c40f,
-    defaultModel: 'claude-3-7-sonnet-20250219',
-    modelProvider: 'Anthropic',
+    requiredCapabilities: ['thinking', 'tools'],
+    roleFocus: 'clean-code-architecture',
     effortLevel: 'High',
     contextCapacity: 200000,
     tokensPerSec: 80,
@@ -132,8 +140,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 110,
     ac: 16,
     avatarColor: 0x9c27b0,
-    defaultModel: 'gemini-2.0-flash-thinking',
-    modelProvider: 'Google DeepMind',
+    requiredCapabilities: ['thinking', 'tools'],
+    roleFocus: 'knowledge-synthesis',
     effortLevel: 'High',
     contextCapacity: 1000000,
     tokensPerSec: 130,
@@ -159,8 +167,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 120,
     ac: 18,
     avatarColor: 0x00bcd4,
-    defaultModel: 'gemini-2.0-flash',
-    modelProvider: 'Google DeepMind',
+    requiredCapabilities: ['tools'],
+    roleFocus: 'system-inspection-watchdog',
     effortLevel: 'Medium',
     contextCapacity: 1000000,
     tokensPerSec: 150,
@@ -186,8 +194,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 105,
     ac: 15,
     avatarColor: 0xe67e22,
-    defaultModel: 'claude-3-7-sonnet-20250219',
-    modelProvider: 'Anthropic',
+    requiredCapabilities: ['tools'],
+    roleFocus: 'agile-routing-planning',
     effortLevel: 'Medium',
     contextCapacity: 200000,
     tokensPerSec: 85,
@@ -213,8 +221,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 85,
     ac: 14,
     avatarColor: 0x3498db,
-    defaultModel: 'claude-3-7-sonnet-20250219',
-    modelProvider: 'Anthropic',
+    requiredCapabilities: ['thinking', 'tools'],
+    roleFocus: 'distributed-system-specifications',
     effortLevel: 'High',
     contextCapacity: 200000,
     tokensPerSec: 80,
@@ -240,8 +248,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 98,
     ac: 18,
     avatarColor: 0x1abc9c,
-    defaultModel: 'deepseek-r1',
-    modelProvider: 'DeepSeek',
+    requiredCapabilities: ['tools'],
+    roleFocus: 'databases-apis-services',
     effortLevel: 'High',
     contextCapacity: 128000,
     tokensPerSec: 75,
@@ -267,8 +275,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 78,
     ac: 13,
     avatarColor: 0xe91e63,
-    defaultModel: 'gpt-4o',
-    modelProvider: 'OpenAI',
+    requiredCapabilities: ['vision', 'tools'],
+    roleFocus: 'visual-design-canvas',
     effortLevel: 'Medium',
     contextCapacity: 128000,
     tokensPerSec: 100,
@@ -294,8 +302,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 88,
     ac: 16,
     avatarColor: 0x27ae60,
-    defaultModel: 'claude-3-5-haiku',
-    modelProvider: 'Anthropic',
+    requiredCapabilities: ['tools'],
+    roleFocus: 'regression-testing-fuzzing',
     effortLevel: 'Medium',
     contextCapacity: 200000,
     tokensPerSec: 140,
@@ -321,8 +329,8 @@ const AGENT_RPG_REGISTRY = {
     maxHp: 115,
     ac: 19,
     avatarColor: 0xe74c3c,
-    defaultModel: 'deepseek-r1',
-    modelProvider: 'DeepSeek',
+    requiredCapabilities: ['tools'],
+    roleFocus: 'infrastructure-cicd-resilience',
     effortLevel: 'High',
     contextCapacity: 128000,
     tokensPerSec: 75,
@@ -443,80 +451,33 @@ function listProjects() {
 
 const HR_SYSTEM_FILE = path.join(HR_SYSTEM_DIR, 'hr-system.json');
 
+function createOverseerAgent(ovId) {
+  const rpgStats = AGENT_RPG_REGISTRY[ovId] || {};
+  const bestModel = selectBestModelForRole(ovId);
+  return {
+    name: rpgStats.name || ovId,
+    role: ovId,
+    project: 'global',
+    status: 'active',
+    harness: bestModel?.source?.harness || 'opencode',
+    model: bestModel?.id || 'system-simulator/balanced-agent',
+    effortLevel: rpgStats.effortLevel || (bestModel?.reasoning?.type === 'effort' ? 'High' : 'Medium'),
+    context_len: bestModel?.contextWindow || rpgStats.contextCapacity || 128000,
+    context_used: 4200,
+    created_at: new Date().toISOString(),
+    last_activity_ms: Date.now(),
+    stats: rpgStats
+  };
+}
+
 function loadHrSystem() {
+  const defaultOverseers = ['ceo-warlock', 'hr-mind-flayer', 'staff-engineer-paladin', 'senior-analyst-diviner', 'marshall-agent-system-inspector'];
+
   if (!fs.existsSync(HR_SYSTEM_FILE)) {
-    const initialRegistry = {
-      'ceo-warlock': {
-        name: 'CEO Warlock',
-        role: 'ceo-warlock',
-        project: 'global',
-        status: 'active',
-        harness: 'opencode',
-        model: 'claude-3-7-sonnet-20250219',
-        effortLevel: 'Extreme',
-        context_len: 200000,
-        context_used: 12400,
-        created_at: new Date().toISOString(),
-        last_activity_ms: Date.now(),
-        stats: AGENT_RPG_REGISTRY['ceo-warlock']
-      },
-      'hr-mind-flayer': {
-        name: 'HR Mind Flayer',
-        role: 'hr-mind-flayer',
-        project: 'global',
-        status: 'active',
-        harness: 'gemini',
-        model: 'gemini-2.0-pro-exp',
-        effortLevel: 'High',
-        context_len: 2000000,
-        context_used: 8200,
-        created_at: new Date().toISOString(),
-        last_activity_ms: Date.now(),
-        stats: AGENT_RPG_REGISTRY['hr-mind-flayer']
-      },
-      'staff-engineer-paladin': {
-        name: 'Staff Engineer Paladin',
-        role: 'staff-engineer-paladin',
-        project: 'global',
-        status: 'active',
-        harness: 'claude-code',
-        model: 'claude-3-7-sonnet-20250219',
-        effortLevel: 'High',
-        context_len: 200000,
-        context_used: 9500,
-        created_at: new Date().toISOString(),
-        last_activity_ms: Date.now(),
-        stats: AGENT_RPG_REGISTRY['staff-engineer-paladin']
-      },
-      'senior-analyst-diviner': {
-        name: 'Senior Analyst Diviner',
-        role: 'senior-analyst-diviner',
-        project: 'global',
-        status: 'active',
-        harness: 'gemini',
-        model: 'gemini-2.0-flash-thinking',
-        effortLevel: 'High',
-        context_len: 1000000,
-        context_used: 5400,
-        created_at: new Date().toISOString(),
-        last_activity_ms: Date.now(),
-        stats: AGENT_RPG_REGISTRY['senior-analyst-diviner']
-      },
-      'marshall-agent-system-inspector': {
-        name: 'Marshall Sentinel',
-        role: 'marshall-agent-system-inspector',
-        project: 'global',
-        status: 'active',
-        harness: 'gemini',
-        model: 'gemini-2.0-flash',
-        effortLevel: 'Medium',
-        context_len: 1000000,
-        context_used: 4100,
-        created_at: new Date().toISOString(),
-        last_activity_ms: Date.now(),
-        stats: AGENT_RPG_REGISTRY['marshall-agent-system-inspector']
-      }
-    };
+    const initialRegistry = {};
+    for (const ovId of defaultOverseers) {
+      initialRegistry[ovId] = createOverseerAgent(ovId);
+    }
     fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(initialRegistry, null, 2));
     return initialRegistry;
   }
@@ -525,26 +486,39 @@ function loadHrSystem() {
     let modified = false;
 
     // Ensure all global overseer agents exist
-    const defaultOverseers = ['ceo-warlock', 'hr-mind-flayer', 'staff-engineer-paladin', 'senior-analyst-diviner', 'marshall-agent-system-inspector'];
     for (const ovId of defaultOverseers) {
       if (!data[ovId]) {
-        data[ovId] = {
-          name: AGENT_RPG_REGISTRY[ovId]?.name || ovId,
-          role: ovId,
-          project: 'global',
-          status: 'active',
-          harness: AGENT_RPG_REGISTRY[ovId]?.defaultModel?.includes('gemini') ? 'gemini' : 'opencode',
-          model: AGENT_RPG_REGISTRY[ovId]?.defaultModel || 'claude-3-7-sonnet-20250219',
-          effortLevel: AGENT_RPG_REGISTRY[ovId]?.effortLevel || 'High',
-          context_len: AGENT_RPG_REGISTRY[ovId]?.contextCapacity || 200000,
-          context_used: 6000,
-          created_at: new Date().toISOString(),
-          last_activity_ms: Date.now(),
-          stats: AGENT_RPG_REGISTRY[ovId]
-        };
+        data[ovId] = createOverseerAgent(ovId);
         modified = true;
       }
     }
+
+    // Dynamic model reconciliation:
+    // If an agent has no model, or references a hardcoded model not present on the host system,
+    // match them with the best available model discovered on the host.
+    for (const agentId of Object.keys(data)) {
+      const agent = data[agentId];
+      const modelExists = agent.model && getModelById(agent.model);
+      if (!modelExists) {
+        const bestModel = selectBestModelForRole(agent.role, agent.model);
+        if (bestModel) {
+          agent.model = bestModel.id;
+          agent.harness = bestModel.source.harness;
+          if (!agent.context_len || agent.context_len === 200000) {
+            agent.context_len = bestModel.contextWindow || agent.context_len || 128000;
+          }
+          modified = true;
+        }
+      } else {
+        // Ensure harness is aligned with model's actual harness
+        const found = getModelById(agent.model);
+        if (found && agent.harness !== found.source.harness) {
+          agent.harness = found.source.harness;
+          modified = true;
+        }
+      }
+    }
+
     if (modified) {
       fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(data, null, 2));
     }
@@ -889,31 +863,6 @@ setInterval(() => {
 // HARNESS DETECTION & EXECUTION
 // ============================================================
 
-function findHarnessBinary(harnessName) {
-  const binaryMap = {
-    opencode: ['opencode', '/usr/bin/opencode', '/usr/local/bin/opencode'],
-    'claude-code': ['claude', 'claude-code'],
-    codex: ['codex', 'openai'],
-    gemini: ['gemini', 'gemini-cli']
-  };
-
-  const possibleNames = binaryMap[harnessName] || [harnessName];
-
-  for (const name of possibleNames) {
-    if (name.startsWith('/') && fs.existsSync(name)) {
-      return name;
-    }
-    try {
-      const result = execSync(`which ${name} 2>/dev/null`, { encoding: 'utf-8' });
-      if (result && result.trim()) {
-        return result.trim();
-      }
-    } catch (e) {}
-  }
-
-  return null;
-}
-
 function spawnOpencodeAgent(projectId, prompt, agentId) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
@@ -924,12 +873,15 @@ function spawnOpencodeAgent(projectId, prompt, agentId) {
   }
 
   try {
-    appendAgentThought(agentId, 'OPENCODE_INVOKE', `Invoking OpenCode harness in ${projectDir}`);
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
+    const modelFlag = agent?.model ? `-m "${agent.model}" ` : '';
+    appendAgentThought(agentId, 'OPENCODE_INVOKE', `Invoking OpenCode harness [${agent?.model || 'default'}] in ${projectDir}`);
     const escapedPrompt = prompt.replace(/"/g, '\\"');
-    const cmd = `${harnessBin} run --dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 8000 });
+    const cmd = `${harnessBin} run ${modelFlag}--dir "${projectDir}" "${escapedPrompt}"`;
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
     appendAgentThought(agentId, 'OPENCODE_SUCCESS', `OpenCode execution completed.`);
-    return { success: true, output, agentId, harness: 'opencode' };
+    return { success: true, output, agentId, harness: 'opencode', model: agent?.model };
   } catch (error) {
     appendAgentThought(agentId, 'OPENCODE_FALLBACK', `Harness note: ${error.message.slice(0, 80)}`);
     return simulateHarnessExecution('opencode', projectId, prompt, agentId);
@@ -939,17 +891,19 @@ function spawnOpencodeAgent(projectId, prompt, agentId) {
 function spawnClaudeCodeAgent(projectId, prompt, agentId) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
-  const harnessBin = findHarnessBinary('claude-code');
+  const harnessBin = findHarnessBinary('claude-code') || findHarnessBinary('claude');
 
   if (!harnessBin) {
     return simulateHarnessExecution('claude-code', projectId, prompt, agentId);
   }
 
   try {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} -p "${escapedPrompt}" --workdir "${projectDir}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 8000 });
-    return { success: true, output, agentId, harness: 'claude-code' };
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    return { success: true, output, agentId, harness: 'claude-code', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('claude-code', projectId, prompt, agentId);
   }
@@ -958,17 +912,19 @@ function spawnClaudeCodeAgent(projectId, prompt, agentId) {
 function spawnCodexAgent(projectId, prompt, agentId) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
-  const harnessBin = findHarnessBinary('codex');
+  const harnessBin = findHarnessBinary('codex') || findHarnessBinary('openai');
 
   if (!harnessBin) {
     return simulateHarnessExecution('codex', projectId, prompt, agentId);
   }
 
   try {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} --dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 8000 });
-    return { success: true, output, agentId, harness: 'codex' };
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    return { success: true, output, agentId, harness: 'codex', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('codex', projectId, prompt, agentId);
   }
@@ -977,46 +933,71 @@ function spawnCodexAgent(projectId, prompt, agentId) {
 function spawnGeminiAgent(projectId, prompt, agentId) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
-  const harnessBin = findHarnessBinary('gemini');
+  const harnessBin = findHarnessBinary('gemini') || findHarnessBinary('gemini-cli');
 
   if (!harnessBin) {
     return simulateHarnessExecution('gemini', projectId, prompt, agentId);
   }
 
   try {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
+    const modelName = agent?.model || 'gemini-2.5-flash';
     const escapedPrompt = prompt.replace(/"/g, '\\"');
-    const cmd = `${harnessBin} --model gemini-2.0-flash --dir "${projectDir}" "${escapedPrompt}"`;
+    const cmd = `${harnessBin} --model "${modelName}" --dir "${projectDir}" "${escapedPrompt}"`;
     const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
-    return { success: true, output, agentId, harness: 'gemini' };
+    return { success: true, output, agentId, harness: 'gemini', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('gemini', projectId, prompt, agentId);
   }
 }
 
+function spawnOllamaAgent(projectId, prompt, agentId) {
+  const projectDir = getProjectFolder(projectId);
+  createProjectFolder(projectId);
+  const harnessBin = findHarnessBinary('ollama');
+
+  if (!harnessBin) {
+    return simulateHarnessExecution('ollama', projectId, prompt, agentId);
+  }
+
+  try {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
+    const modelName = agent?.model || 'llama3';
+    const escapedPrompt = prompt.replace(/"/g, '\\"');
+    const cmd = `${harnessBin} run "${modelName}" "${escapedPrompt}"`;
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    return { success: true, output, agentId, harness: 'ollama', model: agent?.model };
+  } catch (error) {
+    return simulateHarnessExecution('ollama', projectId, prompt, agentId);
+  }
+}
+
 function simulateHarnessExecution(harness, projectId, prompt, agentId) {
   const hrSystem = loadHrSystem();
-  const agent = hrSystem[agentId] || { name: agentId, role: agentId, model: 'claude-3-7-sonnet' };
+  const agent = hrSystem[agentId] || { name: agentId, role: agentId, model: 'system-simulator/balanced-agent' };
   
   let roleFlavor = '';
-  if (agent.role.includes('ceo')) {
+  if (agent.role && agent.role.includes('ceo')) {
     roleFlavor = `[CEO Warlock]: I have received your strategic directive: "${prompt}". Delegating to HR Mind Flayer to ensure Manager Bard and project resources are allocated.`;
-  } else if (agent.role.includes('hr')) {
+  } else if (agent.role && agent.role.includes('hr')) {
     roleFlavor = `[HR Mind Flayer]: Compliance verified. Telepathically reviewing active agent roster and templates for project ${projectId}.`;
-  } else if (agent.role.includes('manager')) {
+  } else if (agent.role && agent.role.includes('manager')) {
     roleFlavor = `[Manager Bard]: Casting Vicious Mockery on project blockers! Breaking down "${prompt}" into sprint tickets for engineering and QA specialists.`;
-  } else if (agent.role.includes('analyst')) {
+  } else if (agent.role && agent.role.includes('analyst')) {
     roleFlavor = `[Senior Analyst Diviner]: Inspecting system telemetry and synthesizing insights for "${prompt}" into Company Knowledge Base.`;
-  } else if (agent.role.includes('wizard') || agent.role.includes('architect')) {
+  } else if (agent.role && (agent.role.includes('wizard') || agent.role.includes('architect'))) {
     roleFlavor = `[Solution Architect Wizard]: Drafting architectural blueprint, API schemas, and distributed data contracts for "${prompt}".`;
-  } else if (agent.role.includes('paladin') || agent.role.includes('staff')) {
+  } else if (agent.role && (agent.role.includes('paladin') || agent.role.includes('staff'))) {
     roleFlavor = `[Staff Engineer Paladin]: Enforcing the Sacred Oath of Clean Code. Inspecting interfaces, SOLID design, and test requirements.`;
-  } else if (agent.role.includes('cleric') || agent.role.includes('backend')) {
+  } else if (agent.role && (agent.role.includes('cleric') || agent.role.includes('backend'))) {
     roleFlavor = `[Backend Cleric]: Praying to PostgreSQL gods. Preparing zero-downtime database schema and REST controllers.`;
-  } else if (agent.role.includes('sorcerer') || agent.role.includes('frontend')) {
+  } else if (agent.role && (agent.role.includes('sorcerer') || agent.role.includes('frontend'))) {
     roleFlavor = `[Frontend Sorcerer]: Channeling PixiJS visual magic and responsive CSS layouts.`;
-  } else if (agent.role.includes('rogue') || agent.role.includes('qa')) {
+  } else if (agent.role && (agent.role.includes('rogue') || agent.role.includes('qa'))) {
     roleFlavor = `[QA Rogue]: Lurking in the shadows with edge-case null pointers, fuzz testing, and regression suites.`;
-  } else if (agent.role.includes('warmage') || agent.role.includes('devops')) {
+  } else if (agent.role && (agent.role.includes('warmage') || agent.role.includes('devops'))) {
     roleFlavor = `[DevOps Warmage]: Fortifying Kubernetes deployment pipelines and Prometheus alerting against traffic surges.`;
   } else {
     roleFlavor = `[${agent.name || agentId}]: Processing directive "${prompt}" via [${agent.model || harness}]. Task execution verified.`;
@@ -1045,6 +1026,8 @@ function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId) {
       return spawnCodexAgent(projectId, prompt, agentId);
     case 'gemini':
       return spawnGeminiAgent(projectId, prompt, agentId);
+    case 'ollama':
+      return spawnOllamaAgent(projectId, prompt, agentId);
     default:
       return spawnOpencodeAgent(projectId, prompt, agentId);
   }
@@ -1056,6 +1039,7 @@ function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId) {
 
 function calculateAgentCostEstimation(role, model, effortLevel = 'High') {
   const meta = AGENT_RPG_REGISTRY[role] || {};
+  const modelObj = getModelById(model);
   const inRate = meta.costPer1kInput || 0.002;
   const outRate = meta.costPer1kOutput || 0.010;
   
@@ -1074,7 +1058,8 @@ function calculateAgentCostEstimation(role, model, effortLevel = 'High') {
     estTotalTokens: estPromptTokens + estOutputTokens,
     estCostUsd: Number(estCost.toFixed(4)),
     inputRate: inRate,
-    outputRate: outRate
+    outputRate: outRate,
+    model: modelObj?.displayName || model
   };
 }
 
@@ -1102,9 +1087,13 @@ function requestAgentSummoning(role, projectId = 'project-alpha', customOptions 
     traits: ['Task Execution']
   };
 
-  const model = customOptions.model || rpgStats.defaultModel || 'claude-3-7-sonnet-20250219';
+  const selectedModel = customOptions.model 
+    ? (getModelById(customOptions.model) || selectBestModelForRole(role, customOptions.model))
+    : selectBestModelForRole(role);
+
+  const model = selectedModel?.id || customOptions.model || 'system-simulator/balanced-agent';
+  const harness = customOptions.harness || selectedModel?.source?.harness || 'opencode';
   const effortLevel = customOptions.effortLevel || rpgStats.effortLevel || 'High';
-  const harness = customOptions.harness || (model.includes('gemini') ? 'gemini' : 'opencode');
   const costEst = calculateAgentCostEstimation(role, model, effortLevel);
 
   const awaitingAgent = {
@@ -1117,7 +1106,7 @@ function requestAgentSummoning(role, projectId = 'project-alpha', customOptions 
     effortLevel,
     promptOverride: customOptions.promptOverride || '',
     costEstimation: costEst,
-    context_len: rpgStats.contextCapacity || 128000,
+    context_len: selectedModel?.contextWindow || rpgStats.contextCapacity || 128000,
     context_used: 1000,
     created_at: new Date().toISOString(),
     last_activity_ms: Date.now(),
@@ -1149,7 +1138,14 @@ function confirmAgentSummoning(agentId, updatedParams = {}) {
 
   // Apply any final tweaks from confirmation dialog
   if (updatedParams.name) agent.name = updatedParams.name;
-  if (updatedParams.model) agent.model = updatedParams.model;
+  if (updatedParams.model) {
+    agent.model = updatedParams.model;
+    const modelCap = getModelById(updatedParams.model);
+    if (modelCap) {
+      agent.harness = modelCap.source.harness;
+      agent.context_len = modelCap.contextWindow || agent.context_len;
+    }
+  }
   if (updatedParams.harness) agent.harness = updatedParams.harness;
   if (updatedParams.effortLevel) agent.effortLevel = updatedParams.effortLevel;
   if (updatedParams.stats) agent.stats = { ...agent.stats, ...updatedParams.stats };
@@ -1203,9 +1199,13 @@ function spawnAgentViaHr(role, projectId = 'global', customName = null, options 
     traits: ['Task Execution']
   };
 
-  const model = options.model || rpgStats.defaultModel || 'claude-3-7-sonnet-20250219';
+  const selectedModel = options.model 
+    ? (getModelById(options.model) || selectBestModelForRole(role, options.model))
+    : selectBestModelForRole(role);
+
+  const model = selectedModel?.id || options.model || 'system-simulator/balanced-agent';
+  const harness = options.harness || selectedModel?.source?.harness || 'opencode';
   const effortLevel = options.effortLevel || rpgStats.effortLevel || 'High';
-  const harness = options.harness || (model.includes('gemini') ? 'gemini' : 'opencode');
 
   const newAgent = {
     name: customName || rpgStats.name,
@@ -1215,7 +1215,7 @@ function spawnAgentViaHr(role, projectId = 'global', customName = null, options 
     harness,
     model,
     effortLevel,
-    context_len: rpgStats.contextCapacity || 128000,
+    context_len: selectedModel?.contextWindow || rpgStats.contextCapacity || 128000,
     context_used: 1500,
     created_at: new Date().toISOString(),
     last_activity_ms: Date.now(),
@@ -1317,6 +1317,29 @@ app.post('/handleStartProject', (req, res) => {
   });
 });
 
+// ============================================================
+// HARNESS & MODEL DISCOVERY ENDPOINTS
+// ============================================================
+
+app.get('/api/harnesses', (req, res) => {
+  res.json({ harnesses: getDetectedHarnesses() });
+});
+
+app.get('/api/models', (req, res) => {
+  res.json({ models: getAvailableModels() });
+});
+
+app.post('/api/models/refresh', async (req, res) => {
+  try {
+    const result = await initializeHarnessesAndModels(true);
+    // Also re-reconcile HR system agents if needed
+    loadHrSystem();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get all agents registry
 app.get('/api/agents', (req, res) => {
   const hrSystem = loadHrSystem();
@@ -1355,7 +1378,14 @@ app.post('/api/agents/update', (req, res) => {
 
   const agent = hrSystem[agentId];
   if (updates.name) agent.name = updates.name;
-  if (updates.model) agent.model = updates.model;
+  if (updates.model) {
+    agent.model = updates.model;
+    const modelCap = getModelById(updates.model);
+    if (modelCap) {
+      agent.harness = modelCap.source.harness;
+      agent.context_len = modelCap.contextWindow || agent.context_len || 128000;
+    }
+  }
   if (updates.harness) agent.harness = updates.harness;
   if (updates.effortLevel) agent.effortLevel = updates.effortLevel;
   if (updates.promptOverride !== undefined) agent.promptOverride = updates.promptOverride;
@@ -1694,6 +1724,10 @@ app.get('/api/agent-thoughts', (req, res) => {
 // SERVER INITIALIZATION
 // ============================================================
 
+// Top-level startup: Query system for available harnesses and models first
+console.log('🚀 Initializing system harnesses and model discovery...');
+await initializeHarnessesAndModels();
+
 loadHrSystem();
 loadKnowledgeBase();
 loadProjectsConfig();
@@ -1707,10 +1741,13 @@ if (!initialHr['project-alpha-manager-bard']) {
 }
 
 app.listen(PORT, () => {
+  const harnesses = getDetectedHarnesses();
+  const models = getAvailableModels();
   console.log(`====================================================`);
   console.log(`🏰 DND Multi-Agent System Server is LIVE`);
   console.log(`🌐 Web UI: http://localhost:${PORT}`);
-  console.log(`⚡ Harness Binary (OpenCode): ${findHarnessBinary('opencode') || 'Simulated/Fallback'}`);
+  console.log(`⚡ Detected AI Harnesses: ${harnesses.map(h => `${h.name} (${h.modelCount} models)`).join(', ') || 'None (Simulated)'}`);
+  console.log(`🧠 Discovered System Models: ${models.length} available dynamically`);
   console.log(`🛡️ Marshall Watchdog Cycle: Active (every 5 mins)`);
   console.log(`🔮 Senior Analyst Scribe: Active (every 5 mins)`);
   console.log(`====================================================`);

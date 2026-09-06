@@ -4,7 +4,9 @@
   "description": "",
   "main": "src/backend.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rm -rf dist && mkdir dist && cp src/backend.js dist/ && cp src/harnessRegistry.js dist/ && cp src/frontend.html dist/",
+    "start": "node dist/backend.js"
   },
   "keywords": [],
   "type": "module",

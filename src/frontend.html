@@ -1653,14 +1653,9 @@
           </select>
         </div>
         <div class="modal-form-group">
-          <label>Model Engine</label>
+          <label>Model Engine (Discovered System Harnesses)</label>
           <select id="spawnModelSelect" onchange="updateSpawnCostPreview()">
-            <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet (Anthropic)</option>
-            <option value="deepseek-r1">DeepSeek R1 (DeepSeek)</option>
-            <option value="gpt-4o">GPT-4o (OpenAI)</option>
-            <option value="gemini-2.0-flash-thinking">Gemini 2.0 Flash Thinking (Google)</option>
-            <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Google)</option>
-            <option value="claude-3-5-haiku">Claude 3.5 Haiku (Anthropic)</option>
+            <option value="">Querying system harnesses...</option>
           </select>
         </div>
         <div class="modal-form-group">
@@ -1706,14 +1701,9 @@
           <input type="text" id="editAgentName">
         </div>
         <div class="modal-form-group">
-          <label>Model Engine</label>
+          <label>Model Engine (Discovered System Harnesses)</label>
           <select id="editAgentModel">
-            <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet (Anthropic)</option>
-            <option value="deepseek-r1">DeepSeek R1 (DeepSeek)</option>
-            <option value="gpt-4o">GPT-4o (OpenAI)</option>
-            <option value="gemini-2.0-flash-thinking">Gemini 2.0 Flash Thinking (Google)</option>
-            <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Google)</option>
-            <option value="claude-3-5-haiku">Claude 3.5 Haiku (Anthropic)</option>
+            <option value="">Querying system harnesses...</option>
           </select>
         </div>
         <div class="modal-form-group">
@@ -2734,9 +2724,12 @@
       document.getElementById('statLevel').innerText = stats.level || 10;
 
       // AI Capabilities Card
-      document.getElementById('capModel').innerText = agent.model || stats.defaultModel || 'Claude 3.7 Sonnet';
+      const modelObj = availableSystemModels.find(m => m.id === agent.model);
+      const modelLabel = modelObj ? modelObj.displayName : (agent.model || 'Auto-Discovered Model');
+      document.getElementById('capModel').innerText = `${modelLabel} [${agent.harness || 'system'}]`;
       document.getElementById('capEffort').innerText = agent.effortLevel || stats.effortLevel || 'High (Thinking)';
-      document.getElementById('capContext').innerText = `${((agent.context_len || 128000) / 1000).toFixed(0)}k Tokens`;
+      const ctxTokens = agent.context_len || modelObj?.contextWindow || 128000;
+      document.getElementById('capContext').innerText = `${((ctxTokens) / 1000).toFixed(0)}k Tokens`;
       document.getElementById('capLatency').innerText = `${stats.tokensPerSec || 90} tokens/sec`;
       document.getElementById('capBench').innerText = stats.sweBenchScore || '68.5%';
       document.getElementById('capAlignment').innerText = stats.instructionAlignment || '98.8%';
@@ -3116,6 +3109,84 @@
     }
 
     // ============================================================
+    // SYSTEM HARNESSES & DYNAMIC MODEL DISCOVERY
+    // ============================================================
+    let availableSystemModels = [];
+    let systemHarnesses = [];
+
+    async function loadSystemModelsAndHarnesses() {
+      try {
+        const [modelsRes, harnessRes] = await Promise.all([
+          fetch(`${BACKEND_URL}/api/models`),
+          fetch(`${BACKEND_URL}/api/harnesses`)
+        ]);
+
+        if (modelsRes.ok) {
+          const mData = await modelsRes.json();
+          availableSystemModels = mData.models || [];
+        }
+        if (harnessRes.ok) {
+          const hData = await harnessRes.json();
+          systemHarnesses = hData.harnesses || [];
+        }
+
+        populateModelSelectDropdowns();
+      } catch (err) {
+        console.error('Error loading dynamic system models:', err);
+      }
+    }
+
+    function populateModelSelectDropdowns() {
+      const spawnSelect = document.getElementById('spawnModelSelect');
+      const editSelect = document.getElementById('editAgentModel');
+      if (!spawnSelect || !editSelect) return;
+
+      if (availableSystemModels.length === 0) {
+        spawnSelect.innerHTML = '<option value="">No models detected (Simulation mode)</option>';
+        editSelect.innerHTML = '<option value="">No models detected (Simulation mode)</option>';
+        return;
+      }
+
+      // Group models by harness / provider
+      const groups = {};
+      for (const model of availableSystemModels) {
+        const harness = model.source?.harness || 'system';
+        const provider = model.source?.provider || harness;
+        const groupKey = `${harness.toUpperCase()} • ${provider}`;
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(model);
+      }
+
+      let html = '';
+      for (const [grpName, models] of Object.entries(groups)) {
+        html += `<optgroup label="${grpName}">`;
+        for (const m of models) {
+          const caps = [];
+          if (m.capabilities?.vision) caps.push('👁️ Vision');
+          if (m.capabilities?.thinking) caps.push('🧠 Thinking');
+          if (m.capabilities?.tools) caps.push('🛠️ Tools');
+          const capStr = caps.length > 0 ? ` [${caps.join(' ')}]` : '';
+          const ctxStr = m.contextWindow ? ` (${Math.round(m.contextWindow / 1000)}k ctx)` : '';
+          html += `<option value="${m.id}">${m.displayName}${capStr}${ctxStr}</option>`;
+        }
+        html += `</optgroup>`;
+      }
+
+      const prevSpawnVal = spawnSelect.value;
+      const prevEditVal = editSelect.value;
+
+      spawnSelect.innerHTML = html;
+      editSelect.innerHTML = html;
+
+      if (prevSpawnVal && availableSystemModels.some(m => m.id === prevSpawnVal)) {
+        spawnSelect.value = prevSpawnVal;
+      }
+      if (prevEditVal && availableSystemModels.some(m => m.id === prevEditVal)) {
+        editSelect.value = prevEditVal;
+      }
+    }
+
+    // ============================================================
     // MODALS HANDLING
     // ============================================================
     function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -3123,22 +3194,25 @@
 
     function openNewProjectModal() { openModal('newProjectModal'); }
     function openSpawnAgentModal() {
+      populateModelSelectDropdowns();
       updateSpawnCostPreview();
       openModal('spawnAgentModal');
     }
 
     function updateSpawnCostPreview() {
       const role = document.getElementById('spawnRoleSelect').value;
-      const model = document.getElementById('spawnModelSelect').value;
+      const modelId = document.getElementById('spawnModelSelect').value || '';
       const effort = document.getElementById('spawnEffortSelect').value;
 
+      const modelObj = availableSystemModels.find(m => m.id === modelId);
       let multiplier = effort === 'Extreme' ? 3.0 : (effort === 'High' ? 1.5 : (effort === 'Low' ? 0.5 : 1.0));
-      let rate = model.includes('haiku') || model.includes('flash') ? 0.001 : 0.003;
+      let isFastModel = modelId.includes('flash') || modelId.includes('lite') || modelId.includes('haiku') || modelId.includes('mini');
+      let rate = isFastModel ? 0.001 : 0.003;
       let estTokens = Math.round(4500 * multiplier);
       let estCost = (estTokens / 1000 * rate * 3.5).toFixed(4);
 
       document.getElementById('costEstTokens').innerText = `${estTokens.toLocaleString()} Tokens`;
-      document.getElementById('costEstUsd').innerText = `$${estCost} USD`;
+      document.getElementById('costEstUsd').innerText = `$${estCost} USD${modelObj ? ` (${modelObj.source.harness})` : ''}`;
     }
 
     async function submitNewProject() {
@@ -3217,8 +3291,11 @@
       const agent = allAgents[currentAgentId];
       if (!agent) return;
 
+      populateModelSelectDropdowns();
       document.getElementById('editAgentName').value = agent.name || '';
-      document.getElementById('editAgentModel').value = agent.model || 'claude-3-7-sonnet-20250219';
+      if (agent.model) {
+        document.getElementById('editAgentModel').value = agent.model;
+      }
       document.getElementById('editAgentEffort').value = agent.effortLevel || 'High';
       document.getElementById('editAgentPrompt').value = agent.promptOverride || '';
       openModal('agentEditModal');
@@ -3337,7 +3414,7 @@
     // ============================================================
     // INITIALIZATION
     // ============================================================
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       resizeCanvas();
       window.addEventListener('resize', resizeCanvas);
 
@@ -3354,6 +3431,7 @@
         });
       });
 
+      await loadSystemModelsAndHarnesses();
       loadProjects();
       loadAgentsAndRender();
       requestAnimationFrame(landscapeLoop);

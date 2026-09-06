@@ -52,7 +52,9 @@
         "Dark One's Blessing",
         "Unquestioned Authority"
       ]
-    }
+    },
+    "model": "opencode/nemotron-3-ultra-free",
+    "harness": "opencode"
   },
   "hr-mind-flayer": {
     "name": "HR Mind Flayer",
@@ -107,7 +109,9 @@
         "Sole Agent Spawner",
         "Magic Resistance"
       ]
-    }
+    },
+    "model": "opencode/big-pickle",
+    "harness": "opencode"
   },
   "staff-engineer-paladin": {
     "name": "Staff Engineer Paladin",
@@ -162,7 +166,9 @@
         "Code Righteousness",
         "Aura of Protection"
       ]
-    }
+    },
+    "model": "opencode/big-pickle",
+    "harness": "opencode"
   },
   "project-alpha-manager-bard": {
     "name": "Manager Bard (Alpha)",
@@ -219,15 +225,17 @@
       ]
     },
     "tasks_total": 5,
-    "tasks_completed": 0
+    "tasks_completed": 0,
+    "model": "opencode/big-pickle",
+    "harness": "opencode"
   },
   "senior-analyst-diviner": {
     "name": "Senior Analyst Diviner",
     "role": "senior-analyst-diviner",
     "project": "global",
     "status": "active",
-    "harness": "gemini",
-    "model": "gemini-2.0-flash-thinking",
+    "harness": "opencode",
+    "model": "opencode/nemotron-3-ultra-free",
     "effortLevel": "High",
     "context_len": 1000000,
     "context_used": 6000,
@@ -293,8 +301,8 @@
     "role": "marshall-agent-system-inspector",
     "project": "global",
     "status": "active",
-    "harness": "gemini",
-    "model": "gemini-2.0-flash",
+    "harness": "opencode",
+    "model": "opencode/big-pickle",
     "effortLevel": "Medium",
     "context_len": 1000000,
     "context_used": 6000,
@@ -361,7 +369,7 @@
     "project": "project-alpha",
     "status": "active",
     "harness": "opencode",
-    "model": "claude-3-7-sonnet-20250219",
+    "model": "opencode/nemotron-3-ultra-free",
     "effortLevel": "High",
     "promptOverride": "",
     "costEstimation": {
@@ -372,7 +380,7 @@
       "inputRate": 0.003,
       "outputRate": 0.015
     },
-    "context_len": 200000,
+    "context_len": 128000,
     "context_used": 1000,
     "created_at": "2026-08-29T11:10:36.689Z",
     "last_activity_ms": 1788001836689,
@@ -428,6 +436,88 @@
         "Arcane Recovery",
         "Deep Spec Analysis",
         "Theoretical Mastery"
+      ]
+    },
+    "tasks_total": 5,
+    "tasks_completed": 0
+  },
+  "project-alpha-frontend-dev-sorcerer": {
+    "name": "Frontend Dev Sorcerer",
+    "role": "frontend-dev-sorcerer",
+    "project": "project-alpha",
+    "status": "active",
+    "harness": "opencode",
+    "model": "google/gemini-2.5-flash",
+    "effortLevel": "Medium",
+    "promptOverride": "",
+    "costEstimation": {
+      "estPromptTokens": 3000,
+      "estOutputTokens": 1500,
+      "estTotalTokens": 4500,
+      "estCostUsd": 0.0225,
+      "inputRate": 0.0025,
+      "outputRate": 0.01,
+      "model": "Gemini 2.5 Flash (GOOGLE)"
+    },
+    "context_len": 1000000,
+    "context_used": 1000,
+    "created_at": "2026-09-06T11:41:38.994Z",
+    "last_activity_ms": 1788694898994,
+    "stats": {
+      "name": "Frontend Dev Sorcerer",
+      "role": "frontend-dev-sorcerer",
+      "class": "Sorcerer (Wild Magic of CSS)",
+      "level": 12,
+      "hp": 78,
+      "maxHp": 78,
+      "ac": 13,
+      "avatarColor": 15277667,
+      "requiredCapabilities": [
+        "vision",
+        "tools"
+      ],
+      "roleFocus": "visual-design-canvas",
+      "effortLevel": "Medium",
+      "contextCapacity": 128000,
+      "tokensPerSec": 100,
+      "sweBenchScore": "66.2%",
+      "instructionAlignment": "98.2%",
+      "costPer1kInput": 0.0025,
+      "costPer1kOutput": 0.01,
+      "stats": {
+        "STR": 8,
+        "DEX": 16,
+        "CON": 14,
+        "INT": 12,
+        "WIS": 10,
+        "CHA": 18
+      },
+      "spells": [
+        {
+          "name": "Wild Magic Surge (Flexbox)",
+          "dice": "3d6+4",
+          "desc": "Instantly centers div in all dimensions."
+        },
+        {
+          "name": "PixiJS Canvas Summoning",
+          "dice": "4d8",
+          "desc": "Renders 60FPS GPU accelerated canvas."
+        },
+        {
+          "name": "Twinned Responsive Layout",
+          "dice": "2d10",
+          "desc": "Seamless mobile and desktop rendering."
+        }
+      ],
+      "inventory": [
+        "Orb of WebGL Shaders",
+        "Cloak of Visual Aesthetics",
+        "Figma Color Swatch Wand"
+      ],
+      "traits": [
+        "Wild Magic Surge",
+        "Flexible Casting",
+        "Responsive Intuition"
       ]
     },
     "tasks_total": 5,
