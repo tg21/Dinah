@@ -37,6 +37,13 @@ const MCP_CATALOG_URL = process.env.MCP_REGISTRY_URL || 'https://registry.modelc
 const PROJECTS_CONFIG_FILE = path.join(PROJECTS_DIR, 'projects-config.json');
 const KNOWLEDGE_BASE_FILE = path.join(SHARED_STATE_DIR, 'knowledge-base.json');
 const MARSHALL_AUDIT_FILE = path.join(SHARED_STATE_DIR, 'marshall-audit.json');
+const STARTUP_SETUP_FILE = path.join(SHARED_STATE_DIR, 'startup-setup.json');
+const TOP_LEVEL_AGENT_IDS = [
+  'hr-mind-flayer',
+  'staff-engineer-paladin',
+  'senior-analyst-diviner',
+  'marshall-agent-system-inspector'
+];
 
 function ensureDirExists(dir) {
   if (!fs.existsSync(dir)) {
@@ -787,6 +794,58 @@ function loadHrSystem() {
 
 function saveHrSystem(hrSystem) {
   fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(hrSystem, null, 2));
+}
+
+function loadStartupSetup() {
+  if (!fs.existsSync(STARTUP_SETUP_FILE)) return { configured: false };
+  try {
+    return JSON.parse(fs.readFileSync(STARTUP_SETUP_FILE, 'utf-8'));
+  } catch (e) {
+    return { configured: false };
+  }
+}
+
+function applyStartupSetup({ ceoModel, topLevelAssignments = {} }) {
+  const hrSystem = loadHrSystem();
+  const modelFor = (modelId, role) => {
+    const selected = modelId === 'ceo' || !modelId
+      ? selectBestModelForRole(role)
+      : getModelById(modelId);
+    return selected || selectBestModelForRole(role);
+  };
+
+  const assignModel = (agentId, requestedModel) => {
+    const agent = hrSystem[agentId];
+    const selected = modelFor(requestedModel, agent?.role || agentId);
+    if (!agent || !selected) return;
+    agent.model = selected.id;
+    agent.harness = selected.source?.harness || agent.harness;
+    agent.context_len = selected.contextWindow || agent.context_len || 128000;
+  };
+
+  assignModel('ceo-warlock', ceoModel);
+  for (const agentId of TOP_LEVEL_AGENT_IDS) {
+    assignModel(agentId, topLevelAssignments[agentId] || 'ceo');
+    if (hrSystem[agentId]) {
+      hrSystem[agentId].modelAssignment = topLevelAssignments[agentId] && topLevelAssignments[agentId] !== 'ceo'
+        ? 'specified'
+        : 'ceo-delegated';
+    }
+  }
+  saveHrSystem(hrSystem);
+
+  const setup = {
+    configured: true,
+    version: 1,
+    configuredAt: new Date().toISOString(),
+    ceoModel: hrSystem['ceo-warlock']?.model || ceoModel,
+    topLevelAssignments: Object.fromEntries(TOP_LEVEL_AGENT_IDS.map(id => [
+      id,
+      topLevelAssignments[id] && topLevelAssignments[id] !== 'ceo' ? topLevelAssignments[id] : 'ceo'
+    ]))
+  };
+  fs.writeFileSync(STARTUP_SETUP_FILE, JSON.stringify(setup, null, 2));
+  return setup;
 }
 
 // ============================================================
@@ -1623,6 +1682,29 @@ app.get('/api/harnesses', (req, res) => {
 
 app.get('/api/models', (req, res) => {
   res.json({ models: getAvailableModels() });
+});
+
+app.get('/api/startup-setup', (req, res) => {
+  res.json({ setup: loadStartupSetup(), topLevelAgentIds: TOP_LEVEL_AGENT_IDS });
+});
+
+app.post('/api/startup-setup', (req, res) => {
+  const { ceoModel, topLevelAssignments = {} } = req.body || {};
+  if (!ceoModel) return res.status(400).json({ error: 'A CEO model is required.' });
+  if (!getModelById(ceoModel)) return res.status(400).json({ error: 'The selected CEO model is not available.' });
+
+  for (const [agentId, modelId] of Object.entries(topLevelAssignments)) {
+    if (!TOP_LEVEL_AGENT_IDS.includes(agentId)) {
+      return res.status(400).json({ error: `Unknown top-level agent: ${agentId}` });
+    }
+    if (modelId !== 'ceo' && !getModelById(modelId)) {
+      return res.status(400).json({ error: `Selected model is not available for ${agentId}.` });
+    }
+  }
+
+  const setup = applyStartupSetup({ ceoModel, topLevelAssignments });
+  appendToSharedLog(`Completed DND Guild startup setup. CEO model: [${setup.ceoModel}].`);
+  res.json({ success: true, setup });
 });
 
 app.get('/api/mcps', (req, res) => {

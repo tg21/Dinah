@@ -4,6 +4,8 @@ Compact instruction file for OpenCode sessions. Every line answers: "Would an ag
 
 ---
 
+# Important: Always update AGENTS.md when relevant after every change
+
 ## 1. Quickstart
 
 | Action | Command |

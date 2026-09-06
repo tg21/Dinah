@@ -1250,6 +1250,57 @@
       gap: 8px;
     }
 
+    .startup-modal-box {
+      max-width: 680px;
+    }
+
+    .startup-intro {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.55;
+      background: rgba(155, 89, 182, 0.08);
+      border: 1px solid rgba(155, 89, 182, 0.25);
+      border-radius: 7px;
+      padding: 10px 12px;
+    }
+
+    .startup-section-title {
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .startup-agent-row {
+      display: grid;
+      grid-template-columns: minmax(150px, .75fr) 1.25fr;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+
+    .startup-agent-row:last-child { border-bottom: 0; }
+
+    .startup-agent-label {
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .startup-agent-label small {
+      display: block;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 400;
+      margin-top: 2px;
+    }
+
+    @media (max-width: 600px) {
+      .startup-agent-row { grid-template-columns: 1fr; gap: 5px; }
+    }
+
     .btn-primary {
       background: linear-gradient(135deg, var(--primary) 0%, #8e44ad 100%);
       border: none;
@@ -1563,6 +1614,33 @@
   <!-- ============================================================
        MODALS
   ============================================================ -->
+  <!-- First-run Guild setup. Completion is persisted by the backend. -->
+  <div class="modal-backdrop" id="startupSetupModal">
+    <div class="modal-box startup-modal-box">
+      <div class="modal-title">
+        <span><i class="fa-solid fa-crown" style="color:var(--gold);"></i> Welcome to DND Guild</span>
+      </div>
+      <div class="modal-body">
+        <div class="startup-intro">
+          Choose the model that leads your guild. For the other executive agents, you can assign a model yourself or let the CEO choose the best available option. This setup is only shown once on this installation.
+        </div>
+
+        <div class="startup-section-title">Chief Executive Officer</div>
+        <div class="modal-form-group">
+          <label>CEO Warlock — primary model</label>
+          <select id="startupCeoModel"></select>
+        </div>
+
+        <div class="startup-section-title">Executive Council</div>
+        <div id="startupTopLevelAgents"></div>
+        <div id="startupSetupStatus" style="font-size:11px;color:var(--accent);min-height:14px;"></div>
+      </div>
+      <div class="modal-btn-row">
+        <button class="btn-primary" id="startupSetupSaveButton" onclick="submitStartupSetup()"><i class="fa-solid fa-door-open"></i> Enter the Guild</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 1. New Project Modal -->
   <div class="modal-backdrop" id="newProjectModal">
     <div class="modal-box">
@@ -3246,6 +3324,85 @@
       }
     }
 
+    const STARTUP_TOP_LEVEL_LABELS = {
+      'hr-mind-flayer': ['HR Mind Flayer', 'People, hiring, and agent orchestration'],
+      'staff-engineer-paladin': ['Staff Engineer Paladin', 'Architecture and engineering standards'],
+      'senior-analyst-diviner': ['Senior Analyst Diviner', 'Telemetry and knowledge synthesis'],
+      'marshall-agent-system-inspector': ['Marshall Sentinel', 'Context and system health audits']
+    };
+
+    function startupModelOptions(includeCeoChoice = false) {
+      let html = includeCeoChoice ? '<option value="ceo">CEO chooses from available models</option>' : '';
+      for (const model of availableSystemModels) {
+        const harness = model.source?.harness || 'system';
+        const caps = [];
+        if (model.capabilities?.thinking || model.capabilities?.extendedThinking) caps.push('Thinking');
+        if (model.capabilities?.tools) caps.push('Tools');
+        const details = caps.length ? ` — ${caps.join(', ')}` : '';
+        html += `<option value="${escapeHtml(model.id)}">${escapeHtml(model.displayName || model.id)} (${escapeHtml(harness)}${details})</option>`;
+      }
+      return html;
+    }
+
+    function populateStartupSetupModal() {
+      const ceoSelect = document.getElementById('startupCeoModel');
+      const council = document.getElementById('startupTopLevelAgents');
+      if (!ceoSelect || !council) return;
+      ceoSelect.innerHTML = startupModelOptions(false);
+      council.innerHTML = Object.entries(STARTUP_TOP_LEVEL_LABELS).map(([id, [name, description]]) => `
+        <div class="startup-agent-row">
+          <div class="startup-agent-label">${name}<small>${description}</small></div>
+          <select id="startup-${id}">${startupModelOptions(true)}</select>
+        </div>
+      `).join('');
+    }
+
+    async function maybeShowStartupSetup() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/startup-setup`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.setup?.configured) return;
+        if (!availableSystemModels.length) {
+          document.getElementById('startupSetupStatus').innerText = 'No models were discovered. Refresh model discovery and try again.';
+          return;
+        }
+        populateStartupSetupModal();
+        openModal('startupSetupModal');
+      } catch (err) {
+        console.error('Unable to check first-run setup:', err);
+      }
+    }
+
+    async function submitStartupSetup() {
+      const status = document.getElementById('startupSetupStatus');
+      const button = document.getElementById('startupSetupSaveButton');
+      const ceoModel = document.getElementById('startupCeoModel').value;
+      const topLevelAssignments = {};
+      for (const id of Object.keys(STARTUP_TOP_LEVEL_LABELS)) {
+        topLevelAssignments[id] = document.getElementById(`startup-${id}`).value;
+      }
+
+      status.style.color = 'var(--text-muted)';
+      status.innerText = 'Manifesting your executive council…';
+      button.disabled = true;
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/startup-setup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ceoModel, topLevelAssignments })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Setup could not be saved.');
+        closeModal('startupSetupModal');
+        await loadAgentsAndRender();
+      } catch (err) {
+        status.style.color = 'var(--accent)';
+        status.innerText = err.message;
+        button.disabled = false;
+      }
+    }
+
     // ============================================================
     // MODALS HANDLING
     // ============================================================
@@ -3641,6 +3798,7 @@
       });
 
       await loadSystemModelsAndHarnesses();
+      await maybeShowStartupSetup();
       loadProjects();
       loadAgentsAndRender();
       requestAnimationFrame(landscapeLoop);
