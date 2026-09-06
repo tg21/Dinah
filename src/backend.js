@@ -1247,7 +1247,7 @@ function spawnAgentViaHr(role, projectId = 'global', customName = null, options 
 
 // Serve Frontend
 app.get('/', (req, res) => {
-  res.sendFile(path.join(APP_DIR, 'frontend.html'));
+  res.sendFile(path.join(APP_DIR, 'src', 'frontend.html'));
 });
 app.use(express.static(APP_DIR));
 

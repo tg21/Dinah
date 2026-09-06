@@ -1,0 +1,444 @@
+ChatGPT said:
+
+Yes — but it depends on the harness. The important distinction is between:
+
+    Tools/MCPs configured by the harness (Codex CLI, Claude Code, Gemini CLI, OpenCode, etc.)
+    Tools you want to dynamically expose to one spawned agent
+    The MCP server processes themselves, which can live in a common folder/shared environment.
+
+If your Node.js process is acting as an agent orchestrator, you generally don't want to install/configure every MCP independently for every harness. Instead, you can have the orchestrator own the MCP configuration and pass the relevant configuration into the child process where the harness supports it.
+The architecture I'd recommend
+
+                    Node.js Orchestrator
+                           │
+             ┌─────────────┴─────────────┐
+             │                           │
+        Agent definition            MCP registry
+        ───────────────            ───────────
+        prompt                      github
+        model                       filesystem
+        thinking                    postgres
+        permissions                 browser
+        tools: [...]                slack
+             │                           │
+             └─────────────┬─────────────┘
+                           │
+                    Harness adapter
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+       Codex CLI       Claude Code       Gemini
+          │                │                │
+       agent            agent             agent
+
+Your Node process could have something like:
+
+const agent = {
+  harness: "codex",
+  model: "gpt-5",
+  prompt: "...",
+  thinking: "high",
+
+  tools: [
+    "github",
+    "filesystem",
+    "postgres"
+  ]
+};
+
+Then your orchestrator resolves those names against a central MCP registry:
+
+const mcpRegistry = {
+  github: {
+    command: "node",
+    args: ["/shared/mcp/github/index.js"]
+  },
+
+  filesystem: {
+    command: "node",
+    args: ["/shared/mcp/filesystem/index.js"]
+  },
+
+  postgres: {
+    command: "node",
+    args: ["/shared/mcp/postgres/index.js"]
+  }
+};
+
+The key question is then:
+
+    Can I give this MCP configuration directly to the CLI invocation?
+
+Codex / Claude / Gemini / OpenCode
+
+There isn't one universal --tools ... protocol shared by these CLIs.
+
+Some support MCP configuration through CLI flags/config files/environment variables; others expect MCP servers to be registered in their own configuration. So you generally need a thin adapter per harness.
+
+For example, conceptually:
+
+switch (agent.harness) {
+  case "codex":
+    return spawnCodex(agent, resolveMcp(agent.tools));
+
+  case "claude":
+    return spawnClaude(agent, resolveMcp(agent.tools));
+
+  case "gemini":
+    return spawnGemini(agent, resolveMcp(agent.tools));
+
+  case "opencode":
+    return spawnOpenCode(agent, resolveMcp(agent.tools));
+}
+
+The MCP servers themselves don't need to be duplicated.
+A useful trick: generate temporary harness config
+
+If a particular CLI doesn't support:
+
+some-cli --mcp github --mcp postgres
+
+you can have your Node orchestrator generate a temporary config for that invocation:
+
+/tmp/agent-8f31/
+    mcp.json
+    config.json
+
+Then launch:
+
+CLI
+ │
+ ├── prompt
+ ├── model
+ ├── thinking settings
+ └── temporary MCP config
+        │
+        ├── github MCP
+        ├── postgres MCP
+        └── filesystem MCP
+
+After the agent exits, delete the temporary configuration.
+
+This gives you per-agent tool isolation without polluting the user's permanent Claude/Codex/Gemini/OpenCode configuration.
+Even better: distinguish MCP servers from MCP tools
+
+I would model your orchestrator like:
+
+{
+  name: "research-agent",
+
+  harness: "claude",
+
+  model: "claude-sonnet-4.x",
+
+  prompt: "...",
+
+  thinking: {
+    effort: "high"
+  },
+
+  mcp: {
+    github: {
+      allowedTools: [
+        "search_repositories",
+        "get_file"
+      ]
+    },
+
+    filesystem: {
+      allowedTools: [
+        "read_file",
+        "list_directory"
+      ]
+    }
+  }
+}
+
+That gives you two levels of permission:
+
+Agent
+ │
+ ├── MCP server: github
+ │      ├── search_repositories ✓
+ │      ├── get_file            ✓
+ │      ├── create_issue        ✗
+ │      └── delete_repository   ✗
+ │
+ └── MCP server: filesystem
+        ├── read_file           ✓
+        ├── write_file          ✗
+        └── delete_file         ✗
+
+That's much safer than simply saying "this agent has GitHub."
+One important caveat
+
+If by "common folder with MCPs installed" you mean:
+
+/shared/mcps/
+    github/
+    postgres/
+    browser/
+    slack/
+
+that's perfectly reasonable.
+
+But installation location and MCP registration are separate things.
+
+You can have:
+
+/shared/mcps/github/server.js
+
+and then dynamically tell each harness:
+
+MCP name: github
+transport: stdio
+command: node
+args: [/shared/mcps/github/server.js]
+
+The harness doesn't need the MCP package installed inside its own directory. It only needs to be able to launch/connect to the MCP server.
+
+If you tell me which exact versions/commands you're using for Codex CLI, Claude Code, Gemini CLI, and OpenCode, I can map out the actual command/config mechanism for each one and show you a Node.js spawn() adapter that lets you do something like:
+
+spawnAgent({
+  harness: "codex",
+  model: "...",
+  thinking: "...",
+  prompt: "...",
+  tools: ["github", "postgres"]
+});
+
+with the MCPs coming entirely from your shared registry.
+You said:
+ChatGPT said:
+
+Yes. The MCP ecosystem now has roughly the equivalent of npm/skills.sh for discovering MCP servers, although it's more fragmented than skills.sh.
+
+For the architecture you described, I'd look at these:
+1. Pharos — probably closest to what you're asking for
+
+positions itself as an MCP package manager/CLI, not merely a directory.
+
+It can:
+
+    Search across multiple MCP registries
+    Install MCPs
+    Verify packages
+    Manage versions/lockfiles
+    Generate/update client configuration
+    Connect to multiple MCP clients
+
+For example, its model is roughly:
+
+pharos search postgres
+pharos install <mcp>
+
+It currently aggregates the official registry, Glama, Smithery, mcp.so, mcp.directory, and others.
+
+For your Node.js orchestrator, this is particularly interesting.
+
+You could have:
+
+your-agent-system/
+├── mcp/
+│   ├── github/
+│   ├── postgres/
+│   ├── browser/
+│   └── slack/
+├── agents/
+├── mcp-registry.json
+└── orchestrator.js
+
+and let your infrastructure manage MCP installation independently of Codex/Claude/Gemini/OpenCode.
+2. Glama — probably best for discovery/evaluation
+
+is a huge MCP registry and has considerably more information than a simple package index: tool definitions, quality signals, maintenance information, etc. It currently indexes tens of thousands of MCP servers and hundreds of thousands of tools.
+
+This is useful for your "what MCP should I give this agent?" problem.
+
+For example:
+
+Agent needs:
+  "read and modify GitHub issues"
+
+        ↓
+
+Search MCP registry
+
+        ↓
+
+GitHub MCP
+
+        ↓
+
+Inspect:
+  - available tools
+  - permissions
+  - maintenance
+  - required credentials
+  - transport
+
+        ↓
+
+Install/connect
+
+3. Official MCP Registry
+
+There is now an official MCP Registry:
+
+This is more like the underlying canonical registry/API than a polished marketplace.
+
+I'd treat this somewhat like:
+
+npm registry
+      ↓
+Official MCP Registry
+
+npmjs.com
+      ↓
+Glama / Smithery / other discovery layers
+
+4. MCPfinder — interesting specifically for agents
+
+There's also MCPfinder, which is actually designed around the workflow you're describing.
+
+It exposes MCP tools such as:
+
+search_mcp_servers
+get_server_details
+get_install_config
+browse_categories
+
+and aggregates the Official Registry, Glama, and Smithery.
+
+That means you can potentially give your orchestrator itself an MCP-discovery capability:
+
+                 Your Orchestrator
+                       │
+                       │ "I need a Jira capability"
+                       ▼
+                 MCPfinder
+                       │
+             ┌─────────┼─────────┐
+             ▼         ▼         ▼
+          Official   Glama    Smithery
+             │         │         │
+             └─────────┼─────────┘
+                       ▼
+                 Best MCP server
+                       │
+                       ▼
+                   Install
+                       │
+                       ▼
+             Add to agent's tools
+
+That's quite close to the "skills.sh but for MCPs" concept.
+And there is an important distinction for your system
+
+I actually wouldn't make your agents install MCPs themselves.
+
+I'd make your Node.js orchestrator the MCP package manager.
+
+Something like:
+
+await mcp.install("github");
+
+await agents.spawn({
+  harness: "codex",
+  model: "gpt-5",
+  prompt: "...",
+  tools: [
+    "github.search_repositories",
+    "github.get_file"
+  ]
+});
+
+Your system then maintains:
+
+MCP Registry
+     │
+     ├── github
+     ├── postgres
+     ├── slack
+     ├── browser
+     └── filesystem
+           │
+           ▼
+    Installed MCP pool
+           │
+           ▼
+    Agent-specific tool selection
+
+So you get one MCP installation shared by every harness.
+
+That's much more powerful than having:
+
+~/.codex/mcp.json
+~/.claude/mcp.json
+~/.gemini/mcp.json
+~/.opencode/mcp.json
+
+with four independently managed copies.
+The really interesting architecture
+
+I'd go one step further:
+
+                 ┌────────────────────┐
+                 │   MCP Registry     │
+                 │                    │
+                 │ github             │
+                 │ postgres           │
+                 │ slack              │
+                 │ browser            │
+                 └─────────┬──────────┘
+                           │
+                      installation
+                           │
+                           ▼
+                 ┌────────────────────┐
+                 │  MCP Manager       │
+                 │  (your Node app)   │
+                 └─────────┬──────────┘
+                           │
+                ┌──────────┴──────────┐
+                │                     │
+          MCP server pool        permissions
+                │                     │
+                └──────────┬──────────┘
+                           │
+                           ▼
+                    Agent instance
+                           │
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+            Codex        Claude       Gemini
+
+Then an agent definition becomes something like:
+
+{
+  "name": "github-researcher",
+  "harness": "codex",
+  "model": "gpt-5",
+  "thinking": "high",
+  "tools": [
+    "github.search_repositories",
+    "github.read_file"
+  ]
+}
+
+The harness becomes almost an implementation detail.
+
+Your orchestrator owns:
+
+    MCP discovery
+    MCP installation
+    MCP versioning
+    credentials
+    permissions
+    which tools an agent can see
+    lifecycle of MCP processes
+    agent spawning
+
+And Codex/Claude/Gemini/OpenCode simply become different agent runtimes.
+
+That is, IMO, the cleanest architecture for the multi-agent system you're describing.
