@@ -2,7 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
-import { exec, execSync } from 'child_process';
+import os from 'os';
+import { exec, execSync, execFileSync, spawn } from 'child_process';
 import {
   initializeHarnessesAndModels,
   getAvailableModels,
@@ -29,6 +30,10 @@ const HR_SYSTEM_DIR = path.join(APP_DIR, 'hr-system');
 const AGENT_TEMPLATES_DIR = path.join(APP_DIR, 'agent-templates');
 const SHARED_STATE_DIR = path.join(APP_DIR, 'shared-state');
 const PROJECTS_DIR = path.join(APP_DIR, 'projects');
+const MCP_DIR = path.join(APP_DIR, 'mcp');
+const MCP_SERVERS_DIR = path.join(MCP_DIR, 'servers');
+const MCP_REGISTRY_FILE = path.join(MCP_DIR, 'registry.json');
+const MCP_CATALOG_URL = process.env.MCP_REGISTRY_URL || 'https://registry.modelcontextprotocol.io';
 const PROJECTS_CONFIG_FILE = path.join(PROJECTS_DIR, 'projects-config.json');
 const KNOWLEDGE_BASE_FILE = path.join(SHARED_STATE_DIR, 'knowledge-base.json');
 const MARSHALL_AUDIT_FILE = path.join(SHARED_STATE_DIR, 'marshall-audit.json');
@@ -43,6 +48,258 @@ ensureDirExists(HR_SYSTEM_DIR);
 ensureDirExists(AGENT_TEMPLATES_DIR);
 ensureDirExists(SHARED_STATE_DIR);
 ensureDirExists(PROJECTS_DIR);
+ensureDirExists(MCP_DIR);
+ensureDirExists(MCP_SERVERS_DIR);
+
+// ============================================================
+// SHARED MCP REGISTRY & PER-AGENT TOOL PERMISSIONS
+// ============================================================
+
+function loadMcpRegistry() {
+  if (!fs.existsSync(MCP_REGISTRY_FILE)) {
+    fs.writeFileSync(MCP_REGISTRY_FILE, JSON.stringify({ mcps: [] }, null, 2));
+    return [];
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(MCP_REGISTRY_FILE, 'utf-8'));
+    return Array.isArray(data) ? data : (data.mcps || []);
+  } catch (e) {
+    console.error('Unable to read MCP registry:', e.message);
+    return [];
+  }
+}
+
+function saveMcpRegistry(mcps) {
+  fs.writeFileSync(MCP_REGISTRY_FILE, JSON.stringify({ mcps }, null, 2));
+}
+
+function normaliseCatalogServer(item) {
+  const server = item?.server || item;
+  if (!server?.name) return null;
+  const packages = server.packages || [];
+  return {
+    name: server.name,
+    description: server.description || '',
+    version: server.version || packages[0]?.version || 'latest',
+    repository: server.repository || null,
+    websiteUrl: server.websiteUrl || server.documentationUrl || null,
+    packages: packages.map(pkg => ({
+      registryType: pkg.registryType,
+      identifier: pkg.identifier,
+      version: pkg.version,
+      transport: pkg.transport,
+      runtimeArguments: pkg.runtimeArguments || [],
+      packageArguments: pkg.packageArguments || []
+    }))
+  };
+}
+
+async function searchMcpCatalog(query) {
+  const url = new URL('/v0.1/servers', MCP_CATALOG_URL);
+  url.searchParams.set('version', 'latest');
+  url.searchParams.set('limit', '30');
+  if (query) url.searchParams.set('search', query.slice(0, 120));
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`MCP registry returned HTTP ${response.status}`);
+  const data = await response.json();
+  return (data.servers || [])
+    .map(normaliseCatalogServer)
+    .filter(server => server && getInstallableNpmPackage(server));
+}
+
+function safeMcpSlug(value) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100);
+}
+
+function packageNameIsSafe(value) {
+  return typeof value === 'string' && /^(?:@[^/]+\/)?[a-zA-Z0-9._~-]+$/.test(value);
+}
+
+function getInstallableNpmPackage(server) {
+  return server?.packages?.find(pkg => pkg.registryType === 'npm' && packageNameIsSafe(pkg.identifier)) || null;
+}
+
+function installedPackageDirectory(targetDir, packageName) {
+  return path.join(targetDir, 'node_modules', ...packageName.split('/'));
+}
+
+function resolveInstalledMcpCommand(targetDir, packageName) {
+  const packageJsonPath = path.join(installedPackageDirectory(targetDir, packageName), 'package.json');
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+  const bin = typeof packageJson.bin === 'string'
+    ? path.basename(packageJson.name || packageName)
+    : Object.keys(packageJson.bin || {})[0];
+  if (!bin) throw new Error(`Installed MCP package ${packageName} does not expose a command-line entry point`);
+  return path.join(targetDir, 'node_modules', '.bin', bin);
+}
+
+function discoverMcpTools(command, args, cwd) {
+  return new Promise(resolve => {
+    let settled = false;
+    let buffer = '';
+    let errorOutput = '';
+    let child;
+    const finish = (tools, error = '') => {
+      if (settled) return;
+      settled = true;
+      try { child?.kill('SIGTERM'); } catch (e) { /* best effort */ }
+      resolve({ tools: tools || [], error: error || errorOutput.trim() || null });
+    };
+    try {
+      child = spawn(command, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: process.env });
+      const timer = setTimeout(() => finish([], 'MCP server did not respond to tool discovery within 12 seconds'), 12000);
+      const send = message => child.stdin.write(`${JSON.stringify(message)}\n`);
+      child.stdout.on('data', chunk => {
+        buffer += chunk.toString();
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const message = JSON.parse(line);
+            if (message.id === 1) {
+              send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+              send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
+            } else if (message.id === 2) {
+              clearTimeout(timer);
+              finish((message.result?.tools || []).map(tool => ({ name: tool.name, description: tool.description || '' })));
+            }
+          } catch (e) { /* ignore startup/log lines */ }
+        }
+      });
+      child.stderr.on('data', chunk => { errorOutput += chunk.toString(); });
+      child.on('error', error => { clearTimeout(timer); finish([], error.message); });
+      child.on('exit', code => {
+        clearTimeout(timer);
+        if (code !== 0) finish([], errorOutput || `MCP server exited before tool discovery (code ${code})`);
+      });
+      send({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'dnd-orchestrator', version: '1.0.0' }
+        }
+      });
+    } catch (e) {
+      finish([]);
+    }
+  });
+}
+
+async function installMcpFromCatalog(serverName, requestedVersion = 'latest') {
+  if (typeof serverName !== 'string' || serverName.length < 1 || serverName.length > 200) {
+    throw new Error('A valid MCP server name is required');
+  }
+  const detailUrl = new URL(`/v0.1/servers/${encodeURIComponent(serverName)}/versions/${encodeURIComponent(requestedVersion)}`, MCP_CATALOG_URL);
+  const response = await fetch(detailUrl);
+  if (!response.ok) throw new Error(`MCP server metadata returned HTTP ${response.status}`);
+  const detail = normaliseCatalogServer(await response.json());
+  const pkg = getInstallableNpmPackage(detail);
+  if (!pkg) throw new Error('This MCP does not publish an installable npm package');
+
+  const version = pkg.version || detail.version;
+  const packageSpec = version && version !== 'latest' ? `${pkg.identifier}@${version}` : pkg.identifier;
+  const id = safeMcpSlug(serverName);
+  const targetDir = path.join(MCP_SERVERS_DIR, id);
+  ensureDirExists(targetDir);
+  try {
+    execFileSync('npm', ['install', '--prefix', targetDir, '--no-audit', '--no-fund', packageSpec], {
+      cwd: APP_DIR,
+      encoding: 'utf-8',
+      timeout: 180000,
+      stdio: 'pipe'
+    });
+  } catch (error) {
+    throw new Error(`npm install failed: ${(error.stderr || error.message).toString().slice(0, 500)}`);
+  }
+
+  const existing = loadMcpRegistry().filter(item => item.id !== id);
+  const command = resolveInstalledMcpCommand(targetDir, pkg.identifier);
+  const args = [...(pkg.packageArguments || [])];
+  const discovery = await discoverMcpTools(command, args, targetDir);
+  const installed = {
+    id,
+    name: detail.name,
+    description: detail.description,
+    version,
+    source: 'official-mcp-registry',
+    serverName,
+    package: pkg.identifier,
+    repository: detail.repository,
+    websiteUrl: detail.websiteUrl,
+    command,
+    args,
+    env: {},
+    tools: discovery.tools,
+    discoveryError: discovery.error,
+    installedAt: new Date().toISOString()
+  };
+  saveMcpRegistry([...existing, installed]);
+  return installed;
+}
+
+function normaliseAgentMcpPermissions(agent) {
+  if (!agent.mcp) agent.mcp = {};
+  return agent.mcp;
+}
+
+function resolveAgentMcps(agent) {
+  const permissions = normaliseAgentMcpPermissions(agent);
+  return loadMcpRegistry()
+    .filter(mcp => permissions[mcp.id]?.enabled !== false && permissions[mcp.id]?.enabled === true)
+    .map(mcp => ({
+      ...mcp,
+      allowedTools: permissions[mcp.id]?.allowedTools || mcp.tools?.map(tool => tool.name) || []
+    }));
+}
+
+function sanitizeMcpPermissions(value) {
+  const registry = loadMcpRegistry();
+  const input = value && typeof value === 'object' ? value : {};
+  const allowedIds = new Set(registry.map(mcp => mcp.id));
+  const result = {};
+  for (const [id, permission] of Object.entries(input)) {
+    if (!allowedIds.has(id) || !permission || typeof permission !== 'object') continue;
+    const mcp = registry.find(item => item.id === id);
+    const knownTools = new Set((mcp.tools || []).map(tool => tool.name));
+    result[id] = {
+      enabled: permission.enabled === true,
+      allowedTools: Array.isArray(permission.allowedTools)
+        ? permission.allowedTools.filter(tool => knownTools.has(tool))
+        : [...knownTools]
+    };
+  }
+  return result;
+}
+
+function createMcpInvocationConfig(agent, agentId, projectId) {
+  const mcps = resolveAgentMcps(agent);
+  const config = {
+    version: 1,
+    agentId,
+    projectId,
+    servers: Object.fromEntries(mcps.map(mcp => [mcp.id, {
+      command: mcp.command,
+      args: mcp.args || [],
+      env: mcp.env || {},
+      allowedTools: mcp.allowedTools
+    }]))
+  };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dnd-agent-mcp-'));
+  const file = path.join(dir, 'mcp.json');
+  fs.writeFileSync(file, JSON.stringify(config, null, 2));
+  return { file, dir, mcps };
+}
+
+function mcpPromptContext(agent, invocation) {
+  const mcps = resolveAgentMcps(agent);
+  if (!mcps.length) return '';
+  const tools = mcps.flatMap(mcp => (mcp.allowedTools || []).map(tool => `${mcp.id}.${tool}`));
+  return `\n\nAvailable MCP tools for this invocation: ${tools.join(', ')}. Use only the enabled tools. MCP manifest: ${invocation.file}.`;
+}
 
 // ============================================================
 // D&D RPG STATS DATABASE & AI CAPABILITY SPECIFICATIONS
@@ -465,7 +722,8 @@ function createOverseerAgent(ovId) {
     context_used: 4200,
     created_at: new Date().toISOString(),
     last_activity_ms: Date.now(),
-    stats: rpgStats
+    stats: rpgStats,
+    mcp: {}
   };
 }
 
@@ -862,7 +1120,7 @@ setInterval(() => {
 // HARNESS DETECTION & EXECUTION
 // ============================================================
 
-function spawnAntigravityAgent(projectId, prompt, agentId) {
+function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('agy') || findHarnessBinary('antigravity');
@@ -878,7 +1136,7 @@ function spawnAntigravityAgent(projectId, prompt, agentId) {
     appendAgentThought(agentId, 'ANTIGRAVITY_INVOKE', `Invoking Antigravity CLI (agy) [${agent?.model || 'default'}] in ${projectDir}`);
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} ${modelFlag}--dangerously-skip-permissions -p "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 45000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 45000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     appendAgentThought(agentId, 'ANTIGRAVITY_SUCCESS', `Antigravity CLI (agy) execution completed.`);
     return { success: true, output: (output || '').trim(), agentId, harness: 'antigravity', model: agent?.model };
   } catch (error) {
@@ -887,7 +1145,7 @@ function spawnAntigravityAgent(projectId, prompt, agentId) {
   }
 }
 
-function spawnOpencodeAgent(projectId, prompt, agentId) {
+function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('opencode');
@@ -903,7 +1161,7 @@ function spawnOpencodeAgent(projectId, prompt, agentId) {
     appendAgentThought(agentId, 'OPENCODE_INVOKE', `Invoking OpenCode harness [${agent?.model || 'default'}] in ${projectDir}`);
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} run ${modelFlag}--dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     appendAgentThought(agentId, 'OPENCODE_SUCCESS', `OpenCode execution completed.`);
     return { success: true, output, agentId, harness: 'opencode', model: agent?.model };
   } catch (error) {
@@ -912,7 +1170,7 @@ function spawnOpencodeAgent(projectId, prompt, agentId) {
   }
 }
 
-function spawnClaudeCodeAgent(projectId, prompt, agentId) {
+function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('claude-code') || findHarnessBinary('claude');
@@ -925,15 +1183,16 @@ function spawnClaudeCodeAgent(projectId, prompt, agentId) {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
     const escapedPrompt = prompt.replace(/"/g, '\\"');
-    const cmd = `${harnessBin} -p "${escapedPrompt}" --workdir "${projectDir}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    const mcpFlag = mcpInvocation?.mcps?.length ? ` --mcp-config "${mcpInvocation.file}"` : '';
+    const cmd = `${harnessBin} -p "${escapedPrompt}" --workdir "${projectDir}"${mcpFlag}`;
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     return { success: true, output, agentId, harness: 'claude-code', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('claude-code', projectId, prompt, agentId);
   }
 }
 
-function spawnCodexAgent(projectId, prompt, agentId) {
+function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('codex') || findHarnessBinary('openai');
@@ -947,14 +1206,14 @@ function spawnCodexAgent(projectId, prompt, agentId) {
     const agent = hrSystem[agentId];
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} --dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     return { success: true, output, agentId, harness: 'codex', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('codex', projectId, prompt, agentId);
   }
 }
 
-function spawnGeminiAgent(projectId, prompt, agentId) {
+function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('gemini') || findHarnessBinary('gemini-cli');
@@ -969,14 +1228,14 @@ function spawnGeminiAgent(projectId, prompt, agentId) {
     const modelName = agent?.model || 'gemini-2.5-flash';
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} --model "${modelName}" --dir "${projectDir}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     return { success: true, output, agentId, harness: 'gemini', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('gemini', projectId, prompt, agentId);
   }
 }
 
-function spawnOllamaAgent(projectId, prompt, agentId) {
+function spawnOllamaAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
   createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('ollama');
@@ -991,7 +1250,7 @@ function spawnOllamaAgent(projectId, prompt, agentId) {
     const modelName = agent?.model || 'llama3';
     const escapedPrompt = prompt.replace(/"/g, '\\"');
     const cmd = `${harnessBin} run "${modelName}" "${escapedPrompt}"`;
-    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000 });
+    const output = execSync(cmd, { cwd: projectDir, encoding: 'utf-8', timeout: 30000, env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' } });
     return { success: true, output, agentId, harness: 'ollama', model: agent?.model };
   } catch (error) {
     return simulateHarnessExecution('ollama', projectId, prompt, agentId);
@@ -1041,22 +1300,29 @@ function simulateHarnessExecution(harness, projectId, prompt, agentId) {
 }
 
 function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId) {
+  const agent = loadHrSystem()[agentId] || { role: agentId, name: agentId };
+  const mcpInvocation = createMcpInvocationConfig(agent, agentId, projectId);
+  const effectivePrompt = prompt + mcpPromptContext(agent, mcpInvocation);
+  try {
   switch (harness) {
     case 'antigravity':
     case 'agy':
-      return spawnAntigravityAgent(projectId, prompt, agentId);
+      return spawnAntigravityAgent(projectId, effectivePrompt, agentId, mcpInvocation);
     case 'opencode':
-      return spawnOpencodeAgent(projectId, prompt, agentId);
+      return spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation);
     case 'claude-code':
-      return spawnClaudeCodeAgent(projectId, prompt, agentId);
+      return spawnClaudeCodeAgent(projectId, effectivePrompt, agentId, mcpInvocation);
     case 'codex':
-      return spawnCodexAgent(projectId, prompt, agentId);
+      return spawnCodexAgent(projectId, effectivePrompt, agentId, mcpInvocation);
     case 'gemini':
-      return spawnGeminiAgent(projectId, prompt, agentId);
+      return spawnGeminiAgent(projectId, effectivePrompt, agentId, mcpInvocation);
     case 'ollama':
-      return spawnOllamaAgent(projectId, prompt, agentId);
+      return spawnOllamaAgent(projectId, effectivePrompt, agentId, mcpInvocation);
     default:
-      return spawnOpencodeAgent(projectId, prompt, agentId);
+      return spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation);
+  }
+  } finally {
+    try { fs.rmSync(mcpInvocation.dir, { recursive: true, force: true }); } catch (e) { /* best effort cleanup */ }
   }
 }
 
@@ -1139,7 +1405,8 @@ function requestAgentSummoning(role, projectId = 'project-alpha', customOptions 
     last_activity_ms: Date.now(),
     stats: rpgStats,
     tasks_total: 5,
-    tasks_completed: 0
+    tasks_completed: 0,
+    mcp: {}
   };
 
   hrSystem[agentId] = awaitingAgent;
@@ -1176,6 +1443,7 @@ function confirmAgentSummoning(agentId, updatedParams = {}) {
   if (updatedParams.harness) agent.harness = updatedParams.harness;
   if (updatedParams.effortLevel) agent.effortLevel = updatedParams.effortLevel;
   if (updatedParams.stats) agent.stats = { ...agent.stats, ...updatedParams.stats };
+  if (updatedParams.mcp !== undefined) agent.mcp = sanitizeMcpPermissions(updatedParams.mcp);
 
   agent.status = 'active';
   agent.costEstimation = calculateAgentCostEstimation(agent.role, agent.model, agent.effortLevel);
@@ -1248,7 +1516,8 @@ function spawnAgentViaHr(role, projectId = 'global', customName = null, options 
     last_activity_ms: Date.now(),
     stats: rpgStats,
     tasks_total: 5,
-    tasks_completed: 0
+    tasks_completed: 0,
+    mcp: {}
   };
 
   hrSystem[agentId] = newAgent;
@@ -1356,6 +1625,30 @@ app.get('/api/models', (req, res) => {
   res.json({ models: getAvailableModels() });
 });
 
+app.get('/api/mcps', (req, res) => {
+  res.json({ mcps: loadMcpRegistry() });
+});
+
+app.get('/api/mcps/search', async (req, res) => {
+  try {
+    const results = await searchMcpCatalog(String(req.query.q || '').trim());
+    const installedIds = new Set(loadMcpRegistry().map(mcp => mcp.serverName || mcp.id));
+    res.json({ results: results.map(result => ({ ...result, installed: installedIds.has(result.name) })) });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.post('/api/mcps/install', async (req, res) => {
+  try {
+    const installed = await installMcpFromCatalog(req.body?.serverName, req.body?.version || 'latest');
+    appendToSharedLog(`Installed MCP [${installed.name}] version [${installed.version}] into shared registry.`);
+    res.json({ success: true, mcp: installed });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/models/refresh', async (req, res) => {
   try {
     const result = await initializeHarnessesAndModels(true);
@@ -1416,6 +1709,7 @@ app.post('/api/agents/update', (req, res) => {
   if (updates.harness) agent.harness = updates.harness;
   if (updates.effortLevel) agent.effortLevel = updates.effortLevel;
   if (updates.promptOverride !== undefined) agent.promptOverride = updates.promptOverride;
+  if (updates.mcp !== undefined) agent.mcp = sanitizeMcpPermissions(updates.mcp);
   if (updates.stats) {
     agent.stats = { ...agent.stats, ...updates.stats };
   }

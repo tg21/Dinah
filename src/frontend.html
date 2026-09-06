@@ -1513,6 +1513,8 @@
         <!-- Inventory -->
         <div class="section-title"><i class="fa-solid fa-sack-dollar"></i> Inventory & Items</div>
         <div id="inventoryList" style="font-size:11px;color:var(--text-muted);background:var(--bg-card);padding:8px;border-radius:6px;border:1px solid var(--border);"></div>
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;"><span><i class="fa-solid fa-toolbox"></i> MCP Tool Inventory</span><button class="action-btn" style="padding:2px 6px;font-size:10px;" onclick="openMcpManagementModal()"><i class="fa-solid fa-store"></i> Manage</button></div>
+        <div id="mcpInventoryList" style="font-size:11px;color:var(--text-muted);background:var(--bg-card);padding:8px;border-radius:6px;border:1px solid var(--border);"></div>
       </div>
     </div>
 
@@ -1720,10 +1722,38 @@
           <label>System Prompt Override</label>
           <textarea id="editAgentPrompt" rows="3" placeholder="Custom instructions or behavioral guidelines..."></textarea>
         </div>
+        <div class="modal-form-group">
+          <label>MCP Tool Inventory <small style="color:var(--text-muted);">Toggle servers and individual tools</small></label>
+          <div id="agentMcpInventory" style="display:flex;flex-direction:column;gap:7px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:8px;max-height:220px;overflow-y:auto;"></div>
+        </div>
       </div>
       <div class="modal-btn-row">
         <button class="btn-secondary" onclick="closeModal('agentEditModal')">Cancel</button>
         <button class="btn-primary" onclick="saveAgentEdits()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. MCP Discovery, Download & Equipment -->
+  <div class="modal-backdrop" id="mcpManagementModal">
+    <div class="modal-box" style="max-width:760px;">
+      <div class="modal-title">
+        <span><i class="fa-solid fa-toolbox" style="color:var(--cyan);"></i> MCP Armory & Marketplace</span>
+        <i class="fa-solid fa-xmark" style="cursor:pointer;" onclick="closeModal('mcpManagementModal')"></i>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="mcpSearchInput" placeholder="Search the official MCP Registry (filesystem, github, postgres...)" onkeydown="if(event.key==='Enter') searchMcpCatalogFromUi()" style="flex:1;background:var(--bg-card);border:1px solid var(--border);padding:8px;border-radius:6px;color:#fff;font-size:12px;">
+          <button class="btn-primary" onclick="searchMcpCatalogFromUi()"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+        </div>
+        <div id="mcpManagementStatus" style="font-size:10px;color:var(--text-muted);margin:8px 0;"></div>
+        <div class="section-title" style="margin-top:8px;"><i class="fa-solid fa-download"></i> Search Results</div>
+        <div id="mcpSearchResults" style="display:flex;flex-direction:column;gap:7px;max-height:250px;overflow-y:auto;"></div>
+        <div class="section-title" style="margin-top:12px;"><i class="fa-solid fa-shield-halved"></i> Shared MCPs</div>
+        <div id="mcpInstalledList" style="display:flex;flex-direction:column;gap:7px;max-height:180px;overflow-y:auto;"></div>
+      </div>
+      <div class="modal-btn-row">
+        <button class="btn-secondary" onclick="closeModal('mcpManagementModal')">Close</button>
       </div>
     </div>
   </div>
@@ -2773,6 +2803,13 @@
       const invList = document.getElementById('inventoryList');
       const items = stats.inventory || ['Company Keycard', 'Terminal Access'];
       invList.innerText = items.join(' • ');
+      const mcpList = document.getElementById('mcpInventoryList');
+      if (mcpList) {
+        const enabled = availableSystemMcps.filter(mcp => agent.mcp?.[mcp.id]?.enabled === true);
+        mcpList.innerText = enabled.length
+          ? enabled.map(mcp => `${mcp.name || mcp.id} (${(agent.mcp[mcp.id].allowedTools || mcp.tools || []).length} tools)`).join(' • ')
+          : 'No MCP tools equipped';
+      }
     }
 
     function renderThoughtStream(thoughts) {
@@ -3113,13 +3150,15 @@
     // SYSTEM HARNESSES & DYNAMIC MODEL DISCOVERY
     // ============================================================
     let availableSystemModels = [];
+    let availableSystemMcps = [];
     let systemHarnesses = [];
 
     async function loadSystemModelsAndHarnesses() {
       try {
-        const [modelsRes, harnessRes] = await Promise.all([
+        const [modelsRes, harnessRes, mcpsRes] = await Promise.all([
           fetch(`${BACKEND_URL}/api/models`),
-          fetch(`${BACKEND_URL}/api/harnesses`)
+          fetch(`${BACKEND_URL}/api/harnesses`),
+          fetch(`${BACKEND_URL}/api/mcps`)
         ]);
 
         if (modelsRes.ok) {
@@ -3130,6 +3169,10 @@
           const hData = await harnessRes.json();
           systemHarnesses = hData.harnesses || [];
           populateHarnessSelectDropdown();
+        }
+        if (mcpsRes.ok) {
+          const mcpData = await mcpsRes.json();
+          availableSystemMcps = mcpData.mcps || [];
         }
 
         populateModelSelectDropdowns();
@@ -3315,7 +3358,156 @@
       }
       document.getElementById('editAgentEffort').value = agent.effortLevel || 'High';
       document.getElementById('editAgentPrompt').value = agent.promptOverride || '';
+      renderAgentMcpInventory(agent);
       openModal('agentEditModal');
+    }
+
+    async function refreshMcpInventory() {
+      const res = await fetch(`${BACKEND_URL}/api/mcps`);
+      if (!res.ok) return;
+      const data = await res.json();
+      availableSystemMcps = data.mcps || [];
+      renderStatsSheet(allAgents[currentAgentId] || {});
+      renderAgentMcpInventory(allAgents[currentAgentId] || {});
+      renderInstalledMcps();
+    }
+
+    function openMcpManagementModal() {
+      renderInstalledMcps();
+      document.getElementById('mcpSearchResults').innerHTML = '<div style="font-size:10px;color:var(--text-muted);">Search the official registry to discover installable MCP servers.</div>';
+      document.getElementById('mcpManagementStatus').innerText = '';
+      openModal('mcpManagementModal');
+    }
+
+    async function searchMcpCatalogFromUi() {
+      const query = document.getElementById('mcpSearchInput').value.trim();
+      const results = document.getElementById('mcpSearchResults');
+      const status = document.getElementById('mcpManagementStatus');
+      status.innerText = 'Searching the official MCP Registry...';
+      results.innerHTML = '';
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/mcps/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Search failed');
+        const installableResults = data.results.filter(result =>
+          (result.packages || []).some(pkg => pkg.registryType === 'npm' && pkg.identifier)
+        );
+        status.innerText = `${installableResults.length} result${installableResults.length === 1 ? '' : 's'} found.`;
+        if (!installableResults.length) {
+          results.innerHTML = '<div style="font-size:10px;color:var(--text-muted);">No MCPs found.</div>';
+          return;
+        }
+        results.innerHTML = installableResults.map(result => {
+          const action = result.installed
+            ? '<span style="color:var(--green);font-size:10px;">Installed</span>'
+            : `<button class="btn-primary" style="padding:4px 8px;font-size:10px;" onclick="installMcpFromCatalog('${encodeURIComponent(result.name)}','${encodeURIComponent(result.version || 'latest')}')"><i class="fa-solid fa-download"></i> Download</button>`;
+          return `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:8px;">
+            <div><div style="font-size:12px;color:#fff;font-weight:700;">${escapeHtml(result.name)}</div><div style="font-size:10px;color:var(--text-muted);">${escapeHtml(result.description || 'No description')} · v${escapeHtml(result.version || 'latest')}</div></div><div>${action}</div>
+          </div>`;
+        }).join('');
+      } catch (err) {
+        status.innerText = err.message;
+      }
+    }
+
+    async function installMcpFromCatalog(encodedName, encodedVersion) {
+      const status = document.getElementById('mcpManagementStatus');
+      status.innerText = 'Downloading and installing MCP package...';
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/mcps/install`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serverName: decodeURIComponent(encodedName), version: decodeURIComponent(encodedVersion) })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'MCP installation failed');
+        await refreshMcpInventory();
+        await equipMcpForCurrentAgent(data.mcp.id, true);
+        status.innerText = `${data.mcp.name} installed and equipped for ${allAgents[currentAgentId]?.name || 'the current agent'}.`;
+        await searchMcpCatalogFromUi();
+      } catch (err) {
+        status.innerText = err.message;
+      }
+    }
+
+    function renderInstalledMcps() {
+      const container = document.getElementById('mcpInstalledList');
+      if (!container) return;
+      if (!availableSystemMcps.length) {
+        container.innerHTML = '<div style="font-size:10px;color:var(--text-muted);">No shared MCPs installed yet.</div>';
+        return;
+      }
+      const agent = allAgents[currentAgentId] || {};
+      container.innerHTML = availableSystemMcps.map(mcp => {
+        const equipped = agent.mcp?.[mcp.id]?.enabled === true;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:7px 8px;">
+          <div><strong style="color:#fff;font-size:11px;">${escapeHtml(mcp.name || mcp.id)}</strong><div style="font-size:10px;color:var(--text-muted);">${escapeHtml(mcp.description || 'Shared MCP server')} · ${mcp.tools?.length || 0} tools discovered${mcp.discoveryError ? ` · ${escapeHtml(mcp.discoveryError)}` : ''}</div></div>
+          <button class="${equipped ? 'btn-secondary' : 'btn-primary'}" style="padding:4px 8px;font-size:10px;" onclick="equipMcpForCurrentAgent('${encodeURIComponent(mcp.id)}', ${!equipped})">${equipped ? 'Unequip' : 'Equip'}</button>
+        </div>`;
+      }).join('');
+    }
+
+    async function equipMcpForCurrentAgent(encodedId, enabled) {
+      const id = decodeURIComponent(encodedId);
+      const agent = allAgents[currentAgentId];
+      if (!agent) return;
+      const permissions = { ...(agent.mcp || {}) };
+      const mcp = availableSystemMcps.find(item => item.id === id);
+      permissions[id] = { enabled, allowedTools: (mcp?.tools || []).map(tool => tool.name) };
+      const res = await fetch(`${BACKEND_URL}/api/agents/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: currentAgentId, updates: { mcp: permissions } })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        allAgents[currentAgentId] = data.agent;
+        renderInstalledMcps();
+        renderStatsSheet(data.agent);
+        renderAgentMcpInventory(data.agent);
+      }
+    }
+
+    function renderAgentMcpInventory(agent) {
+      const container = document.getElementById('agentMcpInventory');
+      if (!container) return;
+      if (!availableSystemMcps.length) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:10px;">No MCPs registered. Add shared servers to mcp/registry.json.</div>';
+        return;
+      }
+      container.innerHTML = availableSystemMcps.map(mcp => {
+        const permission = agent.mcp?.[mcp.id] || {};
+        const tools = mcp.tools || [];
+        return `<div style="border-bottom:1px solid var(--border);padding-bottom:6px;">
+          <label style="display:flex;align-items:center;gap:7px;font-weight:700;color:#fff;cursor:pointer;">
+            <input type="checkbox" data-mcp-id="${escapeHtml(mcp.id)}" data-mcp-server="true" ${permission.enabled ? 'checked' : ''} onchange="toggleMcpServer('${escapeHtml(mcp.id)}', this.checked)">
+            <span>${escapeHtml(mcp.name || mcp.id)}</span><small style="color:var(--text-muted);font-weight:400;">${escapeHtml(mcp.description || '')}</small>
+          </label>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 0 22px;">
+            ${tools.length ? tools.map(tool => `<label style="font-size:10px;color:var(--text-muted);"><input type="checkbox" data-mcp-id="${escapeHtml(mcp.id)}" data-mcp-tool="${escapeHtml(tool.name)}" ${permission.enabled && (permission.allowedTools || tools.map(t => t.name)).includes(tool.name) ? 'checked' : ''} ${permission.enabled ? '' : 'disabled'}> ${escapeHtml(tool.name)}</label>`).join('') : '<small style="color:var(--text-muted);">Server-level access</small>'}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function toggleMcpServer(id, enabled) {
+      document.querySelectorAll(`[data-mcp-id="${CSS.escape(id)}"][data-mcp-tool]`).forEach(input => {
+        input.disabled = !enabled;
+        if (enabled && !input.checked) input.checked = true;
+      });
+    }
+
+    function collectAgentMcpPermissions() {
+      const result = {};
+      availableSystemMcps.forEach(mcp => {
+        const server = document.querySelector(`[data-mcp-id="${CSS.escape(mcp.id)}"][data-mcp-server]`);
+        if (!server) return;
+        result[mcp.id] = {
+          enabled: server.checked,
+          allowedTools: Array.from(document.querySelectorAll(`[data-mcp-id="${CSS.escape(mcp.id)}"][data-mcp-tool]:checked`)).map(input => input.dataset.mcpTool)
+        };
+      });
+      return result;
     }
 
     async function saveAgentEdits() {
@@ -3329,7 +3521,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentId: currentAgentId,
-          updates: { name, model, effortLevel, promptOverride }
+          updates: { name, model, effortLevel, promptOverride, mcp: collectAgentMcpPermissions() }
         })
       });
 
