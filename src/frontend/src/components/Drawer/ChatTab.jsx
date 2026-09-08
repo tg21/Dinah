@@ -101,7 +101,7 @@ export default function ChatTab({ engineRef }) {
                 <strong>{m.role === 'user' ? 'You (Overseer)' : agent.name || 'Agent'}</strong>
                 <span>{time}</span>
               </div>
-              <LogText value={m.content || m.text || ''} />
+            <LogText value={m.content || m.text || m.request || ''} />
             </div>
           );
         })}

@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
-import { APP_DIR, ensureBaseDirs, resolveFrontendDistDir } from './config.js';
+import { TOOL_DIR, ensureBaseDirs, resolveFrontendDistDir } from './config.js';
 import {
   agentRoutes,
   knowledgeRoutes,
@@ -45,7 +45,7 @@ export function createApp() {
         );
     });
   }
-  app.use(express.static(APP_DIR));
+  app.use(express.static(TOOL_DIR));
 
   // Mount domain routers (each router owns its own path prefixes)
   app.use(projectRoutes);

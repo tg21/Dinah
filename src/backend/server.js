@@ -12,18 +12,21 @@ import { createApp } from './app.js';
 
 export const app = createApp();
 
-// Top-level startup: Query system for available harnesses and models first
-console.log('🚀 Initializing system harnesses and model discovery...');
-await initializeHarnessesAndModels();
+// Bind before discovery so the Vite dev proxy never races a closed backend
+// port while CLI harnesses are being scanned.
+app.listen(PORT, async () => {
+  console.log('🚀 DND backend is listening; initializing harnesses and model discovery...');
+  try {
+    await initializeHarnessesAndModels();
+    loadHrSystem();
+    loadKnowledgeBase();
+    loadProjectsConfig();
+    startSeniorAnalystScheduler();
+    startMarshallScheduler();
+  } catch (error) {
+    console.error('Backend initialization failed:', error);
+  }
 
-loadHrSystem();
-loadKnowledgeBase();
-loadProjectsConfig();
-
-startSeniorAnalystScheduler();
-startMarshallScheduler();
-
-app.listen(PORT, () => {
   const harnesses = getDetectedHarnesses();
   const models = getAvailableModels();
   console.log(`====================================================`);

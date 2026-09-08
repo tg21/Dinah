@@ -113,7 +113,7 @@ export default function McpManagementModal() {
         ))}
       </div>
       <div className="section-title" style={{ marginTop: 12 }}>
-        <i className="fa-solid fa-shield-halved" /> Shared MCPs
+        <i className="fa-solid fa-shield-halved" /> Available MCPs
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 180, overflowY: 'auto' }}>
         {!mcps.length && (
@@ -129,7 +129,7 @@ export default function McpManagementModal() {
               <div>
                 <strong style={{ color: '#fff', fontSize: 11 }}>{escapeHtml(mcp.name || mcp.id)}</strong>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                  {escapeHtml(mcp.description || 'Shared MCP server')} · {mcp.tools?.length || 0} tools
+                  {mcp.sourceType === 'shipped' ? 'Included with Dinah' : 'User-managed'} · {escapeHtml(mcp.description || 'MCP server')} · {mcp.tools?.length || 0} tools
                   discovered{mcp.discoveryError ? ` · ${escapeHtml(mcp.discoveryError)}` : ''}
                 </div>
               </div>

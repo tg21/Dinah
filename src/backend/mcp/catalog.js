@@ -3,11 +3,11 @@ import os from 'os';
 import path from 'path';
 import { execFileSync, spawn } from 'child_process';
 import {
-  APP_DIR,
   MCP_CATALOG_URL,
-  MCP_SERVERS_DIR
+  USER_MCP_SERVERS_DIR,
+  WORKING_DIR
 } from '../config.js';
-import { loadMcpRegistry, saveMcpRegistry } from './registry.js';
+import { loadUserMcpRegistry, saveMcpRegistry } from './registry.js';
 
 export function normaliseCatalogServer(item) {
   const server = item?.server || item;
@@ -178,11 +178,11 @@ export async function installMcpFromCatalog(serverName, requestedVersion = 'late
   const packageSpec =
     version && version !== 'latest' ? `${pkg.identifier}@${version}` : pkg.identifier;
   const id = safeMcpSlug(serverName);
-  const targetDir = path.join(MCP_SERVERS_DIR, id);
+  const targetDir = path.join(USER_MCP_SERVERS_DIR, id);
   if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
   try {
     execFileSync('npm', ['install', '--prefix', targetDir, '--no-audit', '--no-fund', packageSpec], {
-      cwd: APP_DIR,
+      cwd: WORKING_DIR,
       encoding: 'utf-8',
       timeout: 180000,
       stdio: 'pipe'
@@ -191,7 +191,7 @@ export async function installMcpFromCatalog(serverName, requestedVersion = 'late
     throw new Error(`npm install failed: ${(error.stderr || error.message).toString().slice(0, 500)}`);
   }
 
-  const existing = loadMcpRegistry().filter((item) => item.id !== id);
+  const existing = loadUserMcpRegistry().filter((item) => item.id !== id);
   const command = resolveInstalledMcpCommand(targetDir, pkg.identifier);
   const args = [...(pkg.packageArguments || [])];
   const discovery = await discoverMcpTools(command, args, targetDir);

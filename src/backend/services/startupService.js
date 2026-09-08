@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { PROMPTS_DIR, STARTUP_SELECTION_AUDIT_FILE, TOP_LEVEL_AGENT_IDS } from '../config.js';
+import { APP_DIR, PROMPTS_DIR, STARTUP_SELECTION_AUDIT_FILE, TOP_LEVEL_AGENT_IDS } from '../config.js';
 import { AGENT_RPG_REGISTRY } from '../data/rpgRegistry.js';
 import { getAvailableModels, getModelById, selectBestModelForRole } from '../harness/index.js';
 import { loadHrSystem } from './hrService.js';

@@ -16,7 +16,7 @@
       "command": "npx",
       "args": [
         "--prefix",
-        "/home/starborn/Code/DND/mcp/servers/io.github.arifulislamat-database-mcp-sqlite",
+        "servers/io.github.arifulislamat-database-mcp-sqlite",
         "--no-install",
         "@database-mcp/sqlite"
       ],

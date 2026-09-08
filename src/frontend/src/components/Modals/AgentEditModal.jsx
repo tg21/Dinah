@@ -100,7 +100,7 @@ export default function AgentEditModal() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: 8, maxHeight: 220, overflowY: 'auto' }}>
           {!mcps.length && (
             <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>
-              No MCPs registered. Add shared servers to mcp/registry.json.
+            No MCPs registered. Add user-managed servers through the MCP armory.
             </div>
           )}
           {mcps.map((mcp) => {
@@ -110,7 +110,7 @@ export default function AgentEditModal() {
               <div key={mcp.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700, color: '#fff', cursor: 'pointer' }}>
                   <input type="checkbox" checked={!!perm.enabled} onChange={(e) => toggleServer(mcp.id, e.target.checked)} />
-                  <span>{escapeHtml(mcp.name || mcp.id)}</span>
+                  <span>{escapeHtml(mcp.name || mcp.id)} <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({mcp.sourceType === 'shipped' ? 'included' : 'user-managed'})</small></span>
                   <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{escapeHtml(mcp.description || '')}</small>
                 </label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, margin: '6px 0 0 22px' }}>

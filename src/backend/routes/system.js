@@ -1,11 +1,31 @@
 import { Router } from 'express';
 import fs from 'fs';
+import { DINAH_MARKER_FILE, TOOL_DIR, WORKING_DIR, USING_DEFAULT_WORKING_AREA } from '../config.js';
 import { getAgentEventQueue } from '../services/eventBus.js';
 import { loadHrSystem } from '../services/hrService.js';
 import { getSharedStateLogFile, loadAgentThoughts } from '../services/messageService.js';
 import { ROLE_THOUGHT_POOLS } from '../data/rpgRegistry.js';
 
 const router = Router();
+
+function loadWorkspaceMarker() {
+  if (!fs.existsSync(DINAH_MARKER_FILE)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(DINAH_MARKER_FILE, 'utf-8'));
+  } catch {
+    return { valid: false };
+  }
+}
+
+router.get('/api/system/workspace', (req, res) => {
+  res.json({
+    toolRoot: TOOL_DIR,
+    workingDirectory: WORKING_DIR,
+    markerFile: DINAH_MARKER_FILE,
+    usingDefaultWorkingArea: USING_DEFAULT_WORKING_AREA,
+    marker: loadWorkspaceMarker()
+  });
+});
 
 // Shared state log
 router.post('/handleGetSharedLog', (req, res) => {

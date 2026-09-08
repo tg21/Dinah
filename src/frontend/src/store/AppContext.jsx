@@ -61,7 +61,15 @@ export function AppProvider({ children }) {
       if (!id) return null;
       try {
         const data = await api.getAgentStatus(id, currentProjectId);
-        if (data?.agent) setDrawerAgent(data.agent);
+        if (data?.agent) {
+          setDrawerAgent({
+            ...data.agent,
+            id,
+            messages: data.messages || [],
+            thoughts: data.thoughts || [],
+            context: data.personalContext || {}
+          });
+        }
         return data;
       } catch (err) {
         console.error('loadAgentDrawer failed:', err);
