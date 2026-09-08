@@ -44,7 +44,7 @@ export default function Drawer({ engineRef }) {
             <h3>
               {agent.name || 'Manager Bard'}{' '}
               <span className={`status-badge ${agent.status || 'active'}`}>
-                {(agent.status || 'Active').replace('-', ' ')}
+                {agent.status === 'awaiting-user' ? 'needs your answer' : (agent.status || 'Active').replace('-', ' ')}
               </span>
             </h3>
             <p>

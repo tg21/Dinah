@@ -8,7 +8,7 @@ import {
   saveProjectsConfig
 } from '../services/projectService.js';
 import { appendToSharedLog } from '../services/messageService.js';
-import { spawnAgentViaHr } from '../services/agentLifecycle.js';
+import { ensureProjectManager, sendProjectBriefToManager } from '../services/agentLifecycle.js';
 
 const router = Router();
 
@@ -51,7 +51,7 @@ router.post('/api/projects/config', (req, res) => {
 
 // Start new project
 router.post('/handleStartProject', (req, res) => {
-  const { projectId, initialAgentRole = 'manager-bard', customPath, budgetUsd } = req.body;
+  const { projectId, customPath, budgetUsd, description = '' } = req.body;
   if (!projectId) {
     return res.status(400).json({ error: 'Project ID is required' });
   }
@@ -64,13 +64,15 @@ router.post('/handleStartProject', (req, res) => {
   }
 
   appendToSharedLog(`CEO Warlock initiated new project: [${projectId}]`);
-  const spawned = spawnAgentViaHr(initialAgentRole, projectId, `Manager Bard (${projectId})`);
+  const manager = ensureProjectManager(projectId);
+  sendProjectBriefToManager(projectId, manager.agentId, description);
 
   return res.json({
     success: true,
     projectId,
-    managerAgentId: spawned.agentId,
-    message: `Project ${projectId} created. HR Mind Flayer spawned ${spawned.agentId}.`
+    managerAgentId: manager.agentId,
+    managerCreated: manager.created,
+    message: `Project ${projectId} created. HR Mind Flayer ${manager.created ? 'spawned' : 'found'} ${manager.agentId}.`
   });
 });
 

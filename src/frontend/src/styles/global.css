@@ -288,6 +288,8 @@
       position: relative;
     }
 
+    .exec-avatar-token.awaiting-user { box-shadow: 0 0 16px #ff2020; animation: user-question-pulse 1.4s ease-in-out infinite; }
+
     .exec-avatar-token .level-badge {
       position: absolute;
       bottom: -4px;
@@ -571,6 +573,8 @@
     .status-badge.working { background: rgba(243, 156, 18, 0.15); color: var(--gold); border: 1px solid rgba(243, 156, 18, 0.3); }
     .status-badge.paused { background: rgba(231, 76, 60, 0.15); color: var(--accent); border: 1px solid rgba(231, 76, 60, 0.3); }
     .status-badge.awaiting-confirmation { background: rgba(0, 188, 212, 0.2); color: var(--cyan); border: 1px solid var(--cyan); box-shadow: 0 0 8px var(--cyan-glow); }
+    .status-badge.awaiting-user { background: rgba(231, 76, 60, 0.22); color: #ff6b6b; border: 1px solid #ff4d4d; box-shadow: 0 0 12px rgba(255, 40, 40, 0.9); animation: user-question-pulse 1.4s ease-in-out infinite; }
+    @keyframes user-question-pulse { 50% { box-shadow: 0 0 22px rgba(255, 40, 40, 1); } }
 
     .drawer-actions {
       display: flex;

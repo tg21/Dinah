@@ -147,7 +147,8 @@ export function createLandscapeEngine(canvas, hooks = {}) {
       if (
         Math.random() < 0.005 &&
         this.data.status !== 'paused' &&
-        this.data.status !== 'awaiting-confirmation'
+        this.data.status !== 'awaiting-confirmation' &&
+        this.data.status !== 'awaiting-user'
       ) {
         this.targetX = this.x + (Math.random() - 0.5) * 60;
         this.targetY = this.y + (Math.random() - 0.5) * 40;
@@ -167,10 +168,24 @@ export function createLandscapeEngine(canvas, hooks = {}) {
       const agentThoughts = getThoughts();
       const isSelected = currentAgentId === this.id;
       const isAwaiting = this.data.status === 'awaiting-confirmation';
+      const needsUser = this.data.status === 'awaiting-user';
       const isPaused = this.data.status === 'paused';
 
       ctx.save();
       ctx.translate(this.x, this.y);
+
+      if (needsUser) {
+        const t = this.animTimer;
+        ctx.save();
+        ctx.strokeStyle = '#ff4d4d';
+        ctx.shadowColor = '#ff2020';
+        ctx.shadowBlur = 14;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, 31 + Math.sin(t * 4) * 3, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       if (isAwaiting) {
         const t = this.animTimer;

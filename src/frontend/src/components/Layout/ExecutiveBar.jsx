@@ -23,10 +23,11 @@ export default function ExecutiveBar() {
               className={`exec-agent-card ${isSelected ? 'selected' : ''}`}
               onClick={() => selectAgent(id)}
             >
-              <div className="exec-avatar-token" style={{ borderColor: conf.color }}>
+              <div className={`exec-avatar-token ${agent.status === 'awaiting-user' ? 'awaiting-user' : ''}`} style={{ borderColor: conf.color }}>
                 <span>{conf.icon}</span>
                 <div className="level-badge">{agent.stats?.level || 16}</div>
               </div>
+              {agent.status === 'awaiting-user' && <span className="status-badge awaiting-user">User input</span>}
               <div className="exec-info">
                 <div className="exec-name-row">
                   <div className="exec-name">{agent.name || id}</div>

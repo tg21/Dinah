@@ -13,7 +13,9 @@ function orchestrationTools(agent) {
     ...(definition?.coordination?.managerTools || []),
     // Every invoked agent needs the delivery protocol to consume a wake-up.
     'list_inbox', 'claim_message', 'acknowledge_message', 'complete_message',
-    'fail_message', 'release_message', 'get_message_status'
+    'fail_message', 'release_message', 'get_message_status',
+    ...(agent.role?.includes('ceo') ? ['create_project', 'ask_user'] : []),
+    ...(agent.role?.includes('manager') ? ['ask_user'] : [])
   ])];
 }
 

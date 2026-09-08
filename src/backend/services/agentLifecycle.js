@@ -9,6 +9,7 @@ import {
 } from './messageService.js';
 import { broadcastAgentEvent } from './eventBus.js';
 import { sanitizeMcpPermissions } from '../mcp/index.js';
+import { enqueueDirectMessage } from './messageQueueService.js';
 
 export function calculateAgentCostEstimation(role, model, effortLevel = 'High') {
   const meta = AGENT_RPG_REGISTRY[role] || {};
@@ -228,4 +229,24 @@ export function spawnAgentViaHr(role, projectId = 'global', customName = null, o
   appendToSharedLog(`HR Mind Flayer spawned agent [${agentId}] for project [${projectId}]`);
 
   return { agentId, agent: newAgent };
+}
+
+// Project creation is idempotent: a project always has exactly one default manager.
+export function ensureProjectManager(projectId, options = {}) {
+  const hrSystem = loadHrSystem();
+  const existing = Object.entries(hrSystem).find(([, agent]) =>
+    agent.project === projectId && agent.role === 'manager-bard' && agent.status !== 'retired'
+  );
+  if (existing) return { agentId: existing[0], agent: existing[1], created: false };
+  return { ...spawnAgentViaHr('manager-bard', projectId, options.name || `Manager Bard (${projectId})`, options), created: true };
+}
+
+export function sendProjectBriefToManager(projectId, managerAgentId, brief, fromAgentId = 'ceo-warlock') {
+  if (!brief || !String(brief).trim()) return null;
+  return enqueueDirectMessage({
+    fromAgentId,
+    toAgentId: managerAgentId,
+    projectId,
+    message: `Project brief from CEO for ${projectId}:\n\n${String(brief).trim()}`
+  });
 }

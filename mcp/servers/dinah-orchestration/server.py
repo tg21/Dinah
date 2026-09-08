@@ -77,6 +77,18 @@ def request_help(neededRole: str, question: str, taskId: str = "", urgency: str 
 
 
 @mcp.tool()
+def ask_user(question: str, taskId: str = "") -> dict:
+    """Pause this agent and send a question to the user. Resume when the user replies."""
+    return call_backend("/api/internal/orchestration/ask-user", context({"question": question, "taskId": taskId or None}))
+
+
+@mcp.tool()
+def create_project(projectId: str = "", description: str = "", customPath: str = "") -> dict:
+    """Create a project as CEO and provision its default Manager Bard."""
+    return call_backend("/api/internal/orchestration/create-project", context({"newProjectId": projectId, "description": description, "customPath": customPath or None}))
+
+
+@mcp.tool()
 def send_agent_message(toAgentId: str, message: str) -> dict:
     """Accept a direct message into the durable queue; processing is acknowledged separately."""
     return call_backend("/api/internal/orchestration/message", context({"fromAgentId": os.environ["DND_AGENT_ID"], "toAgentId": toAgentId, "message": message}))

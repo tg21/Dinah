@@ -1,7 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { SHARED_STATE_DIR } from '../config.js';
-import { appendToSharedLog } from './messageService.js';
+import { appendToSharedLog, appendAgentMessage } from './messageService.js';
+import { loadHrSystem, saveHrSystem } from './hrService.js';
+import { broadcastAgentEvent } from './eventBus.js';
 import { enqueueDirectMessage } from './messageQueueService.js';
 
 const COORDINATION_FILE = path.join(SHARED_STATE_DIR, 'coordination.json');
@@ -82,6 +84,20 @@ export function requestHelp({ projectId, agentId, taskId, neededRole, question, 
   saveState(state);
   appendToSharedLog(`Help request [${request.id}] from [${agentId}] needs [${neededRole}] in [${projectId}].`);
   return request;
+}
+
+export function askUser({ projectId, agentId, taskId, question }) {
+  const textQuestion = requireText(question, 'question');
+  const hr = loadHrSystem();
+  if (!hr[agentId]) throw new Error('Agent not found');
+  hr[agentId].status = 'awaiting-user';
+  hr[agentId].pendingUserQuestion = { question: textQuestion, taskId: taskId || null, askedAt: new Date().toISOString() };
+  hr[agentId].last_activity_ms = Date.now();
+  saveHrSystem(hr);
+  appendAgentMessage(agentId, { from: hr[agentId].name || agentId, project: projectId, request: textQuestion, role: 'agent' });
+  broadcastAgentEvent({ fromAgentId: agentId, toAgentId: 'user', projectId, type: 'agent_needs_user', snippet: textQuestion.slice(0, 80) });
+  appendToSharedLog(`[${agentId}] is waiting for user input in [${projectId}].`);
+  return { id: `user-question-${Date.now()}`, agentId, projectId, question: textQuestion, status: 'awaiting-user' };
 }
 
 export function sendAgentMessage({ fromAgentId, toAgentId, projectId, message }) {

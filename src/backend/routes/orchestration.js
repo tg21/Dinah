@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { authenticateOrchestrationToken } from '../services/orchestrationAuth.js';
 import { loadHrSystem } from '../services/hrService.js';
-import { requestAgentSummoning, spawnAgentViaHr } from '../services/agentLifecycle.js';
+import { requestAgentSummoning, spawnAgentViaHr, ensureProjectManager, sendProjectBriefToManager } from '../services/agentLifecycle.js';
+import { createProjectFolder, loadProjectsConfig, saveProjectsConfig } from '../services/projectService.js';
+import { askUser } from '../services/coordinationService.js';
 import { spawnHarnessAgent } from '../services/harnessRunner.js';
 import { getProjectCoordination, recordTask, updateTaskProgress, reportBlocker, requestHelp, sendAgentMessage } from '../services/coordinationService.js';
 import {
@@ -26,6 +28,19 @@ router.post('/api/internal/orchestration/status', guard, (req, res) => {
     .filter(([, agent]) => (agent.project || 'global') === req.body.projectId)
     .map(([id, agent]) => ({ id, name: agent.name, role: agent.role, status: agent.status, lastActivity: agent.last_activity_ms, contextUsed: agent.context_used, contextLimit: agent.context_len }));
   res.json({ projectId: req.body.projectId, agents, coordination });
+});
+
+router.post('/api/internal/orchestration/create-project', guard, (req, res) => {
+  if (req.body.agentId !== 'ceo-warlock') return res.status(403).json({ error: 'Only CEO Warlock may create projects through this tool' });
+  const projectId = String(req.body.newProjectId || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '');
+  if (!projectId) return res.status(400).json({ error: 'projectId is required; ask the user for a project name' });
+  createProjectFolder(projectId, req.body.customPath || null);
+  const cfg = loadProjectsConfig();
+  if (req.body.description) cfg[projectId].description = req.body.description;
+  saveProjectsConfig(cfg);
+  const manager = ensureProjectManager(projectId);
+  sendProjectBriefToManager(projectId, manager.agentId, req.body.description || 'No brief supplied; ask the user for missing requirements before planning.');
+  res.json({ success: true, projectId, managerAgentId: manager.agentId, managerCreated: manager.created });
 });
 
 router.post('/api/internal/orchestration/staff', guard, (req, res) => {
@@ -69,6 +84,7 @@ router.post('/api/internal/orchestration/task', guard, (req, res) => {
 router.post('/api/internal/orchestration/progress', guard, (req, res) => res.json({ task: updateTaskProgress(req.body) }));
 router.post('/api/internal/orchestration/blocker', guard, (req, res) => res.json({ blocker: reportBlocker(req.body) }));
 router.post('/api/internal/orchestration/help', guard, (req, res) => res.json({ request: requestHelp(req.body) }));
+router.post('/api/internal/orchestration/ask-user', guard, (req, res) => res.json({ request: askUser(req.body) }));
 router.post('/api/internal/orchestration/message', guard, (req, res) => res.json(sendAgentMessage(req.body)));
 router.post('/api/internal/orchestration/project-message', guard, (req, res) => res.json(publishProjectMessage(req.body)));
 router.post('/api/internal/orchestration/subscribe', guard, (req, res) => res.json(subscribeToProject(req.body)));

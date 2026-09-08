@@ -91,6 +91,10 @@ router.post('/handleSendMessage', (req, res) => {
   const hrSystem = loadHrSystem();
   if (hrSystem[agentId]) {
     hrSystem[agentId].last_activity_ms = Date.now();
+    if (hrSystem[agentId].status === 'awaiting-user') {
+      hrSystem[agentId].status = 'working';
+      hrSystem[agentId].pendingUserQuestion = null;
+    }
     const tokenIncrement = Math.round(message.length * 1.5) + 350;
     hrSystem[agentId].context_used = (hrSystem[agentId].context_used || 5000) + tokenIncrement;
     saveHrSystem(hrSystem);
