@@ -25,8 +25,8 @@ export function createApp() {
   ensureBaseDirs();
 
   // Serve Frontend — built React bundle (dist/frontend from `npm run build:frontend`).
-  // Falls back to the legacy src/frontend.html only when no bundle exists
-  // (e.g. fresh checkout before the first frontend build).
+  // No raw-HTML fallback: the React app is the only UI. Without a bundle,
+  // `/` explains how to build it instead of serving a stale page.
   const frontendDist = resolveFrontendDistDir();
   if (frontendDist) {
     app.use(express.static(frontendDist));
@@ -37,7 +37,12 @@ export function createApp() {
     // Must be registered AFTER the API routers, so it only catches UI routes.
   } else {
     app.get('/', (req, res) => {
-      res.sendFile(path.join(APP_DIR, 'src', 'frontend.html'));
+      res
+        .status(503)
+        .type('text/plain')
+        .send(
+          'Frontend bundle not built. Run `npm run install:frontend && npm run build:frontend`, or `npm run dev:frontend` for hot reload.'
+        );
     });
   }
   app.use(express.static(APP_DIR));

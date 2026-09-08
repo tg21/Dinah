@@ -26,7 +26,7 @@ Compact instruction file for OpenCode sessions. Every line answers: "Would an ag
 | `src/backend.js` | Deprecated shim — re-exports `src/backend/server.js` for backward compatibility |
 | `src/backend/` | Modular Express server: `server.js` (listen/init), `app.js` (middleware + router mounting + React bundle static hosting with SPA fallback), `config.js` (paths/constants incl. `FRONTEND_DIST_DIR` resolution), `routes/` (one `express.Router()` per domain: `projects`, `models`, `mcps`, `agents`, `messages`, `knowledge`, `marshall`, `system`), `services/` (`hrService`, `projectService`, `messageService`, `eventBus`, `harnessRunner`, `agentLifecycle`, `startupService`, `knowledgeService`, `marshallService`), `mcp/` (`registry`, `catalog`, `permissions`, `invocation`), `harness/` (detection/discovery: `registry` orchestrator, `common` shared helpers, `store` in-memory state, `selector` role matching, `providers/` one module per harness: `opencode`, `antigravity`, `ollama`, `claude`, `gemini`, `codex`, `simulator`), `data/rpgRegistry.js` (agent RPG stats + thought pools) |
 | `src/frontend/` | Vite + React 18 UI (own `package.json`, `vite.config.js`, `index.html`): `src/main.jsx` entry, `src/App.jsx` shell, `src/api/client.js` (all backend fetch calls), `src/store/AppContext.jsx` (global agent/project/model/MCP/modal state), `src/constants/` (`roles.js` ROLE_CONFIGS + roster, `startup.js` labels/effort/quick prompts), `src/utils/` (`format.js` escaping + 900-char collapse, `cost.js` spawn estimate + model grouping), `src/components/Layout/` (`TopNav`, `ExecutiveBar`), `src/components/PlayArea/` (`PlayArea.jsx`, `engine.js` 2D canvas world/sprites/couriers/camera), `src/components/Drawer/` (`Drawer` + `ChatTab`, `StatsTab`, `ThoughtsTab`, `ContextTab`, `BrainView` three.js, `NetworkTab`), `src/components/Modals/` (`Modal` shell + `StartupSetup`, `NewProject`, `ProjectSettings`, `SpawnAgent`, `AgentEdit`, `McpManagement`, `KnowledgeBase`, `MarshallAudit`), `src/styles/global.css` (theme ported from legacy HTML) |
-| `src/` (other) | `frontend.html` (legacy pre-React bundle — fallback only when `dist/frontend/index.html` is missing; do not extend, port to `src/frontend/` instead), `harnessRegistry.js` (deprecated shim — re-exports `src/backend/harness/index.js`) |
+| `src/` (other) | `harnessRegistry.js` (deprecated shim — re-exports `src/backend/harness/index.js`) |
 | `hr-system/` | `hr-system.json` (agent registry), `agent-<id>.msgs.json`, `agent-<id>.thoughts.json` |
 | `projects/` | Isolated project workspaces, created only for explicitly started projects |
 | `agent-templates/` | 23 markdown templates for agent archetypes |
@@ -89,7 +89,7 @@ If no harnesses are found, the system falls back to a virtual simulation harness
 
 | Script | Effect |
 |---|---|
-| `npm start` | Runs `node src/backend/server.js` (serves `dist/frontend/` React bundle when built, else legacy `src/frontend.html`) |
+| `npm start` | Runs `node src/backend/server.js` (serves the `dist/frontend/` React bundle; `/` returns 503 with build instructions when the bundle is missing) |
 | `npm run dev` | Runs backend + Vite dev server concurrently (needs `concurrently`; installs via root devDeps) |
 | `npm run dev:backend` | Runs backend only on `:2121` |
 | `npm run dev:frontend` | Runs Vite hot-reload UI on `:5173` with `/api` + `/handle*` proxied to `:2121`; needs `npm run install:frontend` first |
@@ -106,7 +106,7 @@ No lint or typecheck configured. Root uses `type: "module"`; `src/frontend/` is 
 
 ## 7. Key Conventions & Gotchas
 
-- **Frontend hosting**. `src/backend/app.js` serves the Vite build from `dist/frontend/` (fallback `src/frontend/dist/`) with an SPA fallback for non-`/api` GETs; only when no bundle exists does `/` fall back to legacy `src/frontend.html`. After editing `src/frontend/`, run `npm run build:frontend` before testing the `:2121` UI, or use `npm run dev:frontend` (`:5173`, proxies `/api` + `/handle*` to `:2121`) for hot reload. New UI code goes in `src/frontend/src/` (API calls in `api/client.js`, shared state in `store/AppContext.jsx`); do not add features to `src/frontend.html`.
+- **Frontend hosting**. `src/backend/app.js` serves the Vite build from `dist/frontend/` (fallback `src/frontend/dist/`) with an SPA fallback for non-`/api` GETs. The React app in `src/frontend/` is the only UI — there is no raw-HTML fallback. After editing `src/frontend/`, run `npm run build:frontend` before testing the `:2121` UI, or use `npm run dev:frontend` (`:5173`, proxies `/api` + `/handle*` to `:2121`) for hot reload. New UI code goes in `src/frontend/src/` (API calls in `api/client.js`, shared state in `store/AppContext.jsx`).
 - **Port**: Server defaults to `2121` (`PORT` env var supported).
 - **CORS**: Enabled for all origins.
 - **`APP_DIR`**: Server runs from `process.cwd()` — keep `src/backend/server.js` as entry and run from repo root.
