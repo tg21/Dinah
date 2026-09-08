@@ -86,11 +86,11 @@ router.post('/api/agents/set-status', (req, res) => {
 
 // Standard direct spawn via HR
 router.post('/api/agents/spawn', (req, res) => {
-  const { role, projectId = 'global', customName, model, harness, effortLevel } = req.body;
+  const { role, projectId = 'global', customName, model, harness, effortLevel, promptOverride } = req.body;
   if (!role) {
     return res.status(400).json({ error: 'Agent role is required' });
   }
-  const result = spawnAgentViaHr(role, projectId, customName, { model, harness, effortLevel });
+  const result = spawnAgentViaHr(role, projectId, customName, { model, harness, effortLevel, promptOverride });
   res.json({ success: true, ...result });
 });
 

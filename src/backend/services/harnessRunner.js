@@ -4,7 +4,8 @@ import { findHarnessBinary } from '../harness/index.js';
 import { createProjectFolder, getProjectFolder } from './projectService.js';
 import { loadHrSystem } from './hrService.js';
 import { appendAgentThought } from './messageService.js';
-import { createMcpInvocationConfig, mcpPromptContext } from '../mcp/index.js';
+import { createMcpInvocationConfig, mcpPromptContext, cleanupMcpInvocation } from '../mcp/index.js';
+import { buildAgentPrompt } from './agentDefinitions.js';
 
 export function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation) {
   const projectDir = getProjectFolder(projectId);
@@ -236,7 +237,7 @@ export function simulateHarnessExecution(harness, projectId, prompt, agentId) {
 export function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId) {
   const agent = loadHrSystem()[agentId] || { role: agentId, name: agentId };
   const mcpInvocation = createMcpInvocationConfig(agent, agentId, projectId);
-  const effectivePrompt = prompt + mcpPromptContext(agent, mcpInvocation);
+  const effectivePrompt = buildAgentPrompt(agent.role || agentId, prompt, { ...agent, project: projectId }) + mcpPromptContext(agent, mcpInvocation);
   try {
     switch (harness) {
       case 'antigravity':
@@ -257,6 +258,7 @@ export function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agent
     }
   } finally {
     try {
+      cleanupMcpInvocation(mcpInvocation);
       fs.rmSync(mcpInvocation.dir, { recursive: true, force: true });
     } catch (e) {
       /* best effort cleanup */

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import {
   SHIPPED_MCP_REGISTRY_FILE,
+  SHIPPED_MCP_DIR,
   SHIPPED_MCP_SERVERS_DIR,
   USER_MCP_DIR,
   USER_MCP_REGISTRY_FILE
@@ -24,6 +25,11 @@ function readRegistry(file, source) {
             path.basename(result.args[prefixIndex + 1])
           );
         }
+        result.args = result.args.map((arg) =>
+          typeof arg === 'string' && arg.endsWith('.py') && !path.isAbsolute(arg)
+            ? path.join(SHIPPED_MCP_DIR, arg)
+            : arg
+        );
       }
       return result;
     });

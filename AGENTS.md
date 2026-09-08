@@ -34,7 +34,7 @@ desired user workspace. That directory becomes the workspace and receives
 | `src/` (other) | `harnessRegistry.js` (deprecated shim — re-exports `src/backend/harness/index.js`) |
 | `working-area/` | Default mutable user workspace created when launched from the tool repository; contains `hr-system/`, `projects/`, `shared-state/`, `user-mcps/`, and `.dinah` |
 | `mcp/` | Shipped MCP registry and server packages tracked by git; never write UI-installed MCPs here |
-| `agent-templates/` | 23 markdown templates for agent archetypes (shipped/read-only) |
+| `agent-templates/` | JSON role definitions; each file is named for its role and contains `name`, `job`, and `basePrompt` (shipped/read-only) |
 | `prompts/` | Shipped system prompts (read-only) |
 
 ---
@@ -101,7 +101,7 @@ If no harnesses are found, the system falls back to a virtual simulation harness
 | `npm run install:frontend` | Installs `src/frontend/` deps (`react`, `react-dom`, `three`, `vite`, `@vitejs/plugin-react`) |
 | `npm run fresh-start` | Deletes the default `working-area/`, then starts `node src/backend/server.js`; use only when a full runtime-state reset is intended |
 | `npm run build` | Builds backend bundle into `dist/backend/` (`build:backend`) AND React UI into `dist/frontend/` (`build:frontend`) |
-| `npm run build:backend` | Copies the modular backend (`src/backend/server.js`, `app.js`, `config.js`, `routes/`, `services/`, `mcp/`, `harness/`, `data/`) plus the `src/backend.js` and `src/harnessRegistry.js` shims into `dist/` |
+| `npm run build:backend` | Copies the modular backend (`src/backend/server.js`, `app.js`, `config.js`, `routes/`, `services/`, `mcp/`, `harness/`, `data/`) and JSON `agent-templates/` plus the `src/backend.js` and `src/harnessRegistry.js` shims into `dist/` |
 | `npm run build:frontend` | Runs `vite build` in `src/frontend/` → emits static assets to `dist/frontend/` (served by `src/backend/app.js`) |
 | `npm test` | Exits with error ("no test specified") — no test suite configured |
 
@@ -120,6 +120,10 @@ No lint or typecheck configured. Root uses `type: "module"`; `src/frontend/` is 
 - **Project directories are auto-created**. `createProjectFolder(projectId)` in `src/backend/services/projectService.js` creates `<working-area>/projects/<id>/` with a `README.md` if missing.
 - **Route/service ownership**. Business logic lives in `src/backend/services/` and `src/backend/mcp/`; `src/backend/routes/*.js` files only validate input, call services, and format responses. Wire new endpoints as an `express.Router()` in `routes/` and mount it in `src/backend/app.js`.
 - **Harness runners**. Per-CLI adapters live in `src/backend/services/harnessRunner.js` (`spawnOpencodeAgent`, `spawnCodexAgent`, …) behind `spawnHarnessAgent`, which also builds/cleans the per-invocation MCP manifest via `src/backend/mcp/invocation.js`.
+- **Agent definitions**. `src/backend/services/agentDefinitions.js` validates and loads `agent-templates/<role>.json`, then injects the role prompt and runtime workspace context into every harness invocation. Role definitions must not contain hardcoded API URLs or curl commands.
+- **Agent coordination**. The shipped `dinah-orchestration` MCP exposes project status, HR staffing requests, task dispatch with acceptance criteria/dependencies, progress, blockers, help requests, and durable agent messages. State is stored in `shared-state/coordination.json`; agents must publish progress, report blockers, and request help instead of relying on periodic full-project scans.
+- **Staffing authority**. Managers use `request_staff`; only `hr-mind-flayer` may use `provision_agent`. Both support model, harness, effort, and `promptOverride` specialization parameters, and the backend enforces the HR boundary.
+- **Model routing and specialization**. Each role definition contains `modelPolicy`, `runtimeCustomization`, and `coordination` metadata. HR/model selection uses the policy when choosing discovered models; staffing requests may provide a model override and a specialization prompt override, which is included in the invocation without replacing the core role prompt.
 - **Harness discovery**. Model discovery per harness lives in `src/backend/harness/providers/<harness>.js` behind `initializeHarnessesAndModels` in `src/backend/harness/registry.js`; shared helpers (`findHarnessBinary`, `checkHttpEndpoint`, `buildModelCapability`) in `harness/common.js`, in-memory state in `harness/store.js`, role matching in `harness/selector.js`. Import from `src/backend/harness/index.js`.
 - **MCP separation**. `mcp/registry.json` and `mcp/servers/` are shipped, git-tracked MCPs. UI-installed MCPs are written to `<working-area>/user-mcps/`; `GET /api/mcps` combines both inventories and labels each entry with `sourceType`.
 - **Projects are opt-in**. Startup and `GET /api/projects` must not seed or create `project-alpha`, `project-beta`, or any other project. Project folders/configuration are created only by an explicit project-creation flow or work dispatched to that project. Global CEO work uses the active working directory and must not create `projects/global/`.
@@ -133,6 +137,7 @@ No lint or typecheck configured. Root uses `type: "module"`; `src/frontend/` is 
 - **Agent drawer payloads**. `/handleGetAgentStatus` returns `agent`, `messages`, `thoughts`, and `personalContext` as sibling fields. The frontend must merge those fields into drawer state; persisted messages use the backend `request` property.
 - **Token tracking**. Each message sent via `POST /handleSendMessage` increments `context_used` by `round(message.length * 1.5) + 350` tokens and adds `spentUsd` to the project budget.
 - **Environment variables**. `PORT`, `OLLAMA_HOST` (`default: http://localhost:11434`), `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY` are read at startup to detect harnesses.
+- **Runtime configuration**. `.dinah` is a workspace marker and records non-secret runtime metadata such as the backend port. Agent prompts receive runtime context from backend code; they must not embed service URLs. Use MCP tools for narrowly scoped agent actions when available, while internal orchestration remains in backend services.
 - **5-minute intervals**. Marshall sentinel and Senior Analyst both run on `setInterval(..., 300000)`. Do not manually run them more frequently than every 5 minutes without reason.
 
 ---

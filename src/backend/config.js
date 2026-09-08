@@ -44,21 +44,29 @@ export const FRONTEND_DIST_DIR = path.join(TOOL_DIR, 'dist', 'frontend');
 export const FRONTEND_DEV_DIST_DIR = path.join(TOOL_DIR, 'src', 'frontend', 'dist');
 
 function initialiseMarker() {
-  if (fs.existsSync(DINAH_MARKER_FILE)) return;
-  fs.writeFileSync(
-    DINAH_MARKER_FILE,
-    JSON.stringify(
-      {
-        system: 'dinah',
-        version: 1,
-        initializedAt: new Date().toISOString(),
-        toolRoot: TOOL_DIR,
-        workingDirectory: WORKING_DIR
-      },
-      null,
-      2
-    )
-  );
+  const defaults = {
+    system: 'dinah',
+    version: 1,
+    initializedAt: new Date().toISOString(),
+    toolRoot: TOOL_DIR,
+    workingDirectory: WORKING_DIR,
+    runtime: { backendPort: Number(PORT) }
+  };
+  if (!fs.existsSync(DINAH_MARKER_FILE)) {
+    fs.writeFileSync(DINAH_MARKER_FILE, JSON.stringify(defaults, null, 2));
+    return;
+  }
+  try {
+    const marker = JSON.parse(fs.readFileSync(DINAH_MARKER_FILE, 'utf8'));
+    if (!marker.runtime?.backendPort) {
+      fs.writeFileSync(
+        DINAH_MARKER_FILE,
+        JSON.stringify({ ...defaults, ...marker, runtime: { ...defaults.runtime, ...marker.runtime } }, null, 2)
+      );
+    }
+  } catch (error) {
+    console.warn(`Unable to read ${DINAH_MARKER_FILE}:`, error.message);
+  }
 }
 
 export function resolveFrontendDistDir() {

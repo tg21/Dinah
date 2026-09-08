@@ -15,4 +15,4 @@ export {
   resolveAgentMcps,
   sanitizeMcpPermissions
 } from './permissions.js';
-export { createMcpInvocationConfig, mcpPromptContext } from './invocation.js';
+export { createMcpInvocationConfig, mcpPromptContext, cleanupMcpInvocation } from './invocation.js';

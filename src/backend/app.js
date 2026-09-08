@@ -11,7 +11,8 @@ import {
   messageRoutes,
   modelRoutes,
   projectRoutes,
-  systemRoutes
+  systemRoutes,
+  orchestrationRoutes
 } from './routes/index.js';
 
 export function createApp() {
@@ -56,6 +57,7 @@ export function createApp() {
   app.use(knowledgeRoutes);
   app.use(marshallRoutes);
   app.use(systemRoutes);
+  app.use(orchestrationRoutes);
 
   // SPA fallback for the React bundle: any non-API GET without an extension
   // serves index.html so client-side routing/state stays on the same page.

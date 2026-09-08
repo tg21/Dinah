@@ -1,6 +1,26 @@
 {
   "mcps": [
     {
+      "id": "dinah-orchestration",
+      "name": "Dinah Orchestration",
+      "description": "Least-privilege agent coordination: staffing, tasks, progress, blockers, help, and messages.",
+      "version": "1.0.0",
+      "source": "dinah-shipped",
+      "command": "python3",
+      "args": ["servers/dinah-orchestration/server.py"],
+      "env": {},
+      "tools": [
+        {"name": "get_project_status", "description": "Read project coordination state."},
+        {"name": "request_staff", "description": "Request a specialist from HR."},
+        {"name": "provision_agent", "description": "Provision an active specialist; authorized only for HR."},
+        {"name": "create_task", "description": "Create and optionally dispatch tracked work with acceptance criteria and dependencies."},
+        {"name": "update_progress", "description": "Publish task progress."},
+        {"name": "report_blocker", "description": "Record a blocker."},
+        {"name": "request_help", "description": "Request specialist help."},
+        {"name": "send_agent_message", "description": "Send a durable agent message."}
+      ]
+    },
+    {
       "id": "io.github.arifulislamat-database-mcp-sqlite",
       "name": "io.github.arifulislamat/database-mcp-sqlite",
       "description": "MCP server for SQLite databases. Read-only by default, row caps, statement timeouts.",

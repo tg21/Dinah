@@ -202,6 +202,7 @@ export function spawnAgentViaHr(role, projectId = 'global', customName = null, o
     harness,
     model,
     effortLevel,
+    promptOverride: options.promptOverride || '',
     context_len: selectedModel?.contextWindow || rpgStats.contextCapacity || 128000,
     context_used: 1500,
     created_at: new Date().toISOString(),

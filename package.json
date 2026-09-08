@@ -11,7 +11,7 @@
     "dev:frontend": "npm --prefix src/frontend run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "fresh-dev": "rm -rf working-area && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "build:backend": "rm -rf dist/backend && mkdir -p dist/backend && cp src/backend/server.js src/backend/app.js src/backend/config.js dist/backend/ && cp -r src/backend/routes dist/backend/ && cp -r src/backend/services dist/backend/ && cp -r src/backend/mcp dist/backend/ && cp -r src/backend/data dist/backend/ && cp -r src/backend/harness dist/backend/ && cp src/backend.js dist/ && cp src/harnessRegistry.js dist/",
+    "build:backend": "rm -rf dist/backend && mkdir -p dist/backend && cp src/backend/server.js src/backend/app.js src/backend/config.js dist/backend/ && cp -r src/backend/routes dist/backend/ && cp -r src/backend/services dist/backend/ && cp -r src/backend/mcp dist/backend/ && cp -r src/backend/data dist/backend/ && cp -r src/backend/harness dist/backend/ && cp -r agent-templates dist/agent-templates && cp src/backend.js dist/ && cp src/harnessRegistry.js dist/",
     "build:frontend": "npm --prefix src/frontend run build",
     "build": "npm run build:backend && npm run build:frontend",
     "start": "node src/backend/server.js"
