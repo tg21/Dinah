@@ -13,7 +13,7 @@ const TABS = [
   ['stats', 'fa-shield-halved', 'Stats'],
   ['thoughts', 'fa-brain', 'Thoughts'],
   ['context', 'fa-database', 'Context'],
-  ['network', 'fa-circle-nodes', 'Network']
+  ['network', 'fa-envelope-open-text', 'Messages']
 ];
 
 export default function Drawer({ engineRef }) {

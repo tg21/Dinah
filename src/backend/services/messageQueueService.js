@@ -108,12 +108,21 @@ function createEnvelope({ projectId = 'global', senderAgentId, recipientAgentId 
     });
   }
   saveState(state);
+  const delivery = state.deliveries.find((item) => item.messageId === message.messageId && item.recipientAgentId === recipientAgentId);
   if (recipientAgentId) {
     appendAgentMessage(recipientAgentId, { from: sender, project: project, request: message.summary, role: 'agent' });
-    broadcastAgentEvent({ fromAgentId: sender, toAgentId: recipientAgentId, type: 'coordination_message', snippet: message.summary.slice(0, 80) });
+    broadcastAgentEvent({
+      fromAgentId: sender,
+      toAgentId: recipientAgentId,
+      type: 'courier_message',
+      messageId: message.messageId,
+      deliveryId: delivery?.deliveryId,
+      projectId: project,
+      summary: message.summary,
+      snippet: message.summary.slice(0, 80)
+    });
   }
   appendToSharedLog(`[${sender}] queued ${type} [${message.messageId}] in [${project}].`);
-  const delivery = state.deliveries.find((item) => item.messageId === message.messageId && item.recipientAgentId === recipientAgentId);
   return { message: publicMessage(message, delivery), duplicate: false };
 }
 
@@ -206,6 +215,19 @@ export function getMessageStatus({ messageId }) {
   const message = state.messages.find((item) => item.messageId === text(messageId, 'messageId'));
   if (!message) throw new Error('Message not found');
   return { message, deliveries: state.deliveries.filter((item) => item.messageId === message.messageId) };
+}
+
+export function getProjectMessageActivity({ projectId = 'global', limit = 100 }) {
+  const state = loadState();
+  if (recoverExpired(state)) saveState(state);
+  const messages = state.messages
+    .filter((message) => message.projectId === projectId || projectId === 'all')
+    .slice(-Math.max(1, Math.min(250, Number(limit) || 100)))
+    .reverse();
+  return messages.map((message) => ({
+    ...message,
+    deliveries: state.deliveries.filter((delivery) => delivery.messageId === message.messageId)
+  }));
 }
 
 export function getQueuedAgents() {

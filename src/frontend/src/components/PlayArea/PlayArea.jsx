@@ -15,7 +15,12 @@ export default function PlayArea({ engineRef }) {
     agentThoughts,
     selectAgent,
     setActiveModal,
-    setDrawerCollapsed
+    setDrawerCollapsed,
+    allAgents,
+    mailFlights,
+    messageActivity,
+    selectedCommunication,
+    setSelectedCommunication
   } = useApp();
 
   const selectedRef = useRef(currentAgentId);
@@ -40,6 +45,15 @@ export default function PlayArea({ engineRef }) {
     engineRef.current?.syncAgents(projectAgents, globalAgents);
   }, [projectAgents, globalAgents]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const launchedMailRef = useRef(new Set());
+  useEffect(() => {
+    for (const mail of mailFlights) {
+      if (launchedMailRef.current.has(mail.id)) continue;
+      launchedMailRef.current.add(mail.id);
+      engineRef.current?.launchCourier(mail.fromAgentId, mail.toAgentId);
+    }
+  }, [mailFlights]);
+
   const pCfg = projectConfigs[currentProjectId] || { budgetUsd: 50.0 };
   const count = Object.keys(projectAgents).length;
 
@@ -59,6 +73,34 @@ export default function PlayArea({ engineRef }) {
         <i className="fa-solid fa-mouse-pointer" /> Click agents to inspect • Drag to pan • Scroll
         to zoom [1.0x–2.5x]
       </div>
+
+      <div className="mail-flight-layer" aria-label="Live agent messages">
+        {mailFlights.map((mail, index) => {
+          const sender = allAgents[mail.fromAgentId]?.name || mail.fromAgentId;
+          const receiver = allAgents[mail.toAgentId]?.name || mail.toAgentId;
+          const detail = messageActivity.find((item) => item.messageId === mail.messageId);
+          return (
+            <button
+              key={mail.id}
+              className="mail-flight"
+              style={{ '--mail-lane': index % 3 }}
+              onClick={() => setSelectedCommunication(detail || mail)}
+              title="Open message details"
+            >
+              <i className="fa-solid fa-envelope" />
+              <span>{sender} → {receiver}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedCommunication && (
+        <CommunicationPopover
+          communication={selectedCommunication}
+          allAgents={allAgents}
+          onClose={() => setSelectedCommunication(null)}
+        />
+      )}
 
       <div className="canvas-overlay-controls">
         <button className="canvas-btn" onClick={() => engineRef.current?.zoom(1.2)} title="Zoom In">
@@ -85,6 +127,26 @@ export default function PlayArea({ engineRef }) {
 
       <DrawerToggle onToggle={() => setDrawerCollapsed((v) => !v)} />
     </main>
+  );
+}
+
+function CommunicationPopover({ communication, allAgents, onClose }) {
+  const senderId = communication.senderAgentId || communication.fromAgentId;
+  const receiverId = communication.recipientAgentId || communication.toAgentId;
+  const sender = allAgents[senderId]?.name || senderId;
+  const receiver = allAgents[receiverId]?.name || receiverId;
+  const delivery = communication.deliveries?.[0] || communication;
+  const status = delivery.deliveryStatus || delivery.status || 'queued';
+  return (
+    <div className="communication-popover">
+      <div className="communication-popover-head">
+        <strong><i className="fa-solid fa-envelope-open-text" /> Message delivery</strong>
+        <button onClick={onClose} aria-label="Close message"><i className="fa-solid fa-xmark" /></button>
+      </div>
+      <div className="communication-route"><span>{sender}</span><i className="fa-solid fa-arrow-right" /><span>{receiver}</span></div>
+      <div className="communication-status">{status.replace('-', ' ')} · {communication.createdAt ? new Date(communication.createdAt).toLocaleTimeString() : 'just now'}</div>
+      <div className="communication-body">{communication.payload?.message || communication.summary || communication.snippet || 'No message content'}</div>
+    </div>
   );
 }
 

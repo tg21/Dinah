@@ -1170,6 +1170,37 @@
       border-color: var(--primary);
     }
 
+    .network-subtitle { color: var(--text-muted); font-size: 10px; margin: -3px 0 9px; }
+    .network-live-pill { color: #70e6a7; font-size: 8px; margin-left: auto; letter-spacing: .06em; }
+    .network-live-pill i { font-size: 6px; vertical-align: middle; }
+    .network-empty { color: var(--text-muted); font-size: 11px; padding: 22px 8px; text-align: center; }
+    .communication-list { display: flex; flex-direction: column; gap: 6px; }
+    .communication-row { width: 92%; text-align: left; color: var(--text); cursor: pointer; background: rgba(45,45,70,.72); border: 1px solid var(--border); border-radius: 8px; padding: 8px 9px; transition: .18s ease; }
+    .communication-row.outgoing { align-self: flex-end; background: rgba(0,188,212,.12); border-color: rgba(0,188,212,.35); }
+    .communication-row:hover, .communication-row.expanded { border-color: var(--cyan); transform: translateY(-1px); }
+    .communication-row-meta { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; }
+    .communication-row-meta span { color: var(--text-muted); font-size: 9px; white-space: nowrap; }
+    .communication-row-summary { color: #d7d7e5; font-size: 10px; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .communication-row-detail { border-top: 1px solid rgba(255,255,255,.1); margin-top: 7px; padding-top: 7px; font-size: 10px; }
+    .communication-row-detail div { display: flex; justify-content: space-between; color: #ddd; margin: 3px 0; }
+    .communication-row-detail div span { color: var(--text-muted); }
+    .communication-row-detail p { color: #fff; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; margin: 7px 0 0; }
+    .message-ticks { color: #9ba0b4; margin-left: 3px; letter-spacing: -2px; }
+    .message-ticks.blue { color: #37c8ff; }
+    .message-ticks.failed { color: #ff6d6d; letter-spacing: 0; }
+    .mail-flight-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+    .mail-flight { position: absolute; top: calc(18% + (var(--mail-lane) * 12%)); left: -18%; pointer-events: auto; display: flex; align-items: center; gap: 7px; color: #171722; background: linear-gradient(135deg,#fff59d,#ffc107); border: 1px solid #ffe082; border-radius: 7px; padding: 6px 9px; box-shadow: 0 5px 18px rgba(0,0,0,.42); font-size: 10px; font-weight: 700; animation: mail-float-across 30s linear forwards; cursor: pointer; }
+    .mail-flight i { font-size: 13px; }
+    @keyframes mail-float-across { from { transform: translateX(0) rotate(-3deg); } to { transform: translateX(135vw) rotate(3deg); } }
+    .communication-popover { position: absolute; right: 18px; top: 72px; width: min(330px,calc(100% - 36px)); z-index: 20; color: #fff; background: rgba(16,16,30,.96); border: 1px solid var(--cyan); border-radius: 9px; box-shadow: 0 10px 30px rgba(0,0,0,.5); padding: 10px; }
+    .communication-popover-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; }
+    .communication-popover-head strong { color: var(--cyan); }
+    .communication-popover-head button { background: transparent; border: 0; color: var(--text-muted); cursor: pointer; }
+    .communication-route { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-weight: 700; font-size: 11px; }
+    .communication-route i { color: var(--gold); }
+    .communication-status { color: #7ed8ff; font-size: 9px; margin-top: 5px; text-transform: capitalize; }
+    .communication-body { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; font-size: 11px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; }
+
     /* ============================================================
        MODALS
     ============================================================ */

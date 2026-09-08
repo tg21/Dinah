@@ -5,6 +5,7 @@ import { getAgentEventQueue } from '../services/eventBus.js';
 import { loadHrSystem } from '../services/hrService.js';
 import { getSharedStateLogFile, loadAgentThoughts } from '../services/messageService.js';
 import { ROLE_THOUGHT_POOLS } from '../data/rpgRegistry.js';
+import { getProjectMessageActivity } from '../services/messageQueueService.js';
 
 const router = Router();
 
@@ -41,6 +42,10 @@ router.post('/handleGetSharedLog', (req, res) => {
 // Inter-Agent Event Stream
 router.get('/api/events', (req, res) => {
   res.json({ events: getAgentEventQueue() });
+});
+
+router.get('/api/message-activity', (req, res) => {
+  res.json({ messages: getProjectMessageActivity({ projectId: req.query.projectId || 'global' }) });
 });
 
 // Relationships graph

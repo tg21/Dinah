@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client.js';
 import { OVERSEER_IDS } from '../constants/roles.js';
 
@@ -18,6 +18,9 @@ export function AppProvider({ children }) {
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
   const [drawerAgent, setDrawerAgent] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
+  const [messageActivity, setMessageActivity] = useState([]);
+  const [mailFlights, setMailFlights] = useState([]);
+  const [selectedCommunication, setSelectedCommunication] = useState(null);
 
   const loadModelsHarnessesMcps = useCallback(async () => {
     try {
@@ -54,6 +57,33 @@ export function AppProvider({ children }) {
     }
     return agents;
   }, []);
+
+  const loadMessageActivity = useCallback(async () => {
+    const data = await api.getMessageActivity(currentProjectId).catch(() => null);
+    if (data) setMessageActivity(data.messages || []);
+  }, [currentProjectId]);
+
+  const seenEvents = useRef(new Set());
+  useEffect(() => {
+    loadMessageActivity();
+    const activityTimer = window.setInterval(loadMessageActivity, 4000);
+    const eventTimer = window.setInterval(async () => {
+      const data = await api.getEvents().catch(() => null);
+      for (const event of data?.events || []) {
+        if (seenEvents.current.has(event.id)) continue;
+        seenEvents.current.add(event.id);
+        if (event.type !== 'courier_message' || event.fromAgentId === 'user') continue;
+        if (event.projectId && event.projectId !== currentProjectId) continue;
+        const flight = { ...event, expiresAt: Date.now() + 30000 };
+        setMailFlights((current) => [...current.filter((item) => item.messageId !== event.messageId), flight]);
+        window.setTimeout(() => setMailFlights((current) => current.filter((item) => item.id !== event.id)), 30000);
+      }
+    }, 1500);
+    return () => {
+      window.clearInterval(activityTimer);
+      window.clearInterval(eventTimer);
+    };
+  }, [currentProjectId, loadMessageActivity]);
 
   const loadAgentDrawer = useCallback(
     async (agentId) => {
@@ -136,6 +166,9 @@ export function AppProvider({ children }) {
       drawerCollapsed,
       drawerAgent,
       activeModal,
+      messageActivity,
+      mailFlights,
+      selectedCommunication,
       setCurrentAgentId,
       setCurrentProjectId,
       setAllAgents,
@@ -147,6 +180,7 @@ export function AppProvider({ children }) {
       setDrawerCollapsed,
       setDrawerAgent,
       setActiveModal,
+      setSelectedCommunication,
       loadModelsHarnessesMcps,
       loadProjects,
       loadAgents,
@@ -170,6 +204,9 @@ export function AppProvider({ children }) {
       drawerCollapsed,
       drawerAgent,
       activeModal,
+      messageActivity,
+      mailFlights,
+      selectedCommunication,
       loadModelsHarnessesMcps,
       loadProjects,
       loadAgents,
