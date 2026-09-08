@@ -17,7 +17,16 @@
         {"name": "update_progress", "description": "Publish task progress."},
         {"name": "report_blocker", "description": "Record a blocker."},
         {"name": "request_help", "description": "Request specialist help."},
-        {"name": "send_agent_message", "description": "Send a durable agent message."}
+        {"name": "send_agent_message", "description": "Accept a direct message into the durable queue."},
+        {"name": "publish_project_message", "description": "Publish to subscribed project agents."},
+        {"name": "subscribe_project", "description": "Subscribe to a project channel."},
+        {"name": "list_inbox", "description": "List durable inbox deliveries."},
+        {"name": "claim_message", "description": "Claim a delivery with a lease."},
+        {"name": "acknowledge_message", "description": "Acknowledge receipt and start processing."},
+        {"name": "complete_message", "description": "Complete a leased delivery."},
+        {"name": "fail_message", "description": "Fail and optionally retry a delivery."},
+        {"name": "release_message", "description": "Release a delivery back to the queue."},
+        {"name": "get_message_status", "description": "Inspect delivery status and attempts."}
       ]
     },
     {

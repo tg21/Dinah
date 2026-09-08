@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { SHARED_STATE_DIR } from '../config.js';
-import { appendAgentMessage, appendToSharedLog } from './messageService.js';
-import { broadcastAgentEvent } from './eventBus.js';
+import { appendToSharedLog } from './messageService.js';
+import { enqueueDirectMessage } from './messageQueueService.js';
 
 const COORDINATION_FILE = path.join(SHARED_STATE_DIR, 'coordination.json');
 
@@ -85,11 +85,8 @@ export function requestHelp({ projectId, agentId, taskId, neededRole, question, 
 }
 
 export function sendAgentMessage({ fromAgentId, toAgentId, projectId, message }) {
-  const text = requireText(message, 'message');
-  appendAgentMessage(toAgentId, { from: fromAgentId, project: projectId, request: text, role: 'agent' });
-  broadcastAgentEvent({ fromAgentId, toAgentId, type: 'coordination_message', snippet: text.slice(0, 80) });
-  appendToSharedLog(`[${fromAgentId}] sent a coordination message to [${toAgentId}] in [${projectId}].`);
-  return { delivered: true, fromAgentId, toAgentId, projectId, message: text };
+  const result = enqueueDirectMessage({ fromAgentId, toAgentId, projectId, message });
+  return { accepted: true, ...result.message, duplicate: result.duplicate };
 }
 
 export function getProjectCoordination(projectId) {

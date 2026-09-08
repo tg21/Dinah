@@ -10,7 +10,10 @@ function orchestrationTools(agent) {
   const definition = loadAgentDefinition(agent.role);
   return [...new Set([
     ...(definition?.coordination?.requiredTools || []),
-    ...(definition?.coordination?.managerTools || [])
+    ...(definition?.coordination?.managerTools || []),
+    // Every invoked agent needs the delivery protocol to consume a wake-up.
+    'list_inbox', 'claim_message', 'acknowledge_message', 'complete_message',
+    'fail_message', 'release_message', 'get_message_status'
   ])];
 }
 

@@ -78,8 +78,62 @@ def request_help(neededRole: str, question: str, taskId: str = "", urgency: str 
 
 @mcp.tool()
 def send_agent_message(toAgentId: str, message: str) -> dict:
-    """Send a durable coordination message to another agent."""
+    """Accept a direct message into the durable queue; processing is acknowledged separately."""
     return call_backend("/api/internal/orchestration/message", context({"fromAgentId": os.environ["DND_AGENT_ID"], "toAgentId": toAgentId, "message": message}))
+
+
+@mcp.tool()
+def publish_project_message(message: str, type: str = "notification", idempotencyKey: str = "") -> dict:
+    """Publish a message to agents subscribed to the current project."""
+    return call_backend("/api/internal/orchestration/project-message", context({"message": message, "type": type, "idempotencyKey": idempotencyKey or None}))
+
+
+@mcp.tool()
+def subscribe_project(projectId: str = "") -> dict:
+    """Subscribe the calling agent to durable project-channel deliveries."""
+    return call_backend("/api/internal/orchestration/subscribe", context({"projectId": projectId or os.environ["DND_PROJECT_ID"]}))
+
+
+@mcp.tool()
+def list_inbox(limit: int = 20, includeCompleted: bool = False) -> dict:
+    """List new direct and project-channel deliveries for the calling agent."""
+    return call_backend("/api/internal/orchestration/inbox", context({"limit": limit, "includeCompleted": includeCompleted}))
+
+
+@mcp.tool()
+def claim_message(messageId: str, leaseMs: int = 120000) -> dict:
+    """Atomically claim one inbox delivery and return its lease token."""
+    return call_backend("/api/internal/orchestration/claim", context({"messageId": messageId, "leaseMs": leaseMs}))
+
+
+@mcp.tool()
+def acknowledge_message(messageId: str, leaseToken: str) -> dict:
+    """Acknowledge receipt and mark a claimed delivery as processing."""
+    return call_backend("/api/internal/orchestration/acknowledge", context({"messageId": messageId, "leaseToken": leaseToken}))
+
+
+@mcp.tool()
+def complete_message(messageId: str, leaseToken: str, result: str = "") -> dict:
+    """Mark a delivery complete. Only the current lease holder may complete it."""
+    return call_backend("/api/internal/orchestration/complete", context({"messageId": messageId, "leaseToken": leaseToken, "result": result or None}))
+
+
+@mcp.tool()
+def fail_message(messageId: str, leaseToken: str, reason: str, retryable: bool = True) -> dict:
+    """Fail a delivery and either retry it or move it to the dead-letter state."""
+    return call_backend("/api/internal/orchestration/fail", context({"messageId": messageId, "leaseToken": leaseToken, "reason": reason, "retryable": retryable}))
+
+
+@mcp.tool()
+def release_message(messageId: str, leaseToken: str, reason: str = "released") -> dict:
+    """Return a claimed delivery to the queue for another attempt."""
+    return call_backend("/api/internal/orchestration/release", context({"messageId": messageId, "leaseToken": leaseToken, "reason": reason}))
+
+
+@mcp.tool()
+def get_message_status(messageId: str) -> dict:
+    """Read delivery attempts and current state for a message."""
+    return call_backend("/api/internal/orchestration/message-status", context({"messageId": messageId}))
 
 
 if __name__ == "__main__":

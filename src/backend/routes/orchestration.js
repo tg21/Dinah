@@ -4,6 +4,10 @@ import { loadHrSystem } from '../services/hrService.js';
 import { requestAgentSummoning, spawnAgentViaHr } from '../services/agentLifecycle.js';
 import { spawnHarnessAgent } from '../services/harnessRunner.js';
 import { getProjectCoordination, recordTask, updateTaskProgress, reportBlocker, requestHelp, sendAgentMessage } from '../services/coordinationService.js';
+import {
+  publishProjectMessage, listInbox, claimMessage, acknowledgeMessage, completeMessage,
+  failMessage, releaseMessage, getMessageStatus, subscribeToProject
+} from '../services/messageQueueService.js';
 
 const router = Router();
 
@@ -66,5 +70,14 @@ router.post('/api/internal/orchestration/progress', guard, (req, res) => res.jso
 router.post('/api/internal/orchestration/blocker', guard, (req, res) => res.json({ blocker: reportBlocker(req.body) }));
 router.post('/api/internal/orchestration/help', guard, (req, res) => res.json({ request: requestHelp(req.body) }));
 router.post('/api/internal/orchestration/message', guard, (req, res) => res.json(sendAgentMessage(req.body)));
+router.post('/api/internal/orchestration/project-message', guard, (req, res) => res.json(publishProjectMessage(req.body)));
+router.post('/api/internal/orchestration/subscribe', guard, (req, res) => res.json(subscribeToProject(req.body)));
+router.post('/api/internal/orchestration/inbox', guard, (req, res) => res.json({ messages: listInbox(req.body) }));
+router.post('/api/internal/orchestration/claim', guard, (req, res) => res.json(claimMessage(req.body)));
+router.post('/api/internal/orchestration/acknowledge', guard, (req, res) => res.json(acknowledgeMessage(req.body)));
+router.post('/api/internal/orchestration/complete', guard, (req, res) => res.json(completeMessage(req.body)));
+router.post('/api/internal/orchestration/fail', guard, (req, res) => res.json(failMessage(req.body)));
+router.post('/api/internal/orchestration/release', guard, (req, res) => res.json(releaseMessage(req.body)));
+router.post('/api/internal/orchestration/message-status', guard, (req, res) => res.json(getMessageStatus(req.body)));
 
 export default router;

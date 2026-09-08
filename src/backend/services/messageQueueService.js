@@ -1,0 +1,215 @@
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { SHARED_STATE_DIR } from '../config.js';
+import { appendAgentMessage, appendToSharedLog } from './messageService.js';
+import { broadcastAgentEvent } from './eventBus.js';
+
+const QUEUE_FILE = path.join(SHARED_STATE_DIR, 'message-queue.json');
+const MAX_ATTEMPTS = 3;
+const DEFAULT_LEASE_MS = 120000;
+
+function id(prefix) {
+  return `${prefix}-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`;
+}
+
+function emptyState() {
+  return { version: 1, messages: [], deliveries: [], subscriptions: [] };
+}
+
+function loadState() {
+  if (!fs.existsSync(QUEUE_FILE)) return emptyState();
+  try {
+    const state = JSON.parse(fs.readFileSync(QUEUE_FILE, 'utf8'));
+    return { ...emptyState(), ...state };
+  } catch {
+    return emptyState();
+  }
+}
+
+function saveState(state) {
+  const temp = `${QUEUE_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, JSON.stringify(state, null, 2));
+  fs.renameSync(temp, QUEUE_FILE);
+}
+
+function text(value, field) {
+  if (typeof value !== 'string' || !value.trim()) throw new Error(`${field} is required`);
+  return value.trim();
+}
+
+function recoverExpired(state, now = Date.now()) {
+  let changed = false;
+  for (const delivery of state.deliveries) {
+    if (['claimed', 'processing'].includes(delivery.status) && delivery.leaseExpiresAt <= now) {
+      delivery.status = 'queued';
+      delivery.leaseToken = null;
+      delivery.claimedAt = null;
+      delivery.leaseExpiresAt = null;
+      const message = state.messages.find((item) => item.messageId === delivery.messageId);
+      if (message && message.status !== 'completed') message.status = 'queued';
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function publicMessage(message, delivery) {
+  return {
+    ...message,
+    deliveryId: delivery?.deliveryId,
+    deliveryStatus: delivery?.status,
+    attemptCount: delivery?.attemptCount ?? message.attemptCount,
+    claimedAt: delivery?.claimedAt ?? null,
+    leaseExpiresAt: delivery?.leaseExpiresAt ?? null
+  };
+}
+
+function createEnvelope({ projectId = 'global', senderAgentId, recipientAgentId = null, threadId = null, type = 'request', payload, summary, idempotencyKey }) {
+  const sender = text(senderAgentId, 'senderAgentId');
+  const project = text(projectId || 'global', 'projectId');
+  const body = payload ?? { message: text(summary, 'message') };
+  const key = idempotencyKey || id('idem');
+  const state = loadState();
+  recoverExpired(state);
+  const existing = state.messages.find((item) => item.idempotencyKey === key);
+  if (existing) {
+    const delivery = state.deliveries.find((item) => item.messageId === existing.messageId && item.recipientAgentId === recipientAgentId);
+    return { message: publicMessage(existing, delivery), duplicate: true };
+  }
+  const now = new Date().toISOString();
+  const message = {
+    messageId: id('msg'),
+    projectId: project,
+    senderAgentId: sender,
+    recipientAgentId,
+    threadId,
+    type,
+    payload: body,
+    summary: summary || body.message || type,
+    createdAt: now,
+    availableAt: now,
+    expiresAt: null,
+    status: 'queued',
+    attemptCount: 0,
+    claimedAt: null,
+    completedAt: null,
+    idempotencyKey: key
+  };
+  state.messages.push(message);
+  const recipients = recipientAgentId ? [recipientAgentId] : state.subscriptions
+    .filter((item) => item.projectId === project && item.active !== false)
+    .map((item) => item.agentId);
+  for (const recipient of [...new Set(recipients)]) {
+    state.deliveries.push({
+      deliveryId: id('delivery'), messageId: message.messageId, recipientAgentId: recipient,
+      status: 'queued', attemptCount: 0, claimedAt: null, leaseExpiresAt: null, leaseToken: null,
+      lastError: null, completedAt: null
+    });
+  }
+  saveState(state);
+  if (recipientAgentId) {
+    appendAgentMessage(recipientAgentId, { from: sender, project: project, request: message.summary, role: 'agent' });
+    broadcastAgentEvent({ fromAgentId: sender, toAgentId: recipientAgentId, type: 'coordination_message', snippet: message.summary.slice(0, 80) });
+  }
+  appendToSharedLog(`[${sender}] queued ${type} [${message.messageId}] in [${project}].`);
+  const delivery = state.deliveries.find((item) => item.messageId === message.messageId && item.recipientAgentId === recipientAgentId);
+  return { message: publicMessage(message, delivery), duplicate: false };
+}
+
+export function enqueueDirectMessage(args) {
+  return createEnvelope({ ...args, senderAgentId: args.senderAgentId || args.fromAgentId, recipientAgentId: text(args.toAgentId, 'toAgentId'), summary: text(args.message, 'message'), payload: { message: text(args.message, 'message') } });
+}
+
+export function publishProjectMessage({ projectId, senderAgentId, message, type = 'notification', idempotencyKey }) {
+  return createEnvelope({ projectId, senderAgentId, type, summary: text(message, 'message'), payload: { message: text(message, 'message') }, idempotencyKey });
+}
+
+export function subscribeToProject({ projectId, agentId }) {
+  const state = loadState();
+  const project = text(projectId, 'projectId');
+  const agent = text(agentId, 'agentId');
+  if (!state.subscriptions.some((item) => item.projectId === project && item.agentId === agent)) state.subscriptions.push({ projectId: project, agentId: agent, active: true, createdAt: new Date().toISOString() });
+  saveState(state);
+  return { subscribed: true, projectId: project, agentId: agent };
+}
+
+export function listInbox({ agentId, projectId, limit = 20, includeCompleted = false }) {
+  const state = loadState();
+  if (recoverExpired(state)) saveState(state);
+  const deliveries = state.deliveries.filter((delivery) => delivery.recipientAgentId === text(agentId, 'agentId'))
+    .filter((delivery) => !projectId || state.messages.find((item) => item.messageId === delivery.messageId)?.projectId === projectId)
+    .filter((delivery) => includeCompleted || !['completed', 'dead-lettered'].includes(delivery.status))
+    .slice(0, Math.max(1, Math.min(100, Number(limit) || 20)));
+  return deliveries.map((delivery) => publicMessage(state.messages.find((item) => item.messageId === delivery.messageId), delivery));
+}
+
+function leaseAction({ messageId, agentId, leaseToken, status }) {
+  const state = loadState();
+  recoverExpired(state);
+  const delivery = state.deliveries.find((item) => item.messageId === messageId && item.recipientAgentId === agentId);
+  if (!delivery) throw new Error('Message delivery not found');
+  if (delivery.status === 'completed') return { message: state.messages.find((item) => item.messageId === messageId), delivery, idempotent: true };
+  if (delivery.leaseToken !== leaseToken || delivery.leaseExpiresAt <= Date.now()) throw new Error('Message lease is missing or expired');
+  delivery.status = status;
+  delivery.leaseExpiresAt = Date.now() + DEFAULT_LEASE_MS;
+  const message = state.messages.find((item) => item.messageId === messageId);
+  message.status = status;
+  saveState(state);
+  return { message, delivery, idempotent: false };
+}
+
+export function claimMessage({ messageId, agentId, leaseMs = DEFAULT_LEASE_MS }) {
+  const state = loadState();
+  if (recoverExpired(state)) saveState(state);
+  const delivery = state.deliveries.find((item) => item.messageId === text(messageId, 'messageId') && item.recipientAgentId === text(agentId, 'agentId'));
+  if (!delivery) throw new Error('Message delivery not found');
+  if (delivery.status === 'completed') return { message: state.messages.find((item) => item.messageId === messageId), delivery, idempotent: true };
+  if (!['queued'].includes(delivery.status)) throw new Error('Message is already claimed or processing');
+  const now = Date.now();
+  delivery.status = 'claimed';
+  delivery.attemptCount += 1;
+  delivery.claimedAt = new Date(now).toISOString();
+  delivery.leaseExpiresAt = now + Math.max(1000, Math.min(600000, Number(leaseMs) || DEFAULT_LEASE_MS));
+  delivery.leaseToken = crypto.randomBytes(24).toString('hex');
+  const message = state.messages.find((item) => item.messageId === messageId);
+  message.status = 'claimed'; message.attemptCount = delivery.attemptCount; message.claimedAt = delivery.claimedAt;
+  saveState(state);
+  return { message: publicMessage(message, delivery), delivery, leaseToken: delivery.leaseToken };
+}
+
+export function acknowledgeMessage(args) { return leaseAction({ ...args, status: 'processing' }); }
+export function completeMessage({ messageId, agentId, leaseToken, result = null }) {
+  const outcome = leaseAction({ messageId, agentId, leaseToken, status: 'completed' });
+  const state = loadState();
+  const message = state.messages.find((item) => item.messageId === messageId);
+  const delivery = state.deliveries.find((item) => item.messageId === messageId && item.recipientAgentId === agentId);
+  delivery.completedAt = new Date().toISOString(); delivery.result = result;
+  message.completedAt = delivery.completedAt; message.result = result; message.status = 'completed';
+  saveState(state);
+  return { ...outcome, message: publicMessage(message, delivery) };
+}
+export function failMessage({ messageId, agentId, leaseToken, reason, retryable = true }) {
+  const state = loadState();
+  const delivery = state.deliveries.find((item) => item.messageId === messageId && item.recipientAgentId === agentId);
+  if (!delivery || delivery.leaseToken !== leaseToken || delivery.leaseExpiresAt <= Date.now()) throw new Error('Message lease is missing or expired');
+  delivery.lastError = text(reason, 'reason'); delivery.leaseToken = null; delivery.leaseExpiresAt = null;
+  delivery.status = retryable && delivery.attemptCount < MAX_ATTEMPTS ? 'queued' : 'dead-lettered';
+  const message = state.messages.find((item) => item.messageId === messageId); message.status = delivery.status;
+  saveState(state);
+  return { message: publicMessage(message, delivery), retrying: delivery.status === 'queued' };
+}
+export function releaseMessage({ messageId, agentId, leaseToken, reason = 'released' }) { return failMessage({ messageId, agentId, leaseToken, reason, retryable: true }); }
+
+export function getMessageStatus({ messageId }) {
+  const state = loadState();
+  const message = state.messages.find((item) => item.messageId === text(messageId, 'messageId'));
+  if (!message) throw new Error('Message not found');
+  return { message, deliveries: state.deliveries.filter((item) => item.messageId === message.messageId) };
+}
+
+export function getQueuedAgents() {
+  const state = loadState();
+  if (recoverExpired(state)) saveState(state);
+  return [...new Set(state.deliveries.filter((item) => item.status === 'queued').map((item) => item.recipientAgentId))];
+}
