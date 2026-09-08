@@ -1,0 +1,150 @@
+import fs from 'fs';
+import {
+  HR_SYSTEM_FILE,
+  STARTUP_SETUP_FILE,
+  TOP_LEVEL_AGENT_IDS
+} from '../config.js';
+import { AGENT_RPG_REGISTRY } from '../data/rpgRegistry.js';
+import { getModelById, selectBestModelForRole } from '../harness/index.js';
+
+export function createOverseerAgent(ovId) {
+  const rpgStats = AGENT_RPG_REGISTRY[ovId] || {};
+  const bestModel = selectBestModelForRole(ovId);
+  return {
+    name: rpgStats.name || ovId,
+    role: ovId,
+    project: 'global',
+    status: 'active',
+    harness: bestModel?.source?.harness || 'opencode',
+    model: bestModel?.id || 'system-simulator/balanced-agent',
+    effortLevel: rpgStats.effortLevel || (bestModel?.reasoning?.type === 'effort' ? 'High' : 'Medium'),
+    context_len: bestModel?.contextWindow || rpgStats.contextCapacity || 128000,
+    context_used: 4200,
+    created_at: new Date().toISOString(),
+    last_activity_ms: Date.now(),
+    stats: rpgStats,
+    mcp: {}
+  };
+}
+
+export function loadHrSystem() {
+  const defaultOverseers = [
+    'ceo-warlock',
+    'hr-mind-flayer',
+    'staff-engineer-paladin',
+    'senior-analyst-diviner',
+    'marshall-agent-system-inspector'
+  ];
+
+  if (!fs.existsSync(HR_SYSTEM_FILE)) {
+    const initialRegistry = {};
+    for (const ovId of defaultOverseers) {
+      initialRegistry[ovId] = createOverseerAgent(ovId);
+    }
+    fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(initialRegistry, null, 2));
+    return initialRegistry;
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(HR_SYSTEM_FILE, 'utf-8'));
+    let modified = false;
+
+    // Ensure all global overseer agents exist
+    for (const ovId of defaultOverseers) {
+      if (!data[ovId]) {
+        data[ovId] = createOverseerAgent(ovId);
+        modified = true;
+      }
+    }
+
+    // Dynamic model reconciliation:
+    // If an agent has no model, or references a hardcoded model not present on the host system,
+    // match them with the best available model discovered on the host.
+    for (const agentId of Object.keys(data)) {
+      const agent = data[agentId];
+      const modelExists = agent.model && getModelById(agent.model);
+      if (!modelExists) {
+        const bestModel = selectBestModelForRole(agent.role, agent.model);
+        if (bestModel) {
+          agent.model = bestModel.id;
+          agent.harness = bestModel.source.harness;
+          if (!agent.context_len || agent.context_len === 200000) {
+            agent.context_len = bestModel.contextWindow || agent.context_len || 128000;
+          }
+          modified = true;
+        }
+      } else {
+        // Ensure harness is aligned with model's actual harness
+        const found = getModelById(agent.model);
+        if (found && agent.harness !== found.source.harness) {
+          agent.harness = found.source.harness;
+          modified = true;
+        }
+      }
+    }
+
+    if (modified) {
+      fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(data, null, 2));
+    }
+    return data;
+  } catch (e) {
+    return {};
+  }
+}
+
+export function saveHrSystem(hrSystem) {
+  fs.writeFileSync(HR_SYSTEM_FILE, JSON.stringify(hrSystem, null, 2));
+}
+
+export function loadStartupSetup() {
+  if (!fs.existsSync(STARTUP_SETUP_FILE)) return { configured: false };
+  try {
+    return JSON.parse(fs.readFileSync(STARTUP_SETUP_FILE, 'utf-8'));
+  } catch (e) {
+    return { configured: false };
+  }
+}
+
+export function applyStartupSetup({ ceoModel, topLevelAssignments = {} }) {
+  const hrSystem = loadHrSystem();
+  const modelFor = (modelId, role) => {
+    const selected =
+      modelId === 'ceo' || !modelId ? selectBestModelForRole(role) : getModelById(modelId);
+    return selected || selectBestModelForRole(role);
+  };
+
+  const assignModel = (agentId, requestedModel) => {
+    const agent = hrSystem[agentId];
+    const selected = modelFor(requestedModel, agent?.role || agentId);
+    if (!agent || !selected) return;
+    agent.model = selected.id;
+    agent.harness = selected.source?.harness || agent.harness;
+    agent.context_len = selected.contextWindow || agent.context_len || 128000;
+  };
+
+  assignModel('ceo-warlock', ceoModel);
+  for (const agentId of TOP_LEVEL_AGENT_IDS) {
+    assignModel(agentId, topLevelAssignments[agentId] || 'ceo');
+    if (hrSystem[agentId]) {
+      hrSystem[agentId].modelAssignment =
+        topLevelAssignments[agentId] && topLevelAssignments[agentId] !== 'ceo'
+          ? 'specified'
+          : 'ceo-delegated';
+    }
+  }
+  saveHrSystem(hrSystem);
+
+  const setup = {
+    configured: true,
+    version: 1,
+    configuredAt: new Date().toISOString(),
+    ceoModel: hrSystem['ceo-warlock']?.model || ceoModel,
+    topLevelAssignments: Object.fromEntries(
+      TOP_LEVEL_AGENT_IDS.map((id) => [
+        id,
+        topLevelAssignments[id] && topLevelAssignments[id] !== 'ceo' ? topLevelAssignments[id] : 'ceo'
+      ])
+    )
+  };
+  fs.writeFileSync(STARTUP_SETUP_FILE, JSON.stringify(setup, null, 2));
+  return setup;
+}

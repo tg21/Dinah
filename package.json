@@ -2,12 +2,12 @@
   "name": "dnd",
   "version": "1.0.0",
   "description": "",
-  "main": "src/backend.js",
+  "main": "src/backend/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "fresh-start": "rm -rf projects hr-system shared-state && node src/backend.js",
-    "build": "rm -rf dist && mkdir dist && cp src/backend.js dist/ && cp src/harnessRegistry.js dist/ && cp src/frontend.html dist/",
-    "start": "node src/backend.js"
+    "fresh-start": "rm -rf projects hr-system shared-state && node src/backend/server.js",
+    "build": "rm -rf dist && mkdir -p dist/backend && cp src/backend/server.js src/backend/app.js src/backend/config.js dist/backend/ && cp -r src/backend/routes dist/backend/ && cp -r src/backend/services dist/backend/ && cp -r src/backend/mcp dist/backend/ && cp -r src/backend/data dist/backend/ && cp -r src/backend/harness dist/backend/ && cp src/backend.js dist/ && cp src/harnessRegistry.js dist/ && cp src/frontend.html dist/",
+    "start": "node src/backend/server.js"
   },
   "keywords": [],
   "type": "module",

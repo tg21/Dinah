@@ -10,7 +10,7 @@ Compact instruction file for OpenCode sessions. Every line answers: "Would an ag
 
 | Action | Command |
 |---|---|
-| Start the backend server | `node backend.js` or `npm start` |
+| Start the backend server | `node src/backend/server.js` or `npm start` |
 | Open the web UI | Browse to `http://localhost:2121` |
 | Refresh harness/model discovery | `POST /api/models/refresh` or call `initializeHarnessesAndModels(true)` |
 
@@ -20,7 +20,9 @@ Compact instruction file for OpenCode sessions. Every line answers: "Would an ag
 
 | Directory | Contents |
 |---|---|
-| `src/` | `backend.js` (Express server), `frontend.html`, `harnessRegistry.js` |
+| `src/backend.js` | Deprecated shim — re-exports `src/backend/server.js` for backward compatibility |
+| `src/backend/` | Modular Express server: `server.js` (listen/init), `app.js` (middleware + router mounting), `config.js` (paths/constants), `routes/` (one `express.Router()` per domain: `projects`, `models`, `mcps`, `agents`, `messages`, `knowledge`, `marshall`, `system`), `services/` (`hrService`, `projectService`, `messageService`, `eventBus`, `harnessRunner`, `agentLifecycle`, `startupService`, `knowledgeService`, `marshallService`), `mcp/` (`registry`, `catalog`, `permissions`, `invocation`), `harness/` (detection/discovery: `registry` orchestrator, `common` shared helpers, `store` in-memory state, `selector` role matching, `providers/` one module per harness: `opencode`, `antigravity`, `ollama`, `claude`, `gemini`, `codex`, `simulator`), `data/rpgRegistry.js` (agent RPG stats + thought pools) |
+| `src/` (other) | `frontend.html`, `harnessRegistry.js` (deprecated shim — re-exports `src/backend/harness/index.js`) |
 | `hr-system/` | `hr-system.json` (agent registry), `agent-<id>.msgs.json`, `agent-<id>.thoughts.json` |
 | `projects/` | Isolated project workspaces, created only for explicitly started projects |
 | `agent-templates/` | 23 markdown templates for agent archetypes |
@@ -83,9 +85,9 @@ If no harnesses are found, the system falls back to a virtual simulation harness
 
 | Script | Effect |
 |---|---|
-| `npm start` | Runs `node src/backend.js` |
-| `npm run fresh-start` | Deletes `projects/`, `hr-system/`, and `shared-state/`, then starts `node src/backend.js`; use only when a full runtime-state reset is intended |
-| `npm run build` | `rm -rf dist && mkdir dist && cp src/backend.js dist/ && cp src/harnessRegistry.js dist/ && cp src/frontend.html dist/` |
+| `npm start` | Runs `node src/backend/server.js` |
+| `npm run fresh-start` | Deletes `projects/`, `hr-system/`, and `shared-state/`, then starts `node src/backend/server.js`; use only when a full runtime-state reset is intended |
+| `npm run build` | Copies the modular backend (`src/backend/server.js`, `app.js`, `config.js`, `routes/`, `services/`, `mcp/`, `harness/`, `data/`) plus the `src/backend.js` and `src/harnessRegistry.js` shims and `frontend.html` into `dist/` |
 | `npm test` | Exits with error ("no test specified") — no test suite configured |
 
 No lint or typecheck configured. The repo uses `type: "module"` in `package.json`.
@@ -96,9 +98,12 @@ No lint or typecheck configured. The repo uses `type: "module"` in `package.json
 
 - **Port**: Server defaults to `2121` (`PORT` env var supported).
 - **CORS**: Enabled for all origins.
-- **`APP_DIR`**: Server runs from `process.cwd()` — keep `backend.js` in `src/` and run from repo root.
-- **HR registry is the source of truth**. `hr-system/hr-system.json` dictates active agents, their models, harnesses, context limits, and statuses. The UI reads from this file.
-- **Project directories are auto-created**. `createProjectFolder(projectId)` in `backend.js` creates `projects/<id>/` with a `README.md` if missing.
+- **`APP_DIR`**: Server runs from `process.cwd()` — keep `src/backend/server.js` as entry and run from repo root.
+- **HR registry is the source of truth**. `hr-system/hr-system.json` dictates active agents, their models, harnesses, context limits, and statuses. The UI reads from this file. HR persistence lives in `src/backend/services/hrService.js`.
+- **Project directories are auto-created**. `createProjectFolder(projectId)` in `src/backend/services/projectService.js` creates `projects/<id>/` with a `README.md` if missing.
+- **Route/service ownership**. Business logic lives in `src/backend/services/` and `src/backend/mcp/`; `src/backend/routes/*.js` files only validate input, call services, and format responses. Wire new endpoints as an `express.Router()` in `routes/` and mount it in `src/backend/app.js`.
+- **Harness runners**. Per-CLI adapters live in `src/backend/services/harnessRunner.js` (`spawnOpencodeAgent`, `spawnCodexAgent`, …) behind `spawnHarnessAgent`, which also builds/cleans the per-invocation MCP manifest via `src/backend/mcp/invocation.js`.
+- **Harness discovery**. Model discovery per harness lives in `src/backend/harness/providers/<harness>.js` behind `initializeHarnessesAndModels` in `src/backend/harness/registry.js`; shared helpers (`findHarnessBinary`, `checkHttpEndpoint`, `buildModelCapability`) in `harness/common.js`, in-memory state in `harness/store.js`, role matching in `harness/selector.js`. Import from `src/backend/harness/index.js`.
 - **Projects are opt-in**. Startup and `GET /api/projects` must not seed or create `project-alpha`, `project-beta`, or any other project. Project folders/configuration are created only by an explicit project-creation flow or work dispatched to that project. Global CEO work uses the repository root and must not create `projects/global/`.
 - **CEO startup model delegation**. When the frontend sends `"ceo"` for a top-level agent during first-run setup, the backend loads `prompts/ceo-select-top-level-models.md`, sends the selected CEO a candidate list and role requirements, validates the returned model IDs, and records the request/result in the CEO message log, thought log, and shared audit log. The prompt must remain provider-neutral and merit-based.
 - **Model selectors**. First-run CEO and executive-council selectors reuse the grouped model presentation from Configure Agent Capabilities: models are grouped by harness and provider, with capability/context details shown on each option.
@@ -116,7 +121,7 @@ No lint or typecheck configured. The repo uses `type: "module"` in `package.json
 
 ```bash
 # 1. Start the server
-node backend.js
+node src/backend/server.js
 
 # 2. Check available harnesses/models
 curl http://localhost:2121/api/models
