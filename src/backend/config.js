@@ -24,6 +24,19 @@ export const STARTUP_SELECTION_AUDIT_FILE = path.join(
 );
 export const HR_SYSTEM_FILE = path.join(HR_SYSTEM_DIR, 'hr-system.json');
 
+// React frontend (Vite). `npm run build:frontend` emits to dist/frontend;
+// the dev tree also keeps src/frontend/dist for local runs without a full build.
+export const FRONTEND_DIST_DIR = path.join(APP_DIR, 'dist', 'frontend');
+export const FRONTEND_DEV_DIST_DIR = path.join(APP_DIR, 'src', 'frontend', 'dist');
+export const LEGACY_FRONTEND_HTML = path.join(APP_DIR, 'src', 'frontend.html');
+
+export function resolveFrontendDistDir() {
+  if (fs.existsSync(path.join(FRONTEND_DIST_DIR, 'index.html'))) return FRONTEND_DIST_DIR;
+  if (fs.existsSync(path.join(FRONTEND_DEV_DIST_DIR, 'index.html')))
+    return FRONTEND_DEV_DIST_DIR;
+  return null;
+}
+
 export const TOP_LEVEL_AGENT_IDS = [
   'hr-mind-flayer',
   'staff-engineer-paladin',
