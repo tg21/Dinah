@@ -2,7 +2,9 @@ node_modules
 projects
 hr-system
 shared-state
+working-area
 playground_sample.html
 dist
 .agents
 .codex
+research_docs

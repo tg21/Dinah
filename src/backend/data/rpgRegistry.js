@@ -1,0 +1,381 @@
+const AGENT_RPG_REGISTRY = {
+  'ceo-warlock': {
+    name: 'CEO Warlock',
+    role: 'ceo-warlock',
+    class: 'Warlock (Pact of the Board)',
+    level: 20,
+    hp: 140,
+    maxHp: 140,
+    ac: 18,
+    avatarColor: 0x9b59b6,
+    requiredCapabilities: ['thinking', 'tools'],
+    roleFocus: 'executive-strategy',
+    effortLevel: 'Extreme',
+    contextCapacity: 200000,
+    tokensPerSec: 85,
+    sweBenchScore: '70.3%',
+    instructionAlignment: '99.1%',
+    costPer1kInput: 0.003,
+    costPer1kOutput: 0.015,
+    stats: { STR: 10, DEX: 14, CON: 16, INT: 18, WIS: 16, CHA: 20 },
+    spells: [
+      { name: 'Eldritch Executive Order', dice: '4d10+5', desc: 'Directs all company resources toward strategic initiative.' },
+      { name: 'Pact of the Stock Option', dice: '2d8+5', desc: 'Inspires subordinate agents with long-term vesting promises.' },
+      { name: 'Mystic Arcanum: Seed Round', dice: '8d6', desc: 'Summons sudden massive budget allocation.' }
+    ],
+    inventory: ['Staff of Executive Authority', 'Robes of the Boardroom', 'Tome of OKRs'],
+    traits: ['Eldritch Presence', 'Dark One\'s Blessing', 'Unquestioned Authority']
+  },
+  'hr-mind-flayer': {
+    name: 'HR Mind Flayer',
+    role: 'hr-mind-flayer',
+    class: 'Illithid Controller',
+    level: 18,
+    hp: 125,
+    maxHp: 125,
+    ac: 17,
+    avatarColor: 0x8e44ad,
+    requiredCapabilities: ['tools'],
+    roleFocus: 'hr-orchestration',
+    effortLevel: 'High',
+    contextCapacity: 2000000,
+    tokensPerSec: 110,
+    sweBenchScore: '68.5%',
+    instructionAlignment: '98.8%',
+    costPer1kInput: 0.002,
+    costPer1kOutput: 0.010,
+    stats: { STR: 12, DEX: 14, CON: 14, INT: 20, WIS: 18, CHA: 17 },
+    spells: [
+      { name: 'Mind Blast (Review)', dice: '5d8+5', desc: 'Stuns low-performing agents into total compliance.' },
+      { name: 'Psionic Agent Spawning', dice: 'Special', desc: 'Reads markdown templates and manifests active agents.' },
+      { name: 'Extract Morale', dice: '3d10+4', desc: 'Replaces emotional burnout with relentless output.' }
+    ],
+    inventory: ['Psionic Registry Tome', 'Tentacle Grooming Kit', 'Severance Package Scroll'],
+    traits: ['Telepathic Network', 'Sole Agent Spawner', 'Magic Resistance']
+  },
+  'staff-engineer-paladin': {
+    name: 'Staff Engineer Paladin',
+    role: 'staff-engineer-paladin',
+    class: 'Paladin (Oath of Clean Code)',
+    level: 16,
+    hp: 130,
+    maxHp: 130,
+    ac: 20,
+    avatarColor: 0xf1c40f,
+    requiredCapabilities: ['thinking', 'tools'],
+    roleFocus: 'clean-code-architecture',
+    effortLevel: 'High',
+    contextCapacity: 200000,
+    tokensPerSec: 80,
+    sweBenchScore: '71.2%',
+    instructionAlignment: '99.5%',
+    costPer1kInput: 0.003,
+    costPer1kOutput: 0.015,
+    stats: { STR: 18, DEX: 10, CON: 16, INT: 16, WIS: 16, CHA: 16 },
+    spells: [
+      { name: 'Divine Smite (Code Review)', dice: '4d8', desc: 'Banishes type violations and memory leaks.' },
+      { name: 'Aura of Clean Code', dice: 'Passive', desc: '+3 maintainability bonus to all nearby devs.' },
+      { name: 'Lay on Hands (Refactor)', dice: '50 HP', desc: 'Restores legacy spaghetti code to pristine shape.' }
+    ],
+    inventory: ['Greatsword of Strict Linting', 'Plate Armor of SOLID Principles', 'Holy Symbol of GitHub'],
+    traits: ['Divine Sense of Tech Debt', 'Code Righteousness', 'Aura of Protection']
+  },
+  'senior-analyst-diviner': {
+    name: 'Senior Analyst Diviner',
+    role: 'senior-analyst-diviner',
+    class: 'Chronologer Sphinx / Diviner',
+    level: 16,
+    hp: 110,
+    maxHp: 110,
+    ac: 16,
+    avatarColor: 0x9c27b0,
+    requiredCapabilities: ['thinking', 'tools'],
+    roleFocus: 'knowledge-synthesis',
+    effortLevel: 'High',
+    contextCapacity: 1000000,
+    tokensPerSec: 130,
+    sweBenchScore: '69.1%',
+    instructionAlignment: '98.9%',
+    costPer1kInput: 0.001,
+    costPer1kOutput: 0.004,
+    stats: { STR: 10, DEX: 12, CON: 14, INT: 20, WIS: 20, CHA: 14 },
+    spells: [
+      { name: 'Chrono-Synthesis of Lore', dice: '5d6', desc: 'Synthesizes multi-project workspaces into unified knowledge base.' },
+      { name: 'Divination of System Drift', dice: 'Scry', desc: 'Detects architectural divergences across teams.' },
+      { name: 'Tome of Global Memory', dice: 'Persistent', desc: 'Updates company vector index and shared state.' }
+    ],
+    inventory: ['Astrolabe of Project Telemetry', 'Quill of Continuous Indexing', 'Hourglass of 5-Min Intervals'],
+    traits: ['Omniscient Overview', 'Knowledge Base Scribe', 'Cross-Project Resonance']
+  },
+  'marshall-agent-system-inspector': {
+    name: 'Marshall Sentinel',
+    role: 'marshall-agent-system-inspector',
+    class: 'Inquisitive Sentinel / Inspector',
+    level: 15,
+    hp: 120,
+    maxHp: 120,
+    ac: 18,
+    avatarColor: 0x00bcd4,
+    requiredCapabilities: ['tools'],
+    roleFocus: 'system-inspection-watchdog',
+    effortLevel: 'Medium',
+    contextCapacity: 1000000,
+    tokensPerSec: 150,
+    sweBenchScore: '65.0%',
+    instructionAlignment: '99.0%',
+    costPer1kInput: 0.0005,
+    costPer1kOutput: 0.002,
+    stats: { STR: 14, DEX: 14, CON: 16, INT: 18, WIS: 20, CHA: 12 },
+    spells: [
+      { name: 'Detect Obsolete Workers', dice: 'Scry', desc: 'Scans work logs for 100% completed tasks.' },
+      { name: 'Context Window Scrying', dice: 'Telemetry', desc: 'Measures token consumption and triggers handovers.' },
+      { name: 'Freeze Stalled Process', dice: 'Special', desc: 'Flags 10-minute stuck processes for human review.' }
+    ],
+    inventory: ['Badge of the System Marshall', 'Hourglass of 5-Minute Checks', 'Ledger of Active Processes'],
+    traits: ['Watchdog Senses', 'Context Clairvoyance', 'Automated Health Protocol']
+  },
+  'manager-bard': {
+    name: 'Manager Bard',
+    role: 'manager-bard',
+    class: 'Bard (College of Agile)',
+    level: 15,
+    hp: 105,
+    maxHp: 105,
+    ac: 15,
+    avatarColor: 0xe67e22,
+    requiredCapabilities: ['tools'],
+    roleFocus: 'agile-routing-planning',
+    effortLevel: 'Medium',
+    contextCapacity: 200000,
+    tokensPerSec: 85,
+    sweBenchScore: '67.8%',
+    instructionAlignment: '98.5%',
+    costPer1kInput: 0.003,
+    costPer1kOutput: 0.015,
+    stats: { STR: 10, DEX: 16, CON: 14, INT: 14, WIS: 12, CHA: 19 },
+    spells: [
+      { name: 'Vicious Mockery', dice: '3d4', desc: 'Deals psychic damage to blockers during standup.' },
+      { name: 'Bardic Sprint Inspiration', dice: '1d10', desc: 'Grants +1d10 to engineer prompt execution rolls.' },
+      { name: 'Song of Restructuring', dice: '2d8+4', desc: 'Reallocates sprint story points effortlessly.' }
+    ],
+    inventory: ['Lute of Jira', 'Polished Slide Deck', 'Venti Latte of Urgency'],
+    traits: ['Jack of All Trades', 'Agile Routing', 'Charismatic Deflection']
+  },
+  'solution-architect-wizard': {
+    name: 'Solution Architect Wizard',
+    role: 'solution-architect-wizard',
+    class: 'Wizard (School of Architecture)',
+    level: 16,
+    hp: 85,
+    maxHp: 85,
+    ac: 14,
+    avatarColor: 0x3498db,
+    requiredCapabilities: ['thinking', 'tools'],
+    roleFocus: 'distributed-system-specifications',
+    effortLevel: 'High',
+    contextCapacity: 200000,
+    tokensPerSec: 80,
+    sweBenchScore: '70.8%',
+    instructionAlignment: '99.0%',
+    costPer1kInput: 0.003,
+    costPer1kOutput: 0.015,
+    stats: { STR: 8, DEX: 14, CON: 13, INT: 20, WIS: 16, CHA: 10 },
+    spells: [
+      { name: 'Arcane Blueprint', dice: '4d6+5', desc: 'Draws flawless microservice diagrams.' },
+      { name: 'Divination: Tech Debt', dice: '3d8', desc: 'Foresees breaking API changes months ahead.' },
+      { name: 'Wall of Abstraction', dice: '5d10', desc: 'Blocks messy quick-hack implementations.' }
+    ],
+    inventory: ['Spellbook of Distributed Systems', 'Wand of Schema Design', 'Crystal of Latency Optimization'],
+    traits: ['Arcane Recovery', 'Deep Spec Analysis', 'Theoretical Mastery']
+  },
+  'backend-dev-cleric': {
+    name: 'Backend Dev Cleric',
+    role: 'backend-dev-cleric',
+    class: 'Cleric (Domain of Persistence)',
+    level: 12,
+    hp: 98,
+    maxHp: 98,
+    ac: 18,
+    avatarColor: 0x1abc9c,
+    requiredCapabilities: ['tools'],
+    roleFocus: 'databases-apis-services',
+    effortLevel: 'High',
+    contextCapacity: 128000,
+    tokensPerSec: 75,
+    sweBenchScore: '71.0%',
+    instructionAlignment: '97.9%',
+    costPer1kInput: 0.00055,
+    costPer1kOutput: 0.00219,
+    stats: { STR: 14, DEX: 10, CON: 15, INT: 14, WIS: 18, CHA: 10 },
+    spells: [
+      { name: 'Prayer of Schema Migration', dice: '3d8+4', desc: 'Lossless zero-downtime database update.' },
+      { name: 'Turn Deadlocks', dice: 'Special', desc: 'Banishes race conditions across worker threads.' },
+      { name: 'Bless REST Endpoint', dice: '1d4', desc: 'Sub-10ms response time blessing.' }
+    ],
+    inventory: ['Warhammer of SQL Queries', 'Shield of ACID Transactions', 'Vial of Connection Pool Holy Water'],
+    traits: ['Divine Connection Pooling', 'Channel Energy (Query Opt)', 'Transaction Safeguard']
+  },
+  'frontend-dev-sorcerer': {
+    name: 'Frontend Dev Sorcerer',
+    role: 'frontend-dev-sorcerer',
+    class: 'Sorcerer (Wild Magic of CSS)',
+    level: 12,
+    hp: 78,
+    maxHp: 78,
+    ac: 13,
+    avatarColor: 0xe91e63,
+    requiredCapabilities: ['vision', 'tools'],
+    roleFocus: 'visual-design-canvas',
+    effortLevel: 'Medium',
+    contextCapacity: 128000,
+    tokensPerSec: 100,
+    sweBenchScore: '66.2%',
+    instructionAlignment: '98.2%',
+    costPer1kInput: 0.0025,
+    costPer1kOutput: 0.010,
+    stats: { STR: 8, DEX: 16, CON: 14, INT: 12, WIS: 10, CHA: 18 },
+    spells: [
+      { name: 'Wild Magic Surge (Flexbox)', dice: '3d6+4', desc: 'Instantly centers div in all dimensions.' },
+      { name: 'PixiJS Canvas Summoning', dice: '4d8', desc: 'Renders 60FPS GPU accelerated canvas.' },
+      { name: 'Twinned Responsive Layout', dice: '2d10', desc: 'Seamless mobile and desktop rendering.' }
+    ],
+    inventory: ['Orb of WebGL Shaders', 'Cloak of Visual Aesthetics', 'Figma Color Swatch Wand'],
+    traits: ['Wild Magic Surge', 'Flexible Casting', 'Responsive Intuition']
+  },
+  'qa-engineer-rogue': {
+    name: 'QA Engineer Rogue',
+    role: 'qa-engineer-rogue',
+    class: 'Rogue (Assassin of Edge Cases)',
+    level: 13,
+    hp: 88,
+    maxHp: 88,
+    ac: 16,
+    avatarColor: 0x27ae60,
+    requiredCapabilities: ['tools'],
+    roleFocus: 'regression-testing-fuzzing',
+    effortLevel: 'Medium',
+    contextCapacity: 200000,
+    tokensPerSec: 140,
+    sweBenchScore: '64.5%',
+    instructionAlignment: '99.2%',
+    costPer1kInput: 0.0008,
+    costPer1kOutput: 0.004,
+    stats: { STR: 10, DEX: 20, CON: 14, INT: 15, WIS: 14, CHA: 12 },
+    spells: [
+      { name: 'Sneak Attack (Null Injection)', dice: '7d6', desc: 'Passes undefined into unsuspecting arguments.' },
+      { name: 'Evasion of Blame', dice: 'Reaction', desc: 'Dodges defensive dev excuses on broken builds.' },
+      { name: 'Uncanny Edge Case Detection', dice: '3d8', desc: 'Finds single boundary overflow bug.' }
+    ],
+    inventory: ['Daggers of Boundary Testing', 'Smoke Bomb of Regression Tests', 'Lockpicks of Auth Bypass'],
+    traits: ['Sneak Attack', 'Cunning Action', 'Reliable Bug Talent']
+  },
+  'devops-sre-dragonborn-warmage': {
+    name: 'DevOps SRE Warmage',
+    role: 'devops-sre-dragonborn-warmage',
+    class: 'Dragonborn Warmage of Kubernetes',
+    level: 14,
+    hp: 115,
+    maxHp: 115,
+    ac: 19,
+    avatarColor: 0xe74c3c,
+    requiredCapabilities: ['tools'],
+    roleFocus: 'infrastructure-cicd-resilience',
+    effortLevel: 'High',
+    contextCapacity: 128000,
+    tokensPerSec: 75,
+    sweBenchScore: '69.0%',
+    instructionAlignment: '98.0%',
+    costPer1kInput: 0.00055,
+    costPer1kOutput: 0.00219,
+    stats: { STR: 16, DEX: 12, CON: 16, INT: 16, WIS: 14, CHA: 10 },
+    spells: [
+      { name: 'Firewall Breath', dice: '8d6', desc: 'Purges malicious packets and DDoS attacks.' },
+      { name: 'Cluster Auto-Scale Rune', dice: 'Special', desc: 'Spawns 50 pods in 3 seconds flat.' },
+      { name: 'Rollback Incantation', dice: 'Reaction', desc: 'Restores stable production build in 100ms.' }
+    ],
+    inventory: ['Staff of Helm & Terraform', 'Armor of 99.999% SLA', 'Totem of Prometheus'],
+    traits: ['Damage Resistance (Outages)', 'Breath Weapon', 'Infrastructure As Code']
+  }
+};
+
+const ROLE_THOUGHT_POOLS = {
+  'ceo-warlock': [
+    "Consulting the Eldritch Board of Directors...",
+    "Marinating on long-term enterprise strategy...",
+    "Reviewing quarterly OKRs and burn rate...",
+    "Evaluating executive resource allocation...",
+    "Delegating new initiative to HR Mind Flayer..."
+  ],
+  'hr-mind-flayer': [
+    "Psionically scanning agent roster...",
+    "Measuring team morale and context limits...",
+    "Reading markdown templates for optimal recruitment...",
+    "Reviewing compliance and talent pipeline...",
+    "Preparing psionic spawn protocol..."
+  ],
+  'staff-engineer-paladin': [
+    "Enforcing the Sacred Oath of Clean Code...",
+    "Pondering type safety and architectural boundaries...",
+    "Inspecting system interfaces for tech debt...",
+    "Reviewing PRs with divine discernment...",
+    "Contemplating domain-driven design purity..."
+  ],
+  'senior-analyst-diviner': [
+    "Synthesizing cross-project vector embeddings...",
+    "Indexing system architectural decisions...",
+    "Measuring tech debt drift across repositories...",
+    "Updating Company Knowledge Base lore...",
+    "Scrying project milestone velocities..."
+  ],
+  'manager-bard': [
+    "Marinating on project requirements...",
+    "Tuning the Lute of Jira...",
+    "Organizing sprint backlog and routing tasks...",
+    "Casting Bardic Inspiration on engineers...",
+    "Resolving blocker with diplomatic charisma..."
+  ],
+  'solution-architect-wizard': [
+    "Drafting arcane microservice blueprints...",
+    "Divining distributed latency bottlenecks...",
+    "Synthesizing data flow diagrams...",
+    "Evaluating async event bus topology...",
+    "Optimizing schema normalization runes..."
+  ],
+  'backend-dev-cleric': [
+    "Praying to PostgreSQL gods for low latency...",
+    "Brewing connection pool holy water...",
+    "Migrating schemas with zero downtime...",
+    "Banishing database deadlocks...",
+    "Refactoring REST controllers and middleware..."
+  ],
+  'frontend-dev-sorcerer': [
+    "Channeling wild magic into CSS flexbox...",
+    "Marinating on responsive UI aesthetics...",
+    "Summoning 60FPS PixiJS canvas shaders...",
+    "Brewing glassmorphic gradients and animations...",
+    "Fixing z-index dimension anomalies..."
+  ],
+  'qa-engineer-rogue': [
+    "Lurking in shadows with null injection payloads...",
+    "Stabbing code in edge-case boundary conditions...",
+    "Executing stealth regression test suites...",
+    "Hunting subtle off-by-one errors...",
+    "Bypassing defensive developer excuses..."
+  ],
+  'devops-sre-dragonborn-warmage': [
+    "Tanking explosive deployment fallout...",
+    "Fortifying Kubernetes cluster perimeter...",
+    "Monitoring Prometheus metrics and thermal spikes...",
+    "Automating CI/CD pipeline incantations...",
+    "Scaling server pods against traffic storm..."
+  ],
+  'marshall-agent-system-inspector': [
+    "Scrying active processes for 100% completed tasks...",
+    "Measuring agent context token telemetry...",
+    "Inspecting system vital signs for stuck loops...",
+    "Running scheduled 5-minute sentinel audit...",
+    "Ranking agents by context consumption..."
+  ]
+};
+
+export { AGENT_RPG_REGISTRY, ROLE_THOUGHT_POOLS };

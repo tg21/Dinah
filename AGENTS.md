@@ -10,9 +10,17 @@ Compact instruction file for OpenCode sessions. Every line answers: "Would an ag
 
 | Action | Command |
 |---|---|
-| Start the backend server | `node backend.js` or `npm start` |
-| Open the web UI | Browse to `http://localhost:2121` |
+| Start the backend server | `node src/backend/server.js` or `npm start` |
+| Start backend + React dev server | `npm run dev` (backend `:2121` + Vite `:5173` with `/api` proxy) |
+| Start React dev server only | `npm run dev:frontend` (needs backend on `:2121`) |
+| Open the web UI (prod bundle) | Browse to `http://localhost:2121` |
+| Open the web UI (hot-reload dev) | Browse to `http://localhost:5173` |
 | Refresh harness/model discovery | `POST /api/models/refresh` or call `initializeHarnessesAndModels(true)` |
+
+When running from another directory, launch with the tool entry path (for example
+`node /path/to/dinah/src/backend/server.js`) while keeping the shell in the
+desired user workspace. That directory becomes the workspace and receives
+`.dinah`, `projects/`, `hr-system/`, `shared-state/`, and `user-mcps/`.
 
 ---
 
@@ -20,11 +28,14 @@ Compact instruction file for OpenCode sessions. Every line answers: "Would an ag
 
 | Directory | Contents |
 |---|---|
-| `src/` | `backend.js` (Express server), `frontend.html`, `harnessRegistry.js` |
-| `hr-system/` | `hr-system.json` (agent registry), `agent-<id>.msgs.json`, `agent-<id>.thoughts.json` |
-| `projects/` | Isolated project workspaces, created only for explicitly started projects |
-| `agent-templates/` | 23 markdown templates for agent archetypes |
-| `shared-state/` | `shared-state.log` (append-only audit log) |
+| `src/backend.js` | Deprecated shim — re-exports `src/backend/server.js` for backward compatibility |
+| `src/backend/` | Modular Express server: `server.js` (listen/init), `app.js` (middleware + router mounting + React bundle static hosting with SPA fallback), `config.js` (tool-root/working-directory detection and paths), `routes/` (one `express.Router()` per domain: `projects`, `models`, `mcps`, `agents`, `messages`, `knowledge`, `marshall`, `system`), `services/` (`hrService`, `projectService`, `messageService`, `eventBus`, `harnessRunner`, `agentLifecycle`, `startupService`, `knowledgeService`, `marshallService`), `mcp/` (`registry`, `catalog`, `permissions`, `invocation`), `harness/` (detection/discovery: `registry` orchestrator, `common` shared helpers, `store` in-memory state, `selector` role matching, `providers/` one module per harness: `opencode`, `antigravity`, `ollama`, `claude`, `gemini`, `codex`, `simulator`), `data/rpgRegistry.js` (agent RPG stats + thought pools) |
+| `src/frontend/` | Vite + React 18 UI (own `package.json`, `vite.config.js`, `index.html`): `src/main.jsx` entry, `src/App.jsx` shell, `src/api/client.js` (all backend fetch calls), `src/store/AppContext.jsx` (global agent/project/model/MCP/modal state), `src/constants/` (`roles.js` ROLE_CONFIGS + roster, `startup.js` labels/effort/quick prompts), `src/utils/` (`format.js` escaping + 900-char collapse, `cost.js` spawn estimate + model grouping), `src/components/Layout/` (`TopNav`, `ExecutiveBar`), `src/components/PlayArea/` (`PlayArea.jsx`, `engine.js` 2D canvas world/sprites/couriers/camera), `src/components/Drawer/` (`Drawer` + `ChatTab`, `StatsTab`, `ThoughtsTab`, `ContextTab`, `BrainView` three.js, `NetworkTab`), `src/components/Modals/` (`Modal` shell + `StartupSetup`, `NewProject`, `ProjectSettings`, `SpawnAgent`, `AgentEdit`, `McpManagement`, `KnowledgeBase`, `MarshallAudit`), `src/styles/global.css` (theme ported from legacy HTML) |
+| `src/` (other) | `harnessRegistry.js` (deprecated shim — re-exports `src/backend/harness/index.js`) |
+| `working-area/` | Default mutable user workspace created when launched from the tool repository; contains `hr-system/`, `projects/`, `shared-state/`, `user-mcps/`, and `.dinah` |
+| `mcp/` | Shipped MCP registry and server packages tracked by git; never write UI-installed MCPs here |
+| `agent-templates/` | JSON role definitions; each file is named for its role and contains `name`, `job`, and `basePrompt` (shipped/read-only) |
+| `prompts/` | Shipped system prompts (read-only) |
 
 ---
 
@@ -83,31 +94,54 @@ If no harnesses are found, the system falls back to a virtual simulation harness
 
 | Script | Effect |
 |---|---|
-| `npm start` | Runs `node src/backend.js` |
-| `npm run fresh-start` | Deletes `projects/`, `hr-system/`, and `shared-state/`, then starts `node src/backend.js`; use only when a full runtime-state reset is intended |
-| `npm run build` | `rm -rf dist && mkdir dist && cp src/backend.js dist/ && cp src/harnessRegistry.js dist/ && cp src/frontend.html dist/` |
+| `npm start` | Runs `node src/backend/server.js` (serves the `dist/frontend/` React bundle; `/` returns 503 with build instructions when the bundle is missing) |
+| `npm run dev` | Runs backend + Vite dev server concurrently (needs `concurrently`; installs via root devDeps) |
+| `npm run dev:backend` | Runs backend only on `:2121` |
+| `npm run dev:frontend` | Runs Vite hot-reload UI on `:5173` with `/api` + `/handle*` proxied to `:2121`; needs `npm run install:frontend` first |
+| `npm run install:frontend` | Installs `src/frontend/` deps (`react`, `react-dom`, `three`, `vite`, `@vitejs/plugin-react`) |
+| `npm run fresh-start` | Deletes the default `working-area/`, then starts `node src/backend/server.js`; use only when a full runtime-state reset is intended |
+| `npm run build` | Builds backend bundle into `dist/backend/` (`build:backend`) AND React UI into `dist/frontend/` (`build:frontend`) |
+| `npm run build:backend` | Copies the modular backend (`src/backend/server.js`, `app.js`, `config.js`, `routes/`, `services/`, `mcp/`, `harness/`, `data/`) and JSON `agent-templates/` plus the `src/backend.js` and `src/harnessRegistry.js` shims into `dist/` |
+| `npm run build:frontend` | Runs `vite build` in `src/frontend/` → emits static assets to `dist/frontend/` (served by `src/backend/app.js`) |
 | `npm test` | Exits with error ("no test specified") — no test suite configured |
 
-No lint or typecheck configured. The repo uses `type: "module"` in `package.json`.
+No lint or typecheck configured. Root uses `type: "module"`; `src/frontend/` is a separate Vite package (`dnd-frontend`) with its own `package.json`.
 
 ---
 
 ## 7. Key Conventions & Gotchas
 
+- **Frontend hosting**. `src/backend/app.js` serves the Vite build from `dist/frontend/` (fallback `src/frontend/dist/`) with an SPA fallback for non-`/api` GETs. The React app in `src/frontend/` is the only UI — there is no raw-HTML fallback. After editing `src/frontend/`, run `npm run build:frontend` before testing the `:2121` UI, or use `npm run dev:frontend` (`:5173`, proxies `/api` + `/handle*` to `:2121`) for hot reload. New UI code goes in `src/frontend/src/` (API calls in `api/client.js`, shared state in `store/AppContext.jsx`).
 - **Port**: Server defaults to `2121` (`PORT` env var supported).
 - **CORS**: Enabled for all origins.
-- **`APP_DIR`**: Server runs from `process.cwd()` — keep `backend.js` in `src/` and run from repo root.
-- **HR registry is the source of truth**. `hr-system/hr-system.json` dictates active agents, their models, harnesses, context limits, and statuses. The UI reads from this file.
-- **Project directories are auto-created**. `createProjectFolder(projectId)` in `backend.js` creates `projects/<id>/` with a `README.md` if missing.
-- **Projects are opt-in**. Startup and `GET /api/projects` must not seed or create `project-alpha`, `project-beta`, or any other project. Project folders/configuration are created only by an explicit project-creation flow or work dispatched to that project. Global CEO work uses the repository root and must not create `projects/global/`.
+- **Working directory detection**. `src/backend/config.js` derives the shipped tool root from the module location. When launched from the tool repository, mutable state is placed in `working-area/`; when launched from any other directory, that directory itself is the working area. A `.dinah` marker is created/read in the working area, and `/api/system/workspace` exposes the resolved paths.
+- **Backend startup ordering**. `src/backend/server.js` listens on the configured port before harness/model discovery so the Vite proxy can connect while initialization is still running.
+- **HR registry is the source of truth**. `<working-area>/hr-system/hr-system.json` dictates active agents, their models, harnesses, context limits, and statuses. The UI reads from this file. HR persistence lives in `src/backend/services/hrService.js`.
+- **Project directories are auto-created**. `createProjectFolder(projectId)` in `src/backend/services/projectService.js` creates `<working-area>/projects/<id>/` with a `README.md` if missing.
+- **Route/service ownership**. Business logic lives in `src/backend/services/` and `src/backend/mcp/`; `src/backend/routes/*.js` files only validate input, call services, and format responses. Wire new endpoints as an `express.Router()` in `routes/` and mount it in `src/backend/app.js`.
+- **Harness runners**. Per-CLI adapters live in `src/backend/services/harnessRunner.js` (`spawnOpencodeAgent`, `spawnCodexAgent`, …) behind `spawnHarnessAgent`, which also builds/cleans the per-invocation MCP manifest via `src/backend/mcp/invocation.js`.
+- **Agent definitions**. `src/backend/services/agentDefinitions.js` validates and loads `agent-templates/<role>.json`, then injects the role prompt and runtime workspace context into every harness invocation. Role definitions must not contain hardcoded API URLs or curl commands.
+- **Agent coordination**. The shipped `dinah-orchestration` MCP exposes project status, HR staffing requests, task dispatch with acceptance criteria/dependencies, progress, blockers, help requests, and durable agent messages. State is stored in `shared-state/coordination.json`; agents must publish progress, report blockers, and request help instead of relying on periodic full-project scans.
+- **Agent messaging**. `shared-state/message-queue.json` is the durable source of truth for direct/project messages, delivery leases, acknowledgements, retries, and dead letters; `agent-*.msgs.json` remains a UI/audit projection. Use the `dinah-orchestration` inbox/claim/acknowledge/complete/fail/release tools for delivery, and treat `send_agent_message` as queue acceptance only. The backend dispatcher wakes one active agent at a time with a bounded inbox batch and recovers expired leases.
+- **Messaging observability UI**. The drawer's Messages tab reads `/api/message-activity`; current-project messages render as cascaded incoming/outgoing bubbles with queued/claimed/processing/completed/dead-letter ticks. `/api/events` emits `courier_message` events, which the play area renders as clickable mail flights for 30 seconds; keep event payloads populated with `messageId`, `deliveryId`, `projectId`, sender, recipient, and summary.
+- **Staffing authority**. Managers use `request_staff`; only `hr-mind-flayer` may use `provision_agent`. Both support model, harness, effort, and `promptOverride` specialization parameters, and the backend enforces the HR boundary.
+- **Model routing and specialization**. Each role definition contains `modelPolicy`, `runtimeCustomization`, and `coordination` metadata. HR/model selection uses the policy when choosing discovered models; staffing requests may provide a model override and a specialization prompt override, which is included in the invocation without replacing the core role prompt.
+- **Harness discovery**. Model discovery per harness lives in `src/backend/harness/providers/<harness>.js` behind `initializeHarnessesAndModels` in `src/backend/harness/registry.js`; shared helpers (`findHarnessBinary`, `checkHttpEndpoint`, `buildModelCapability`) in `harness/common.js`, in-memory state in `harness/store.js`, role matching in `harness/selector.js`. Import from `src/backend/harness/index.js`.
+- **MCP separation**. `mcp/registry.json` and `mcp/servers/` are shipped, git-tracked MCPs. UI-installed MCPs are written to `<working-area>/user-mcps/`; `GET /api/mcps` combines both inventories and labels each entry with `sourceType`.
+- **Projects are opt-in**. Startup and `GET /api/projects` must not seed or create `project-alpha`, `project-beta`, or any other project. Project folders/configuration are created only by an explicit project-creation flow or work dispatched to that project. Global CEO work uses the active working directory and must not create `projects/global/`.
+- **Project manager invariant**. Every explicit project-creation flow (`/handleStartProject` or the CEO `create_project` orchestration tool) must call the idempotent manager guarantee and send the project brief to that project's `manager-bard`; never create a project without a manager.
+- **User-question handoff**. Agents that need a user decision use the orchestration `ask_user` tool. This sets status `awaiting-user`, persists the pending question, and emits `agent_needs_user`; a user reply clears the hold and resumes the agent. Keep the UI hold signal visible and do not route manager execution questions back through the CEO.
 - **CEO startup model delegation**. When the frontend sends `"ceo"` for a top-level agent during first-run setup, the backend loads `prompts/ceo-select-top-level-models.md`, sends the selected CEO a candidate list and role requirements, validates the returned model IDs, and records the request/result in the CEO message log, thought log, and shared audit log. The prompt must remain provider-neutral and merit-based.
 - **Model selectors**. First-run CEO and executive-council selectors reuse the grouped model presentation from Configure Agent Capabilities: models are grouped by harness and provider, with capability/context details shown on each option.
 - **Harness prompt execution**. Pass agent prompts to harness CLIs as argument arrays (`execFileSync`), never by interpolating them into shell command strings; prompts can contain Markdown/code fences and shell metacharacters.
 - **Harness CLI syntax is not interchangeable**. OpenCode uses `run ... --dir`; Codex uses `exec ... --cd` and requires the selected model via `--model`. Keep adapter-specific flags in their respective runner functions.
-- **Startup selection observability**. The compact CEO request/result belongs in the CEO message/thought logs; the complete prompt, raw harness response, parsed decision, timing, and resolved assignments belong in `shared-state/startup-model-selection.json`.
+- **Startup selection observability**. The compact CEO request/result belongs in the CEO message/thought logs; the complete prompt, raw harness response, parsed decision, timing, and resolved assignments belong in `<working-area>/shared-state/startup-model-selection.json`.
+- **Startup service workspace path**. `src/backend/services/startupService.js` must import `APP_DIR` from `config.js` when recording workspace-relative message/audit paths; `APP_DIR` is the active working directory alias.
 - **Long-log UI behavior**. Message and thought renderers must collapse entries over 900 characters by default, show a short preview, and constrain expanded content with scrollable overflow and word wrapping.
+- **Agent drawer payloads**. `/handleGetAgentStatus` returns `agent`, `messages`, `thoughts`, and `personalContext` as sibling fields. The frontend must merge those fields into drawer state; persisted messages use the backend `request` property.
 - **Token tracking**. Each message sent via `POST /handleSendMessage` increments `context_used` by `round(message.length * 1.5) + 350` tokens and adds `spentUsd` to the project budget.
 - **Environment variables**. `PORT`, `OLLAMA_HOST` (`default: http://localhost:11434`), `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY` are read at startup to detect harnesses.
+- **Runtime configuration**. `.dinah` is a workspace marker and records non-secret runtime metadata such as the backend port. Agent prompts receive runtime context from backend code; they must not embed service URLs. Use MCP tools for narrowly scoped agent actions when available, while internal orchestration remains in backend services.
 - **5-minute intervals**. Marshall sentinel and Senior Analyst both run on `setInterval(..., 300000)`. Do not manually run them more frequently than every 5 minutes without reason.
 
 ---
@@ -116,7 +150,7 @@ No lint or typecheck configured. The repo uses `type: "module"` in `package.json
 
 ```bash
 # 1. Start the server
-node backend.js
+node src/backend/server.js
 
 # 2. Check available harnesses/models
 curl http://localhost:2121/api/models

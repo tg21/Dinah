@@ -1,6 +1,35 @@
 {
   "mcps": [
     {
+      "id": "dinah-orchestration",
+      "name": "Dinah Orchestration",
+      "description": "Least-privilege agent coordination: staffing, tasks, progress, blockers, help, and messages.",
+      "version": "1.0.0",
+      "source": "dinah-shipped",
+      "command": "python3",
+      "args": ["servers/dinah-orchestration/server.py"],
+      "env": {},
+      "tools": [
+        {"name": "get_project_status", "description": "Read project coordination state."},
+        {"name": "request_staff", "description": "Request a specialist from HR."},
+        {"name": "provision_agent", "description": "Provision an active specialist; authorized only for HR."},
+        {"name": "create_task", "description": "Create and optionally dispatch tracked work with acceptance criteria and dependencies."},
+        {"name": "update_progress", "description": "Publish task progress."},
+        {"name": "report_blocker", "description": "Record a blocker."},
+        {"name": "request_help", "description": "Request specialist help."},
+        {"name": "send_agent_message", "description": "Accept a direct message into the durable queue."},
+        {"name": "publish_project_message", "description": "Publish to subscribed project agents."},
+        {"name": "subscribe_project", "description": "Subscribe to a project channel."},
+        {"name": "list_inbox", "description": "List durable inbox deliveries."},
+        {"name": "claim_message", "description": "Claim a delivery with a lease."},
+        {"name": "acknowledge_message", "description": "Acknowledge receipt and start processing."},
+        {"name": "complete_message", "description": "Complete a leased delivery."},
+        {"name": "fail_message", "description": "Fail and optionally retry a delivery."},
+        {"name": "release_message", "description": "Release a delivery back to the queue."},
+        {"name": "get_message_status", "description": "Inspect delivery status and attempts."}
+      ]
+    },
+    {
       "id": "io.github.arifulislamat-database-mcp-sqlite",
       "name": "io.github.arifulislamat/database-mcp-sqlite",
       "description": "MCP server for SQLite databases. Read-only by default, row caps, statement timeouts.",
@@ -16,7 +45,7 @@
       "command": "npx",
       "args": [
         "--prefix",
-        "/home/starborn/Code/DND/mcp/servers/io.github.arifulislamat-database-mcp-sqlite",
+        "servers/io.github.arifulislamat-database-mcp-sqlite",
         "--no-install",
         "@database-mcp/sqlite"
       ],
