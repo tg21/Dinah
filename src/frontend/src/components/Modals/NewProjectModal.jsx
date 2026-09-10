@@ -4,7 +4,7 @@ import { useApp } from '../../store/AppContext.jsx';
 import { api } from '../../api/client.js';
 
 export default function NewProjectModal() {
-  const { setActiveModal, loadProjects, switchProject } = useApp();
+  const { setActiveModal, loadProjects, loadAgents, switchProject } = useApp();
   const [id, setId] = useState('');
   const [customPath, setCustomPath] = useState('');
   const [budget, setBudget] = useState(50);
@@ -14,6 +14,7 @@ export default function NewProjectModal() {
     await api.startProject({ projectId: id.trim(), customPath: customPath.trim() || null, budgetUsd: Number(budget) || 50 });
     setActiveModal(null);
     await loadProjects();
+    await loadAgents();
     await switchProject(id.trim());
   }
 

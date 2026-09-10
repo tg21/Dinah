@@ -1,6 +1,4 @@
 import { Router } from 'express';
-import path from 'path';
-import { PROJECTS_DIR } from '../config.js';
 import {
   createProjectFolder,
   listProjects,
@@ -16,7 +14,7 @@ const router = Router();
 router.get('/api/projects', (req, res) => {
   const projects = listProjects();
   const config = loadProjectsConfig();
-  res.json({ projects: listProjects(), config });
+  res.json({ projects, config });
 });
 
 // Project Configuration Endpoints
@@ -29,24 +27,30 @@ router.post('/api/projects/config', (req, res) => {
   if (!projectId) return res.status(400).json({ error: 'projectId is required' });
 
   const cfg = loadProjectsConfig();
-  if (!cfg[projectId]) {
-    cfg[projectId] = {
-      path: customPath || path.join(PROJECTS_DIR, projectId),
-      budgetUsd: budgetUsd || 50.0,
-      spentUsd: 0.0,
-      maxTokens: maxTokens || 1000000,
-      tokensUsed: 0,
-      description: description || `Project ${projectId}`
-    };
+  const isNew = !cfg[projectId];
+  if (isNew) {
+    // A config entry is a project: create the folder and guarantee its manager
+    // so this path cannot leave a manager-less project behind.
+    createProjectFolder(projectId, customPath || null);
+    const fresh = loadProjectsConfig();
+    // createProjectFolder already seeded defaults; apply caller overrides.
+    if (customPath) fresh[projectId].path = customPath;
+    if (budgetUsd !== undefined) fresh[projectId].budgetUsd = Number(budgetUsd);
+    if (maxTokens !== undefined) fresh[projectId].maxTokens = Number(maxTokens);
+    if (description) fresh[projectId].description = description;
+    saveProjectsConfig(fresh);
+    Object.assign(cfg, fresh);
   } else {
     if (customPath) cfg[projectId].path = customPath;
     if (budgetUsd !== undefined) cfg[projectId].budgetUsd = Number(budgetUsd);
     if (maxTokens !== undefined) cfg[projectId].maxTokens = Number(maxTokens);
     if (description) cfg[projectId].description = description;
+    saveProjectsConfig(cfg);
   }
-  saveProjectsConfig(cfg);
+  const manager = ensureProjectManager(projectId);
+  if (isNew && description) sendProjectBriefToManager(projectId, manager.agentId, description);
   appendToSharedLog(`Updated project configuration for [${projectId}]: ${JSON.stringify(cfg[projectId])}`);
-  res.json({ success: true, projectConfig: cfg[projectId] });
+  res.json({ success: true, projectConfig: cfg[projectId], managerAgentId: manager.agentId, managerCreated: manager.created });
 });
 
 // Start new project

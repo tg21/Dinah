@@ -7,10 +7,20 @@ import { appendAgentThought } from './messageService.js';
 import { broadcastAgentEvent } from './eventBus.js';
 import { createMcpInvocationConfig, mcpPromptContext, cleanupMcpInvocation } from '../mcp/index.js';
 import { buildAgentPrompt } from './agentDefinitions.js';
+import { ensureProjectManager } from './agentLifecycle.js';
 
-function resolveProjectDir(projectId, workspaceDir) {
+export function resolveProjectDir(projectId, workspaceDir) {
   const projectDir = workspaceDir || getProjectFolder(projectId);
-  if (projectId !== 'global' && !fs.existsSync(projectDir)) createProjectFolder(projectId, projectDir);
+  if (projectId && projectId !== 'global' && !fs.existsSync(projectDir)) createProjectFolder(projectId, projectDir);
+  // Work dispatched to a new projectId implicitly creates that project.
+  // Guarantee its manager so implicit projects never stay manager-less.
+  if (projectId && projectId !== 'global') {
+    try {
+      ensureProjectManager(projectId);
+    } catch {
+      /* manager guarantee is best-effort here; harness dispatch must proceed */
+    }
+  }
   return projectDir;
 }
 
