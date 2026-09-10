@@ -8,6 +8,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "eval": "node scripts/run-evals.js",
+    "eval:integration": "node scripts/run-manager-integration.js",
     "test:all": "npm test && npm run eval --",
     "fresh-start": "rm -rf working-area && node src/backend/server.js",
     "install:frontend": "npm --prefix src/frontend install",

@@ -81,7 +81,10 @@ export function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation, wo
     return { success: true, output, agentId, harness: 'opencode', model: agent?.model };
   } catch (error) {
     appendAgentThought(agentId, 'OPENCODE_FALLBACK', `Harness note: ${error.message.slice(0, 80)}`);
-    return simulateHarnessExecution('opencode', projectId, prompt, agentId);
+    return {
+      ...simulateHarnessExecution('opencode', projectId, prompt, agentId),
+      fallbackReason: error.message
+    };
   }
 }
 
@@ -245,7 +248,10 @@ export function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agent
     agent.role || agentId,
     prompt,
     { ...agent, project: projectId },
-    { workspaceDir: options.workspaceDir }
+    {
+      workspaceDir: options.workspaceDir,
+      includeToolRoot: options.includeToolRoot !== false
+    }
   ) + mcpPromptContext(agent, mcpInvocation);
   try {
     switch (harness) {

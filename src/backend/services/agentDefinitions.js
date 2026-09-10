@@ -39,7 +39,7 @@ export function buildAgentPrompt(role, task, agent = {}, options = {}) {
     agent.promptOverride ? `Active specialization override: ${agent.promptOverride}` : null,
     `Coordination protocol: ${definition?.coordination?.operatingRule || 'Publish progress, report blockers, and request help through the available coordination tools.'}`,
     `Workspace: ${options.workspaceDir || (agent.project === 'global' ? APP_DIR : path.join(APP_DIR, 'projects', agent.project || 'global'))}`,
-    `Tool root: ${TOOL_DIR}`,
+    options.includeToolRoot === false ? null : `Tool root: ${TOOL_DIR}`,
     `Backend port: ${PORT}`,
     'Use the workspace and enabled MCP tools as the source of truth. Do not invent endpoints, credentials, paths, or completed work.',
     'When an action requires orchestration, return a structured request describing the action and arguments; do not issue arbitrary HTTP requests.'

@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import { resolveAgentMcps } from './permissions.js';
 import { issueOrchestrationToken, revokeOrchestrationToken } from '../services/orchestrationAuth.js';
-import { PORT } from '../config.js';
+import { PORT, TOOL_DIR } from '../config.js';
 import { loadAgentDefinition } from '../services/agentDefinitions.js';
 
 function orchestrationTools(agent) {
@@ -19,6 +19,21 @@ function orchestrationTools(agent) {
   ])];
 }
 
+function resolveMcpInvocation(mcp) {
+  if (mcp.id !== 'dinah-orchestration') return mcp;
+  const args = [...(mcp.args || [])];
+  if (args[0] && !path.isAbsolute(args[0])) {
+    args[0] = path.resolve(TOOL_DIR, args[0]);
+  }
+  const venvCandidates = [
+    process.env.DINAH_MCP_PYTHON,
+    path.join(TOOL_DIR, '.venv', 'dinah-orchestration', 'bin', 'python'),
+    path.join(TOOL_DIR, '..', '.venv', 'dinah-orchestration', 'bin', 'python')
+  ].filter(Boolean);
+  const python = venvCandidates.find((candidate) => fs.existsSync(candidate));
+  return { ...mcp, command: python || mcp.command, args };
+}
+
 export function createMcpInvocationConfig(agent, agentId, projectId) {
   const mcps = resolveAgentMcps({
     ...agent,
@@ -26,8 +41,14 @@ export function createMcpInvocationConfig(agent, agentId, projectId) {
       ...(agent.mcp || {}),
       'dinah-orchestration': { enabled: true, allowedTools: orchestrationTools(agent) }
     }
-  });
+  }).map(resolveMcpInvocation);
   const orchestrationToken = issueOrchestrationToken(agentId, projectId);
+  const orchestrationEnv = {
+    DND_BACKEND_URL: `http://127.0.0.1:${PORT}`,
+    DND_AGENT_ID: agentId,
+    DND_PROJECT_ID: projectId,
+    DND_MCP_TOKEN: orchestrationToken
+  };
   const config = {
     version: 1,
     agentId,
@@ -41,12 +62,7 @@ export function createMcpInvocationConfig(agent, agentId, projectId) {
           env: {
             ...(mcp.env || {}),
             ...(mcp.id === 'dinah-orchestration'
-              ? {
-                  DND_BACKEND_URL: `http://127.0.0.1:${PORT}`,
-                  DND_AGENT_ID: agentId,
-                  DND_PROJECT_ID: projectId,
-                  DND_MCP_TOKEN: orchestrationToken
-                }
+              ? orchestrationEnv
               : {})
           },
           allowedTools: mcp.allowedTools
@@ -67,7 +83,10 @@ export function createMcpInvocationConfig(agent, agentId, projectId) {
         {
           type: 'local',
           command: [mcp.command, ...(mcp.args || [])],
-          environment: mcp.env || {},
+          environment: {
+            ...(mcp.env || {}),
+            ...(mcp.id === 'dinah-orchestration' ? orchestrationEnv : {})
+          },
           enabled: true
         }
       ])
