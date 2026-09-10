@@ -7,9 +7,9 @@ import { appendAgentThought } from './messageService.js';
 import { createMcpInvocationConfig, mcpPromptContext, cleanupMcpInvocation } from '../mcp/index.js';
 import { buildAgentPrompt } from './agentDefinitions.js';
 
-export function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation) {
-  const projectDir = getProjectFolder(projectId);
-  if (projectId !== 'global') createProjectFolder(projectId);
+export function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = workspaceDir || getProjectFolder(projectId);
+  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('agy') || findHarnessBinary('antigravity');
 
   if (!harnessBin) {
@@ -47,9 +47,9 @@ export function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation)
   }
 }
 
-export function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation) {
-  const projectDir = getProjectFolder(projectId);
-  if (projectId !== 'global') createProjectFolder(projectId);
+export function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = workspaceDir || getProjectFolder(projectId);
+  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('opencode');
 
   if (!harnessBin) {
@@ -81,9 +81,9 @@ export function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation) {
   }
 }
 
-export function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation) {
-  const projectDir = getProjectFolder(projectId);
-  if (projectId !== 'global') createProjectFolder(projectId);
+export function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = workspaceDir || getProjectFolder(projectId);
+  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('claude-code') || findHarnessBinary('claude');
 
   if (!harnessBin) {
@@ -107,9 +107,9 @@ export function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation) 
   }
 }
 
-export function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation) {
-  const projectDir = getProjectFolder(projectId);
-  if (projectId !== 'global') createProjectFolder(projectId);
+export function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = workspaceDir || getProjectFolder(projectId);
+  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('codex') || findHarnessBinary('openai');
 
   if (!harnessBin) {
@@ -138,9 +138,9 @@ export function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation) {
   }
 }
 
-export function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation) {
-  const projectDir = getProjectFolder(projectId);
-  if (projectId !== 'global') createProjectFolder(projectId);
+export function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = workspaceDir || getProjectFolder(projectId);
+  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('gemini') || findHarnessBinary('gemini-cli');
 
   if (!harnessBin) {
@@ -163,9 +163,9 @@ export function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation) {
   }
 }
 
-export function spawnOllamaAgent(projectId, prompt, agentId, mcpInvocation) {
-  const projectDir = getProjectFolder(projectId);
-  if (projectId !== 'global') createProjectFolder(projectId);
+export function spawnOllamaAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = workspaceDir || getProjectFolder(projectId);
+  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
   const harnessBin = findHarnessBinary('ollama');
 
   if (!harnessBin) {
@@ -234,27 +234,32 @@ export function simulateHarnessExecution(harness, projectId, prompt, agentId) {
   };
 }
 
-export function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId) {
+export function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId, options = {}) {
   const agent = loadHrSystem()[agentId] || { role: agentId, name: agentId };
   const mcpInvocation = createMcpInvocationConfig(agent, agentId, projectId);
-  const effectivePrompt = buildAgentPrompt(agent.role || agentId, prompt, { ...agent, project: projectId }) + mcpPromptContext(agent, mcpInvocation);
+  const effectivePrompt = buildAgentPrompt(
+    agent.role || agentId,
+    prompt,
+    { ...agent, project: projectId },
+    { workspaceDir: options.workspaceDir }
+  ) + mcpPromptContext(agent, mcpInvocation);
   try {
     switch (harness) {
       case 'antigravity':
       case 'agy':
-        return spawnAntigravityAgent(projectId, effectivePrompt, agentId, mcpInvocation);
+        return spawnAntigravityAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'opencode':
-        return spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation);
+        return spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'claude-code':
-        return spawnClaudeCodeAgent(projectId, effectivePrompt, agentId, mcpInvocation);
+        return spawnClaudeCodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'codex':
-        return spawnCodexAgent(projectId, effectivePrompt, agentId, mcpInvocation);
+        return spawnCodexAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'gemini':
-        return spawnGeminiAgent(projectId, effectivePrompt, agentId, mcpInvocation);
+        return spawnGeminiAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'ollama':
-        return spawnOllamaAgent(projectId, effectivePrompt, agentId, mcpInvocation);
+        return spawnOllamaAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       default:
-        return spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation);
+        return spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
     }
   } finally {
     try {

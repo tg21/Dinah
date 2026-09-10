@@ -27,7 +27,7 @@ export function loadAgentDefinition(role) {
   }
 }
 
-export function buildAgentPrompt(role, task, agent = {}) {
+export function buildAgentPrompt(role, task, agent = {}, options = {}) {
   const definition = loadAgentDefinition(role);
   const basePrompt = definition?.basePrompt ||
     'Act as a careful specialist. Inspect the repository and requirements before making changes. Explain decisions, verify your work, and report blockers honestly.';
@@ -38,7 +38,7 @@ export function buildAgentPrompt(role, task, agent = {}) {
     `Runtime customization: ${JSON.stringify(definition?.runtimeCustomization || {})}`,
     agent.promptOverride ? `Active specialization override: ${agent.promptOverride}` : null,
     `Coordination protocol: ${definition?.coordination?.operatingRule || 'Publish progress, report blockers, and request help through the available coordination tools.'}`,
-    `Workspace: ${agent.project === 'global' ? APP_DIR : path.join(APP_DIR, 'projects', agent.project || 'global')}`,
+    `Workspace: ${options.workspaceDir || (agent.project === 'global' ? APP_DIR : path.join(APP_DIR, 'projects', agent.project || 'global'))}`,
     `Tool root: ${TOOL_DIR}`,
     `Backend port: ${PORT}`,
     'Use the workspace and enabled MCP tools as the source of truth. Do not invent endpoints, credentials, paths, or completed work.',

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import trajectoryScenario from './fixtures/manager-trajectory.golden.json';
 import hitlScenario from './fixtures/hitl-outcome.golden.json';
 import { evaluateHitlOutcome, evaluateTrajectory } from './evaluators.js';
+import { extractJson } from '../../scripts/run-evals.js';
 
 describe('evaluator sanity checks', () => {
   it('accepts a valid trajectory contract and rejects a missing QA event', () => {
@@ -26,5 +27,12 @@ describe('evaluator sanity checks', () => {
     const result = evaluateHitlOutcome(withoutReply, hitlScenario.expected);
     expect(result.passed).toBe(false);
     expect(result.failures).toContain('Missing HITL transition: user_replied');
+  });
+
+  it('extracts event traces with a preamble, suffix, or markdown fence', () => {
+    const trace = JSON.stringify({ events: trajectoryScenario.events });
+    expect(extractJson(`Returning the trace. ${trace}`)).toEqual(trajectoryScenario.events);
+    expect(extractJson(`\n\`\`\`json\n${trace}\n\`\`\`\n`)).toEqual(trajectoryScenario.events);
+    expect(extractJson(`${trace}\nDone.`)).toEqual(trajectoryScenario.events);
   });
 });

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { createInterface } from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
@@ -99,16 +100,53 @@ function slug(value) {
   return String(value || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-function extractJson(rawOutput) {
+export function extractJson(rawOutput) {
   const text = String(rawOutput || '').trim();
-  const candidates = [text, text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')];
+  const candidates = [
+    text,
+    text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  ];
+
+  // Models sometimes obey the requested schema but add one short sentence
+  // before or after it. Find balanced JSON values inside that response while
+  // respecting quoted strings and escaped characters.
   for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(candidate);
-      if (Array.isArray(parsed)) return parsed;
-      if (Array.isArray(parsed.events)) return parsed.events;
-    } catch {
-      // Try the next representation.
+    for (let start = 0; start < candidate.length; start += 1) {
+      if (candidate[start] !== '{' && candidate[start] !== '[') continue;
+      const open = candidate[start];
+      const close = open === '{' ? '}' : ']';
+      const stack = [close];
+      let inString = false;
+      let escaped = false;
+      for (let index = start + 1; index < candidate.length; index += 1) {
+        const character = candidate[index];
+        if (inString) {
+          if (escaped) escaped = false;
+          else if (character === '\\') escaped = true;
+          else if (character === '"') inString = false;
+          continue;
+        }
+        if (character === '"') {
+          inString = true;
+        } else if (character === '{') {
+          stack.push('}');
+        } else if (character === '[') {
+          stack.push(']');
+        } else if (character === '}' || character === ']') {
+          if (stack.at(-1) !== character) break;
+          stack.pop();
+          if (stack.length === 0) {
+            try {
+              const parsed = JSON.parse(candidate.slice(start, index + 1));
+              if (Array.isArray(parsed)) return parsed;
+              if (Array.isArray(parsed.events)) return parsed.events;
+            } catch {
+              // Continue looking for another complete JSON value.
+            }
+            break;
+          }
+        }
+      }
     }
   }
   return null;
@@ -165,10 +203,21 @@ async function runScenario(name, scenarioConfig, route) {
   let parsedEvents = null;
   let error = null;
   let simulated = false;
+  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dnd-eval-workspace-'));
 
   try {
+    fs.writeFileSync(
+      path.join(workspaceDir, 'EVAL-SPACE.md'),
+      `# Isolated evaluation workspace\n\nScenario: ${scenario.name}\n`
+    );
     saveHrSystem({ ...originalHr, [agentId]: agent });
-    const response = spawnHarnessAgent(route.harness, 'global', buildPrompt(scenario, scenarioConfig.instructions), agentId);
+    const response = spawnHarnessAgent(
+      route.harness,
+      'global',
+      buildPrompt(scenario, scenarioConfig.instructions),
+      agentId,
+      { workspaceDir }
+    );
     rawOutput = response?.output || '';
     simulated = Boolean(response?.simulated);
     parsedEvents = extractJson(rawOutput);
@@ -177,6 +226,7 @@ async function runScenario(name, scenarioConfig, route) {
     error = caught.message;
   } finally {
     saveHrSystem(originalHr);
+    fs.rmSync(workspaceDir, { recursive: true, force: true });
   }
 
   const finishedAt = new Date();
@@ -186,6 +236,7 @@ async function runScenario(name, scenarioConfig, route) {
     testName: name,
     harness: route.harness,
     model: route.model,
+    workspace: 'isolated temporary workspace',
     startedAt: startedAt.toISOString(),
     finishedAt: finishedAt.toISOString(),
     durationMs: finishedAt - startedAt,
@@ -235,7 +286,9 @@ async function main() {
   if (results.some((result) => !result.passed)) process.exitCode = 1;
 }
 
-main().catch((error) => {
-  console.error(`Live eval runner failed: ${error.message}`);
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(`Live eval runner failed: ${error.message}`);
+    process.exitCode = 1;
+  });
+}
