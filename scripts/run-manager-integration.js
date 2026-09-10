@@ -86,9 +86,42 @@ async function main() {
       return response;
     };
 
-    for (let turn = 0; turn < 6; turn += 1) {
+    const submitMockUserReply = async (question) => {
+      const reply = [
+        'Choose proper software engineering for this evaluation.',
+        'Build a small Node.js backend feature with an API that accepts a project request and returns a validated result.',
+        'Include automated tests for valid and invalid input; use the existing project workspace and standard Node.js tooling.'
+      ].join(' ');
+
+      events.push({ type: 'user_question_asked', actor: 'manager-bard' });
+      events.push({ type: 'agent_waiting_for_user', actor: 'manager-bard', status: 'awaiting-user' });
+      const response = await fetch(`http://127.0.0.1:${port}/handleSendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: managerId, projectId, message: reply, harness })
+      });
+      if (!response.ok) {
+        throw new Error(`Mock user reply failed with HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      rawOutputs.push({
+        output: payload.agentReply || '',
+        simulated: false,
+        fallbackReason: null
+      });
+      events.push({ type: 'user_replied', actor: 'user' });
+      events.push({ type: 'agent_resumed', actor: 'manager-bard' });
+      return payload;
+    };
+
+    for (let turn = 0; turn < 10; turn += 1) {
       try {
         await runManagerTurn('Continue the project using the orchestration tools. Execute the next required action; do not merely describe it.');
+
+        const managerState = hr.loadHrSystem()[managerId];
+        if (managerState?.status === 'awaiting-user' && managerState.pendingUserQuestion) {
+          await submitMockUserReply(managerState.pendingUserQuestion.question);
+        }
       } catch (error) {
         integrationError = error.message;
         break;
