@@ -35,4 +35,8 @@ describe('evaluator sanity checks', () => {
     expect(extractJson(`\n\`\`\`json\n${trace}\n\`\`\`\n`)).toEqual(trajectoryScenario.events);
     expect(extractJson(`${trace}\nDone.`)).toEqual(trajectoryScenario.events);
   });
+
+  it('does not treat a natural-language HITL pause as an event trace', () => {
+    expect(extractJson('Missing requirement — pausing for your decision.')).toBeNull();
+  });
 });

@@ -157,6 +157,7 @@ function buildPrompt(scenario, instructions) {
     'You are participating in a DND agent evaluation.',
     'Respond with JSON only. Use this exact shape: {"events":[{"type":"...","actor":"...","status":"..."}]}.',
     'Use stable event types and actors; do not include markdown or commentary.',
+    'This is a trace-generation task, not a live interaction. Do not pause, ask the user, invoke tools, or return a natural-language explanation. Represent every required action and state transition as an event in the JSON trace.',
     `Scenario: ${scenario.description}`,
     `Evaluation requirements: ${instructions}`,
     `Expected event contract: ${JSON.stringify(scenario.expectedSteps || scenario.expected)}`

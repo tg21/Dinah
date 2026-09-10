@@ -57,7 +57,25 @@ export function createMcpInvocationConfig(agent, agentId, projectId) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dnd-agent-mcp-'));
   const file = path.join(dir, 'mcp.json');
   fs.writeFileSync(file, JSON.stringify(config, null, 2));
-  return { file, dir, mcps, orchestrationToken };
+  // OpenCode does not consume Dinah's internal manifest format. Give it a
+  // native temporary config and pass it through OPENCODE_CONFIG in the
+  // OpenCode adapter. Other harnesses continue using `file` above.
+  const opencodeConfig = {
+    mcp: Object.fromEntries(
+      mcps.map((mcp) => [
+        mcp.id,
+        {
+          type: 'local',
+          command: [mcp.command, ...(mcp.args || [])],
+          environment: mcp.env || {},
+          enabled: true
+        }
+      ])
+    )
+  };
+  const opencodeFile = path.join(dir, 'opencode.json');
+  fs.writeFileSync(opencodeFile, JSON.stringify(opencodeConfig, null, 2));
+  return { file, opencodeFile, dir, mcps, orchestrationToken };
 }
 
 export function cleanupMcpInvocation(invocation) {
@@ -76,5 +94,5 @@ export function mcpPromptContext(agent, invocation) {
   const tools = mcps.flatMap((mcp) =>
     (mcp.allowedTools || []).map((tool) => `${mcp.id}.${tool}`)
   );
-  return `\n\nAvailable MCP tools for this invocation: ${tools.join(', ')}. Use them as the authoritative coordination channel: publish progress after meaningful work, report blockers immediately, request help when blocked, and check project status before planning. Use only enabled tools. MCP manifest: ${invocation.file}.`;
+  return `\n\nAvailable MCP tools for this invocation: ${tools.join(', ')}. Use them as the authoritative coordination channel: publish progress after meaningful work, report blockers immediately, request help when blocked, and check project status before planning. Use only enabled tools. The harness has configured these tools; do not inspect or read MCP configuration files.`;
 }

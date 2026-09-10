@@ -104,8 +104,10 @@ export default function AgentEditModal() {
             </div>
           )}
           {mcps.map((mcp) => {
-            const perm = perms[mcp.id] || {};
             const tools = mcp.tools || [];
+            const perm = perms[mcp.id] || (mcp.id === 'dinah-orchestration'
+              ? { enabled: true, allowedTools: tools.map((tool) => tool.name) }
+              : {});
             return (
               <div key={mcp.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700, color: '#fff', cursor: 'pointer' }}>

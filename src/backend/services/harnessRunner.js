@@ -71,7 +71,11 @@ export function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation, wo
       cwd: projectDir,
       encoding: 'utf-8',
       timeout: 30000,
-      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' }
+      env: {
+        ...process.env,
+        DND_MCP_CONFIG: mcpInvocation?.file || '',
+        OPENCODE_CONFIG: mcpInvocation?.opencodeFile || ''
+      }
     });
     appendAgentThought(agentId, 'OPENCODE_SUCCESS', `OpenCode execution completed.`);
     return { success: true, output, agentId, harness: 'opencode', model: agent?.model };

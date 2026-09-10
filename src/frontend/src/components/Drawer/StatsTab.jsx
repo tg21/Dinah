@@ -16,7 +16,9 @@ export default function StatsTab() {
     { name: 'Execute Directive', dice: '2d8', desc: 'Performs assigned project task.' }
   ];
   const items = stats.inventory || ['Company Keycard', 'Terminal Access'];
-  const enabledMcps = mcps.filter((mcp) => agent.mcp?.[mcp.id]?.enabled === true);
+  const enabledMcps = mcps.filter((mcp) =>
+    agent.mcp?.[mcp.id]?.enabled === true || mcp.id === 'dinah-orchestration'
+  );
 
   function rollD20() {
     const roll = Math.floor(Math.random() * 20) + 1;
