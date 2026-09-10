@@ -31,6 +31,20 @@ function requireText(value, field) {
   return value.trim();
 }
 
+function canonicalAssignee(projectId, assignee) {
+  const requested = requireText(assignee, 'assignee');
+  const hr = loadHrSystem();
+  if (hr[requested]?.project === projectId) return requested;
+
+  // Models commonly use the role name returned by the roster instead of the
+  // project-scoped agent id. Store the id so later progress updates from that
+  // agent can find the task reliably.
+  const matches = Object.entries(hr).filter(([, agent]) =>
+    agent.project === projectId && agent.role === requested && ['active', 'working'].includes(agent.status)
+  );
+  return matches.length === 1 ? matches[0][0] : requested;
+}
+
 export function recordTask({ projectId, title, description = '', assignee, acceptanceCriteria = [], dependencies = [], createdBy }) {
   const state = loadState();
   const project = projectState(state, requireText(projectId, 'projectId'));
@@ -38,7 +52,7 @@ export function recordTask({ projectId, title, description = '', assignee, accep
     id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     title: requireText(title, 'title'),
     description,
-    assignee: requireText(assignee, 'assignee'),
+    assignee: canonicalAssignee(projectId, assignee),
     acceptanceCriteria: Array.isArray(acceptanceCriteria) ? acceptanceCriteria : [],
     dependencies: Array.isArray(dependencies) ? dependencies : [],
     status: 'assigned',
@@ -55,8 +69,16 @@ export function recordTask({ projectId, title, description = '', assignee, accep
 export function updateTaskProgress({ projectId, taskId, agentId, status, summary, percent }) {
   const state = loadState();
   const project = projectState(state, requireText(projectId, 'projectId'));
-  const task = project.tasks.find((item) => item.id === taskId && item.assignee === agentId);
+  const agent = loadHrSystem()[agentId];
+  const task = project.tasks.find((item) =>
+    item.id === taskId && (
+      item.createdBy === agentId ||
+      item.assignee === agentId ||
+      item.assignee === agent?.role
+    )
+  );
   if (!task) throw new Error('Task not found or agent is not its assignee');
+  if (task.assignee !== agentId && task.createdBy !== agentId) task.assignee = agentId;
   task.status = requireText(status, 'status');
   task.summary = requireText(summary, 'summary');
   if (percent !== undefined) task.percent = Math.max(0, Math.min(100, Number(percent)));

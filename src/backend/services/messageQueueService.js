@@ -212,7 +212,11 @@ export function releaseMessage({ messageId, agentId, leaseToken, reason = 'relea
 
 export function getMessageStatus({ messageId }) {
   const state = loadState();
-  const message = state.messages.find((item) => item.messageId === text(messageId, 'messageId'));
+  const identifier = text(messageId, 'messageId');
+  const message = state.messages.find((item) => item.messageId === identifier) ||
+    state.messages.find((item) => state.deliveries.some((delivery) =>
+      delivery.deliveryId === identifier && delivery.messageId === item.messageId
+    ));
   if (!message) throw new Error('Message not found');
   return { message, deliveries: state.deliveries.filter((item) => item.messageId === message.messageId) };
 }

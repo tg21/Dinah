@@ -116,11 +116,21 @@ describe('manager trajectory orchestration integration', () => {
       projectId,
       title: 'Implement the backend slice',
       description: 'Build the requested backend behavior.',
-      assignee: worker.agentId,
+      // Managers receive role names in the roster, while runtime agents use
+      // project-scoped ids. Coordination must canonicalize this at creation.
+      assignee: worker.agent.role,
       acceptanceCriteria: ['The backend behavior is covered by tests.'],
       createdBy: 'manager-bard'
     });
     expect(task.status).toBe('assigned');
+    expect(task.assignee).toBe(worker.agentId);
+
+    const managerProgress = fakeWorkerComplete({
+      projectId,
+      task: { ...task, assignee: 'manager-bard' },
+      summary: 'Manager has dispatched the implementation task.'
+    });
+    expect(managerProgress.task.status).toBe('completed');
 
     const dispatch = await spawnHarnessAgent(
       'system-simulator',

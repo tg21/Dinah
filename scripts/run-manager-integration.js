@@ -14,6 +14,15 @@ function arg(name, fallback = null) {
   return index >= 0 ? process.argv[index + 1] : fallback;
 }
 
+function effortArg(value) {
+  const normalized = String(value || 'Medium').toLowerCase();
+  const effort = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  if (!['Low', 'Medium', 'High', 'Extreme'].includes(effort)) {
+    throw new Error(`Invalid --effort value: ${value}. Choose Low, Medium, High, or Extreme.`);
+  }
+  return effort;
+}
+
 async function freePort() {
   const server = net.createServer();
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -33,6 +42,7 @@ function projectBrief() {
 async function main() {
   const harness = arg('harness', 'opencode');
   const model = arg('model');
+  const effortLevel = effortArg(arg('effort', 'Medium'));
   if (!model) throw new Error('Use --model <manager-model> to run the manager integration eval.');
 
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'dnd-manager-integration-'));
@@ -55,7 +65,7 @@ async function main() {
     server.once('error', reject);
   });
   try {
-    lifecycle.ensureProjectManager(projectId, { model, harness });
+    lifecycle.ensureProjectManager(projectId, { model, harness, effortLevel });
     const managerId = Object.entries(hr.loadHrSystem())
       .find(([, agent]) => agent.project === projectId && agent.role === 'manager-bard')[0];
     const manager = hr.loadHrSystem()[managerId];
@@ -194,6 +204,7 @@ async function main() {
       testName: 'manager-trajectory-integration',
       harness,
       model,
+      effortLevel,
       projectId,
       isolatedWorkspace: workspace,
       events,

@@ -42,6 +42,15 @@ function parseArgs(argv) {
   return options;
 }
 
+function normalizeEffort(value) {
+  const normalized = String(value || 'Medium').toLowerCase();
+  const effort = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  if (!['Low', 'Medium', 'High', 'Extreme'].includes(effort)) {
+    throw new Error(`Invalid --effort value: ${value}. Choose Low, Medium, High, or Extreme.`);
+  }
+  return effort;
+}
+
 function printHelp() {
   console.log([
     'Live agent eval runner',
@@ -53,6 +62,7 @@ function printHelp() {
     '  --eval <name[,name]>  manager-trajectory, hitl-outcome, or all (default: all)',
     '  --harness <name>      Harness provider, for example codex or opencode',
     '  --model <id>          Exact discovered model ID',
+    '  --effort <level>      Manager effort: Low, Medium, High, or Extreme (default: Medium)',
     '  --refresh             Refresh harness/model discovery before running',
     '  --list-models         Discover and print available harness/model pairs',
     '  --help                Show this help'
@@ -166,7 +176,11 @@ function buildPrompt(scenario, instructions) {
 
 async function discover(options) {
   if (options.harness === 'system-simulator') {
-    return { harness: 'system-simulator', model: options.model || 'system-simulator/balanced-agent' };
+    return {
+      harness: 'system-simulator',
+      model: options.model || 'system-simulator/balanced-agent',
+      effortLevel: options.effortLevel
+    };
   }
   const discovery = await initializeHarnessesAndModels(Boolean(options.refresh));
   const models = discovery.models || [];
@@ -179,7 +193,7 @@ async function discover(options) {
   if (options.harness && selected.source?.harness !== options.harness) {
     throw new Error(`Model ${selected.id} belongs to ${selected.source?.harness}, not ${options.harness}.`);
   }
-  return { harness: selected.source.harness, model: selected.id };
+  return { harness: selected.source.harness, model: selected.id, effortLevel: options.effortLevel };
 }
 
 async function runScenario(name, scenarioConfig, route) {
@@ -194,7 +208,7 @@ async function runScenario(name, scenarioConfig, route) {
     status: 'active',
     harness: route.harness,
     model: route.model,
-    effortLevel: 'Medium',
+    effortLevel: route.effortLevel,
     context_len: 128000,
     context_used: 0,
     last_activity_ms: Date.now(),
@@ -237,6 +251,7 @@ async function runScenario(name, scenarioConfig, route) {
     testName: name,
     harness: route.harness,
     model: route.model,
+    effortLevel: route.effortLevel,
     workspace: 'isolated temporary workspace',
     startedAt: startedAt.toISOString(),
     finishedAt: finishedAt.toISOString(),
@@ -252,6 +267,7 @@ async function runScenario(name, scenarioConfig, route) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  options.effortLevel = normalizeEffort(options.effort || 'Medium');
   if (options.help) {
     printHelp();
     return;

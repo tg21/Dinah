@@ -144,7 +144,7 @@ def release_message(messageId: str, leaseToken: str, reason: str = "released") -
 
 @mcp.tool()
 def get_message_status(messageId: str) -> dict:
-    """Read delivery attempts and current state for a message."""
+    """Read delivery attempts and current state using a message or delivery ID."""
     return call_backend("/api/internal/orchestration/message-status", context({"messageId": messageId}))
 
 

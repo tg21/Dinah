@@ -36,6 +36,7 @@ export function buildAgentPrompt(role, task, agent = {}, options = {}) {
     `Job: ${definition?.job || 'Specialist agent'}`,
     `Model policy: ${JSON.stringify(definition?.modelPolicy || {})}`,
     `Runtime customization: ${JSON.stringify(definition?.runtimeCustomization || {})}`,
+    agent.effortLevel ? `Effort level: ${agent.effortLevel}` : null,
     agent.promptOverride ? `Active specialization override: ${agent.promptOverride}` : null,
     `Coordination protocol: ${definition?.coordination?.operatingRule || 'Publish progress, report blockers, and request help through the available coordination tools.'}`,
     `Workspace: ${options.workspaceDir || (agent.project === 'global' ? APP_DIR : path.join(APP_DIR, 'projects', agent.project || 'global'))}`,
