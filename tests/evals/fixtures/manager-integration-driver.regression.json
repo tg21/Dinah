@@ -1,0 +1,26 @@
+{
+  "failure": "integration-eval-manager-1789054325841 stalled after staff_requested/staff_provisioned: the runner matched only status === 'assigned' for worker completion (the manager had already moved its arch task to in_progress and created impl/tests tasks), served only the first awaiting-confirmation role, and never emitted plan_published, so task_dispatched/progress_reported/review_requested/qa_passed/acceptance_reported never followed.",
+  "projectId": "eval-manager-1789054325841",
+  "managerId": "eval-manager-1789054325841-manager-bard",
+  "roster": {
+    "eval-manager-1789054325841-manager-bard": { "role": "manager-bard", "project": "eval-manager-1789054325841", "status": "active" },
+    "eval-manager-1789054325841-backend-developer": { "role": "backend-developer", "project": "eval-manager-1789054325841", "status": "awaiting-confirmation" },
+    "eval-manager-1789054325841-code-reviewer": { "role": "code-reviewer", "project": "eval-manager-1789054325841", "status": "awaiting-confirmation" },
+    "eval-manager-1789054325841-qa-engineer": { "role": "qa-engineer", "project": "eval-manager-1789054325841", "status": "awaiting-confirmation" },
+    "eval-manager-1789054325841-backend-developer-1": { "role": "backend-developer", "project": "eval-manager-1789054325841", "status": "active" }
+  },
+  "tasks": [
+    { "id": "task-arch", "title": "Architecture + API contract", "assignee": "eval-manager-1789054325841-manager-bard", "status": "in_progress" },
+    { "id": "task-impl", "title": "Implement API with validation", "assignee": "backend-developer", "status": "assigned" },
+    { "id": "task-tests", "title": "Automated tests valid/invalid", "assignee": "backend-developer", "status": "assigned" },
+    { "id": "task-review", "title": "Code review", "assignee": "code-reviewer", "status": "assigned" },
+    { "id": "task-qa", "title": "QA validation", "assignee": "qa-engineer", "status": "assigned" },
+    { "id": "task-docs", "title": "Documentation last", "assignee": "backend-developer", "status": "assigned" }
+  ],
+  "expected": {
+    "planPublished": true,
+    "awaitingRoles": ["backend-developer", "code-reviewer", "qa-engineer"],
+    "implementationTaskId": "task-impl",
+    "qaTargetForCompletedImpl": "task-impl"
+  }
+}

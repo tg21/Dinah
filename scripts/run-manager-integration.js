@@ -50,13 +50,14 @@ async function main() {
   process.chdir(workspace);
   process.env.PORT = String(port);
 
-  const [{ createApp }, hr, lifecycle, coordination, harnessRunner, fakeAgents] = await Promise.all([
+  const [{ createApp }, hr, lifecycle, coordination, harnessRunner, fakeAgents, driver] = await Promise.all([
     import('../src/backend/app.js'),
     import('../src/backend/services/hrService.js'),
     import('../src/backend/services/agentLifecycle.js'),
     import('../src/backend/services/coordinationService.js'),
     import('../src/backend/services/harnessRunner.js'),
-    import('../tests/evals/helpers/fakeAgents.js')
+    import('../tests/evals/helpers/fakeAgents.js'),
+    import('../tests/evals/helpers/integrationDriver.js')
   ]);
 
   const server = createApp().listen(port, '127.0.0.1');
@@ -72,7 +73,7 @@ async function main() {
     const events = [{ type: 'project_brief_received', actor: 'manager-bard' }];
     const rawOutputs = [];
     let integrationError = null;
-    const observed = { staffRequested: false, workerCompleted: false, qaPassed: false, reviewRequested: false };
+    const observed = { staffRequested: false, workerCompleted: false, qaPassed: false, reviewRequested: false, planPublished: false, completedTaskId: null, provisionedFor: [] };
 
     const runManagerTurn = async (instruction) => {
       const response = await harnessRunner.spawnHarnessAgent(
@@ -137,47 +138,84 @@ async function main() {
         break;
       }
 
-      const roster = hr.loadHrSystem();
-      const awaiting = Object.entries(roster).find(([, agent]) =>
-        agent.project === projectId && agent.status === 'awaiting-confirmation' && agent.role !== 'manager-bard'
-      );
-      if (awaiting && !observed.staffRequested) {
-        observed.staffRequested = true;
-        events.push({ type: 'staff_requested', actor: 'manager-bard' });
-        const fake = fakeAgents.provisionFakeAgent(awaiting[1].role, projectId, 'Fake Backend Worker');
+      const readQueueMessages = () => {
+        try {
+          const queueFile = path.join(workspace, 'shared-state', 'message-queue.json');
+          if (!fs.existsSync(queueFile)) return [];
+          const queue = JSON.parse(fs.readFileSync(queueFile, 'utf8'));
+          return Array.isArray(queue.messages) ? queue.messages : [];
+        } catch {
+          return [];
+        }
+      };
+      const managerMessageMatches = (messages, pattern) => driver.managerMessageMatches(messages, { projectId, managerId, pattern });
+
+      const state = coordination.getProjectCoordination(projectId);
+
+      // The golden trajectory expects plan_published before staffing. The
+      // manager publishes its plan by creating tracked tasks, so record the
+      // plan as soon as the first task exists — before any staffing events
+      // emitted later in this same turn, to preserve the expected order.
+      if (!observed.planPublished && driver.hasPublishedPlan(state.tasks)) {
+        observed.planPublished = true;
+        events.push({ type: 'plan_published', actor: 'manager-bard' });
+      }
+
+      // Provision a fake collaborator for EVERY staffing request the manager
+      // makes. Managers request simplified role names (backend-developer,
+      // code-reviewer, qa-engineer) and keep requesting while earlier roles
+      // sit in awaiting-confirmation; honouring only the first one stalls
+      // review/QA forever.
+      const awaiting = driver.selectAwaitingStaff(hr.loadHrSystem(), projectId, observed.provisionedFor);
+      for (const pending of awaiting) {
+        observed.provisionedFor.push(pending.agentId);
+        if (!observed.staffRequested) {
+          observed.staffRequested = true;
+          events.push({ type: 'staff_requested', actor: 'manager-bard' });
+        }
+        const fake = fakeAgents.provisionFakeAgent(pending.role, projectId, `Fake ${pending.role}`);
         events.push({ type: 'staff_provisioned', actor: 'hr-mind-flayer' });
         fakeAgents.notifyManager({
           projectId,
           fromAgentId: 'hr-mind-flayer',
-          message: `Staff provisioned: ${fake.agentId}`
+          message: `Staff provisioned: ${fake.agentId} (role ${pending.role})`
         });
       }
 
-      const state = coordination.getProjectCoordination(projectId);
-      const implementationTask = state.tasks.find((task) => task.assignee !== 'qa-engineer-rogue' && task.status !== 'passed');
-      if (implementationTask && !observed.workerCompleted && implementationTask.status === 'assigned') {
+      // Drive one implementation task per turn toward completion. Managers
+      // move tasks to in_progress (and complete setup tasks themselves) in
+      // the same turn they create them, so matching only status === 'assigned'
+      // never fires. Review/QA/manager-held tasks are excluded; the oldest
+      // remaining implementation task is completed first.
+      const implementationTask = driver.selectImplementationTask(
+        coordination.getProjectCoordination(projectId).tasks,
+        { managerId, qaPassed: observed.qaPassed }
+      );
+      if (implementationTask) {
         const fakeWorker = fakeAgents.fakeWorkerComplete({ projectId, task: implementationTask });
-        observed.workerCompleted = true;
-        events.push({ type: 'task_dispatched', actor: 'manager-bard' });
-        events.push({ type: 'progress_reported', actor: 'backend-dev-cleric' });
+        observed.completedTaskId = fakeWorker.task.id;
+        if (!observed.workerCompleted) {
+          observed.workerCompleted = true;
+          events.push({ type: 'task_dispatched', actor: 'manager-bard' });
+          events.push({ type: 'progress_reported', actor: String(implementationTask.assignee || 'backend-dev-cleric') });
+        }
         fakeAgents.notifyManager({
           projectId,
-          fromAgentId: implementationTask.assignee,
+          fromAgentId: String(implementationTask.assignee),
           message: `Implementation complete for ${fakeWorker.task.id}; review is required.`
         });
       }
 
       if (observed.workerCompleted && !observed.reviewRequested) {
-        const messages = JSON.parse(fs.readFileSync(path.join(workspace, 'shared-state', 'message-queue.json'), 'utf8'));
-        observed.reviewRequested = messages.messages.some((message) =>
-          message.projectId === projectId && message.senderAgentId === managerId && /review/i.test(message.summary || '')
-        );
+        observed.reviewRequested = managerMessageMatches(readQueueMessages(), /review/i);
         if (observed.reviewRequested) events.push({ type: 'review_requested', actor: 'manager-bard' });
       }
 
       if (observed.reviewRequested && !observed.qaPassed) {
         const qa = fakeAgents.provisionFakeAgent('qa-engineer-rogue', projectId, 'Fake QA Agent');
-        const latestTask = coordination.getProjectCoordination(projectId).tasks.find((task) => task.assignee !== qa.agentId);
+        const tasks = coordination.getProjectCoordination(projectId).tasks;
+        const latestTask = driver.selectQaTarget(tasks, observed.completedTaskId)
+          || tasks.find((task) => task.assignee !== qa.agentId);
         const qaResult = fakeAgents.fakeQaPass({ projectId, task: latestTask, qaAgentId: qa.agentId });
         observed.qaPassed = qaResult.task.status === 'passed';
         if (observed.qaPassed) {
@@ -187,8 +225,7 @@ async function main() {
       }
 
       if (observed.qaPassed) {
-        const messages = JSON.parse(fs.readFileSync(path.join(workspace, 'shared-state', 'message-queue.json'), 'utf8'));
-        if (messages.messages.some((message) => message.projectId === projectId && message.senderAgentId === managerId && /accept/i.test(message.summary || ''))) {
+        if (managerMessageMatches(readQueueMessages(), /accept/i)) {
           events.push({ type: 'acceptance_reported', actor: 'manager-bard' });
           break;
         }
