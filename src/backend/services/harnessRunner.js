@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { execFileSync } from 'child_process';
+import { execFile, execFileSync } from 'child_process';
 import { findHarnessBinary } from '../harness/index.js';
 import { createProjectFolder, getProjectFolder } from './projectService.js';
 import { loadHrSystem } from './hrService.js';
@@ -47,9 +47,15 @@ export function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation,
   }
 }
 
-export function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
   const projectDir = workspaceDir || getProjectFolder(projectId);
-  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
+  // Isolated evals and callers with a custom workspace pass the target path
+  // directly. Ensure it exists before execFileSync uses it as cwd; otherwise
+  // Node reports the misleading `spawnSync ... ENOENT` and OpenCode never
+  // gets far enough to initialize MCP or evaluate permissions.
+  if (projectId !== 'global' && !fs.existsSync(projectDir)) {
+    createProjectFolder(projectId, projectDir);
+  }
   const harnessBin = findHarnessBinary('opencode');
 
   if (!harnessBin) {
@@ -64,26 +70,54 @@ export function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation, wo
       'OPENCODE_INVOKE',
       `Invoking OpenCode harness [${agent?.model || 'default'}] in ${projectDir}`
     );
-    const args = ['run'];
+    // Dinah agents are non-interactive and must be able to use the enabled
+    // orchestration MCP tools without waiting for a human approval prompt.
+    // The invocation still uses a temporary, token-scoped MCP config and the
+    // orchestration server enforces the agent/project boundary.
+    const args = ['run', '--auto'];
     if (agent?.model) args.push('-m', agent.model);
     args.push('--dir', projectDir, prompt);
-    const output = execFileSync(harnessBin, args, {
-      cwd: projectDir,
-      encoding: 'utf-8',
-      timeout: 30000,
-      env: {
-        ...process.env,
-        DND_MCP_CONFIG: mcpInvocation?.file || '',
-        OPENCODE_CONFIG: mcpInvocation?.opencodeFile || ''
-      }
+    const output = await new Promise((resolve, reject) => {
+      execFile(harnessBin, args, {
+        cwd: projectDir,
+        encoding: 'utf-8',
+        // Tool-using manager turns can include model latency plus several MCP
+        // round trips. Thirty seconds consistently terminated valid OpenCode
+        // sessions before they could finish their first action.
+        timeout: 120000,
+        maxBuffer: 10 * 1024 * 1024,
+        env: {
+          ...process.env,
+          DND_MCP_CONFIG: mcpInvocation?.file || '',
+          OPENCODE_CONFIG: mcpInvocation?.opencodeFile || ''
+        }
+      }, (error, stdout, stderr) => {
+        if (error) {
+          error.stdout = stdout;
+          error.stderr = stderr;
+          reject(error);
+          return;
+        }
+        resolve(stdout);
+      });
     });
     appendAgentThought(agentId, 'OPENCODE_SUCCESS', `OpenCode execution completed.`);
     return { success: true, output, agentId, harness: 'opencode', model: agent?.model };
   } catch (error) {
-    appendAgentThought(agentId, 'OPENCODE_FALLBACK', `Harness note: ${error.message.slice(0, 80)}`);
+    const stderr = Buffer.isBuffer(error.stderr) ? error.stderr.toString('utf8') : String(error.stderr || '');
+    const stdout = Buffer.isBuffer(error.stdout) ? error.stdout.toString('utf8') : String(error.stdout || '');
+    const diagnostics = [
+      `message=${error.message}`,
+      `code=${error.code || 'unknown'}`,
+      `status=${error.status ?? 'unknown'}`,
+      `signal=${error.signal || 'none'}`,
+      stderr ? `stderr=${stderr.slice(-1200)}` : '',
+      stdout ? `stdout=${stdout.slice(-600)}` : ''
+    ].filter(Boolean).join(' | ');
+    appendAgentThought(agentId, 'OPENCODE_FALLBACK', `Harness diagnostics: ${diagnostics}`);
     return {
       ...simulateHarnessExecution('opencode', projectId, prompt, agentId),
-      fallbackReason: error.message
+      fallbackReason: diagnostics
     };
   }
 }
@@ -241,7 +275,7 @@ export function simulateHarnessExecution(harness, projectId, prompt, agentId) {
   };
 }
 
-export function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId, options = {}) {
+export async function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId, options = {}) {
   const agent = loadHrSystem()[agentId] || { role: agentId, name: agentId };
   const mcpInvocation = createMcpInvocationConfig(agent, agentId, projectId);
   const effectivePrompt = buildAgentPrompt(
@@ -257,19 +291,19 @@ export function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agent
     switch (harness) {
       case 'antigravity':
       case 'agy':
-        return spawnAntigravityAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
+        return await spawnAntigravityAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'opencode':
-        return spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
+        return await spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'claude-code':
-        return spawnClaudeCodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
+        return await spawnClaudeCodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'codex':
-        return spawnCodexAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
+        return await spawnCodexAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'gemini':
-        return spawnGeminiAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
+        return await spawnGeminiAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'ollama':
-        return spawnOllamaAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
+        return await spawnOllamaAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       default:
-        return spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
+        return await spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
     }
   } finally {
     try {

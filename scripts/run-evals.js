@@ -212,7 +212,7 @@ async function runScenario(name, scenarioConfig, route) {
       `# Isolated evaluation workspace\n\nScenario: ${scenario.name}\n`
     );
     saveHrSystem({ ...originalHr, [agentId]: agent });
-    const response = spawnHarnessAgent(
+    const response = await spawnHarnessAgent(
       route.harness,
       'global',
       buildPrompt(scenario, scenarioConfig.instructions),

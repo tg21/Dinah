@@ -91,7 +91,7 @@ describe('manager trajectory orchestration integration', () => {
     fs.rmSync(testPaths.workingDir, { recursive: true, force: true });
   });
 
-  it('records the manager workflow only after real orchestration operations succeed', () => {
+  it('records the manager workflow only after real orchestration operations succeed', async () => {
     const managerDefinition = loadAgentDefinition('manager-bard');
     const requiredTools = new Set([
       ...(managerDefinition.coordination?.requiredTools || []),
@@ -122,7 +122,7 @@ describe('manager trajectory orchestration integration', () => {
     });
     expect(task.status).toBe('assigned');
 
-    const dispatch = spawnHarnessAgent(
+    const dispatch = await spawnHarnessAgent(
       'system-simulator',
       projectId,
       `${task.title}\n\n${task.description}`,

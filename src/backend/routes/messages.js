@@ -61,7 +61,7 @@ router.post('/handleGetAgentStatus', (req, res) => {
 });
 
 // Send message to agent
-router.post('/handleSendMessage', (req, res) => {
+router.post('/handleSendMessage', async (req, res) => {
   const { agentId = 'ceo-warlock', projectId = 'project-alpha', message, harness = 'opencode' } = req.body;
 
   if (!message || !message.trim()) {
@@ -114,7 +114,7 @@ router.post('/handleSendMessage', (req, res) => {
   // 3. Dispatch to harness
   appendAgentThought(agentId, 'USER_INPUT', `Received prompt: "${message.slice(0, 80)}..."`);
   const effectiveHarness = hrSystem[agentId]?.harness || harness;
-  const harnessResult = spawnHarnessAgent(effectiveHarness, projectId, message, agentId);
+  const harnessResult = await spawnHarnessAgent(effectiveHarness, projectId, message, agentId);
 
   // 4. Record agent reply
   appendAgentMessage(agentId, {

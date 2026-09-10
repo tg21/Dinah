@@ -25,7 +25,7 @@ export function extractJsonObject(output) {
   }
 }
 
-export function selectTopLevelModelsByCeo(ceoModel, requestedAssignments) {
+export async function selectTopLevelModelsByCeo(ceoModel, requestedAssignments) {
   const delegatedIds = TOP_LEVEL_AGENT_IDS.filter(
     (id) => !requestedAssignments[id] || requestedAssignments[id] === 'ceo'
   );
@@ -61,7 +61,7 @@ export function selectTopLevelModelsByCeo(ceoModel, requestedAssignments) {
     `Evaluating available models and harnesses on capability, context, reliability, and cost merit for: ${delegatedIds.join(', ')}.`
   );
   const startedAt = Date.now();
-  const result = spawnHarnessAgent(ceo?.harness || 'opencode', 'global', prompt, 'ceo-warlock');
+  const result = await spawnHarnessAgent(ceo?.harness || 'opencode', 'global', prompt, 'ceo-warlock');
   const decision = extractJsonObject(result.output);
   const assignments = {};
   for (const agentId of delegatedIds) {

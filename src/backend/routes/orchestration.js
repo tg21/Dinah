@@ -68,14 +68,14 @@ router.post('/api/internal/orchestration/provision', guard, (req, res) => {
   res.json(result);
 });
 
-router.post('/api/internal/orchestration/task', guard, (req, res) => {
+router.post('/api/internal/orchestration/task', guard, async (req, res) => {
   const task = recordTask({ ...req.body, createdBy: req.body.agentId });
   if (req.body.dispatch === true) {
     const hr = loadHrSystem();
     const assignee = hr[req.body.assignee];
     if (!assignee) return res.status(404).json({ error: 'Assignee not found' });
     if (!['active', 'working'].includes(assignee.status)) return res.status(409).json({ error: 'Assignee is not active' });
-    const result = spawnHarnessAgent(assignee.harness, req.body.projectId, `${task.title}\n\n${task.description}\n\nAcceptance criteria:\n${task.acceptanceCriteria.join('\n')}`, req.body.assignee);
+    const result = await spawnHarnessAgent(assignee.harness, req.body.projectId, `${task.title}\n\n${task.description}\n\nAcceptance criteria:\n${task.acceptanceCriteria.join('\n')}`, req.body.assignee);
     return res.json({ task, dispatch: result });
   }
   res.json({ task });

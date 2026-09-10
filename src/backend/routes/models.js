@@ -25,7 +25,7 @@ router.get('/api/startup-setup', (req, res) => {
   res.json({ setup: loadStartupSetup(), topLevelAgentIds: TOP_LEVEL_AGENT_IDS });
 });
 
-router.post('/api/startup-setup', (req, res) => {
+router.post('/api/startup-setup', async (req, res) => {
   const { ceoModel, topLevelAssignments = {} } = req.body || {};
   if (!ceoModel) return res.status(400).json({ error: 'A CEO model is required.' });
   if (!getModelById(ceoModel)) return res.status(400).json({ error: 'The selected CEO model is not available.' });
@@ -42,7 +42,7 @@ router.post('/api/startup-setup', (req, res) => {
   // Persist the selected CEO model before invoking the CEO so the request is
   // actually executed with the model chosen in the frontend.
   applyStartupSetup({ ceoModel, topLevelAssignments: {} });
-  const ceoSelections = selectTopLevelModelsByCeo(ceoModel, topLevelAssignments);
+  const ceoSelections = await selectTopLevelModelsByCeo(ceoModel, topLevelAssignments);
   const resolvedAssignments = { ...topLevelAssignments, ...ceoSelections.assignments };
   const setup = applyStartupSetup({ ceoModel, topLevelAssignments: resolvedAssignments });
   setup.topLevelAssignments = Object.fromEntries(

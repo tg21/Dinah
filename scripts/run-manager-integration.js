@@ -64,8 +64,8 @@ async function main() {
     let integrationError = null;
     const observed = { staffRequested: false, workerCompleted: false, qaPassed: false, reviewRequested: false };
 
-    const runManagerTurn = (instruction) => {
-      const response = harnessRunner.spawnHarnessAgent(
+    const runManagerTurn = async (instruction) => {
+      const response = await harnessRunner.spawnHarnessAgent(
         harness,
         projectId,
         `${projectBrief()}\n\nCurrent evaluation state:\n${JSON.stringify({
@@ -88,7 +88,7 @@ async function main() {
 
     for (let turn = 0; turn < 6; turn += 1) {
       try {
-        runManagerTurn('Continue the project using the orchestration tools. Execute the next required action; do not merely describe it.');
+        await runManagerTurn('Continue the project using the orchestration tools. Execute the next required action; do not merely describe it.');
       } catch (error) {
         integrationError = error.message;
         break;

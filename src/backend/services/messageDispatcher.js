@@ -6,7 +6,7 @@ import { claimMessage, getQueuedAgents, listInbox, failMessage } from './message
 const activeWakeups = new Set();
 let timer;
 
-function dispatchAgent(agentId) {
+async function dispatchAgent(agentId) {
   if (activeWakeups.has(agentId)) return;
   const agent = loadHrSystem()[agentId];
   if (!agent || !['active', 'working'].includes(agent.status)) return;
@@ -30,7 +30,7 @@ function dispatchAgent(agentId) {
   ].join('\n\n');
   try {
     appendAgentThought(agentId, 'MESSAGE_WAKE', `Dispatcher claimed ${claim.message.messageId}.`);
-    spawnHarnessAgent(agent.harness || 'opencode', agent.project || 'global', prompt, agentId);
+    await spawnHarnessAgent(agent.harness || 'opencode', agent.project || 'global', prompt, agentId);
   } catch (error) {
     try { failMessage({ messageId: claim.message.messageId, agentId, leaseToken: claim.leaseToken, reason: error.message, retryable: true }); } catch { /* lease recovery handles a crash */ }
   } finally {
@@ -38,14 +38,13 @@ function dispatchAgent(agentId) {
   }
 }
 
-export function dispatchQueuedMessages() {
-  for (const agentId of getQueuedAgents()) dispatchAgent(agentId);
+export async function dispatchQueuedMessages() {
+  await Promise.all(getQueuedAgents().map((agentId) => dispatchAgent(agentId)));
 }
 
 export function startMessageDispatcher() {
   if (timer) return;
   timer = setInterval(dispatchQueuedMessages, 5000);
   timer.unref?.();
-  dispatchQueuedMessages();
+  dispatchQueuedMessages().catch(() => {});
 }
-
