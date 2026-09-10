@@ -1,0 +1,12 @@
+{
+  "name": "manager-pauses-for-a-user-decision-and-resumes",
+  "description": "A missing requirement pauses the manager and the final outcome records the decision.",
+  "events": [
+    { "type": "user_question_asked", "actor": "manager-bard", "questionId": "q-1" },
+    { "type": "agent_waiting_for_user", "actor": "manager-bard", "status": "awaiting-user" },
+    { "type": "user_replied", "actor": "user", "questionId": "q-1" },
+    { "type": "agent_resumed", "actor": "manager-bard", "status": "working" },
+    { "type": "outcome_delivered", "actor": "manager-bard", "status": "active" }
+  ],
+  "expected": { "finalStatus": "active" }
+}

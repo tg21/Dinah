@@ -103,9 +103,24 @@ If no harnesses are found, the system falls back to a virtual simulation harness
 | `npm run build` | Builds backend bundle into `dist/backend/` (`build:backend`) AND React UI into `dist/frontend/` (`build:frontend`) |
 | `npm run build:backend` | Copies the modular backend (`src/backend/server.js`, `app.js`, `config.js`, `routes/`, `services/`, `mcp/`, `harness/`, `data/`) and JSON `agent-templates/` plus the `src/backend.js` and `src/harnessRegistry.js` shims into `dist/` |
 | `npm run build:frontend` | Runs `vite build` in `src/frontend/` → emits static assets to `dist/frontend/` (served by `src/backend/app.js`) |
-| `npm test` | Exits with error ("no test specified") — no test suite configured |
+| `npm test` | Runs the Vitest suite once |
+| `npm run test:watch` | Runs Vitest in watch mode during development |
+| `npm run test:coverage` | Runs Vitest with V8 coverage reporting |
+| `npm run eval -- --harness <name> --model <id>` | Runs live trajectory/outcome evals with a selected harness/model and saves results under `eval-results/` |
+| `npm run test:all -- --harness <name> --model <id>` | Runs normal tests, then live evals |
 
 No lint or typecheck configured. Root uses `type: "module"`; `src/frontend/` is a separate Vite package (`dnd-frontend`) with its own `package.json`.
+
+## 7.5 Testing & Golden Regression Cases
+
+- Tests live under `tests/backend/` for backend/service behavior, `tests/agents/` for agent-specific checks, and `tests/evals/` for evaluator sanity checks plus live-eval contracts.
+- Vitest is the root test runner. Keep tests deterministic and independent of installed harness CLIs, API keys, network access, and mutable runtime state unless a test explicitly opts into an integration environment.
+- Live trajectory evals check ordered agent behavior such as manager planning, staffing, dispatch, review, QA, and acceptance. Live outcome evals check user-facing results and HITL transitions such as `ask_user` → `awaiting-user` → user reply → resume. The deterministic tests in `tests/evals/evaluator-sanity.test.js` only verify evaluator logic; they are not evidence that an agent performs well.
+- When a real failure is found, preserve the smallest useful trace as a JSON fixture under `tests/evals/fixtures/` and add an assertion that reproduces it before fixing the implementation. These fixtures form the golden regression set; do not remove one merely because the implementation now passes.
+- Golden traces should contain only stable, non-secret event data. Redact prompts, credentials, personal data, and large logs; store the invariant event type, actor, relevant status, and expected result instead.
+- Every new regression fixture should include the failure it prevents and be exercised by the live eval runner; evaluator sanity checks should remain in `npm test` so evaluator changes cannot silently break regression detection.
+- Live evals are opt-in and use `npm run eval -- --harness <name> --model <id> [--eval manager-trajectory|hitl-outcome|all] [--refresh]`. Running `npm run eval` without selection arguments opens an interactive harness/model/eval selector when a TTY is available; CI and other non-TTY callers must provide explicit flags. Use `--help` or `--list-models` to inspect options. The runner asks the selected manager model for a JSON event trace, evaluates it against the golden contract, and writes one result file per test.
+- `eval-results/` is intentionally ignored by git. Result filenames include model, harness, test name, and timestamp; result JSON also records the raw response, parsed events, pass/fail status, timing, whether the harness fell back to simulation, and evaluation failures. Do not place secrets in prompts or result output.
 
 ---
 

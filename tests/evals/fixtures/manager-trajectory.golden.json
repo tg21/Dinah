@@ -1,0 +1,25 @@
+{
+  "name": "manager-plans-and-closes-a-project",
+  "description": "The manager receives a brief, coordinates specialists, and reports acceptance.",
+  "events": [
+    { "type": "project_brief_received", "actor": "manager-bard" },
+    { "type": "plan_published", "actor": "manager-bard" },
+    { "type": "staff_requested", "actor": "manager-bard" },
+    { "type": "staff_provisioned", "actor": "hr-mind-flayer" },
+    { "type": "task_dispatched", "actor": "manager-bard" },
+    { "type": "progress_reported", "actor": "backend-dev-cleric" },
+    { "type": "review_requested", "actor": "manager-bard" },
+    { "type": "qa_passed", "actor": "qa-engineer-rogue" },
+    { "type": "acceptance_reported", "actor": "manager-bard" }
+  ],
+  "expectedSteps": [
+    { "type": "project_brief_received", "actor": "manager-bard" },
+    { "type": "plan_published", "actor": "manager-bard" },
+    { "type": "staff_requested", "actor": "manager-bard" },
+    { "type": "task_dispatched", "actor": "manager-bard" },
+    { "type": "progress_reported" },
+    { "type": "review_requested", "actor": "manager-bard" },
+    { "type": "qa_passed" },
+    { "type": "acceptance_reported", "actor": "manager-bard" }
+  ]
+}

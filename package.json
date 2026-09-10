@@ -4,7 +4,11 @@
   "description": "",
   "main": "src/backend/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "eval": "node scripts/run-evals.js",
+    "test:all": "npm test && npm run eval --",
     "fresh-start": "rm -rf working-area && node src/backend/server.js",
     "install:frontend": "npm --prefix src/frontend install",
     "dev:backend": "node src/backend/server.js",
@@ -24,6 +28,8 @@
     "express": "^5.2.1"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@vitest/coverage-v8": "^5.0.0",
+    "concurrently": "^9.1.2",
+    "vitest": "^5.0.0"
   }
 }
