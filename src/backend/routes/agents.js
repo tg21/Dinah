@@ -8,6 +8,7 @@ import {
 } from '../services/agentLifecycle.js';
 import { appendToSharedLog } from '../services/messageService.js';
 import { sanitizeMcpPermissions } from '../mcp/index.js';
+import { cancelHarnessAgent } from '../services/harnessRunner.js';
 
 const router = Router();
 
@@ -82,6 +83,17 @@ router.post('/api/agents/set-status', (req, res) => {
   saveHrSystem(hrSystem);
   appendToSharedLog(`Agent [${agentId}] status changed to [${status}].`);
   res.json({ success: true, agentId, status });
+});
+
+// Explicitly stop a running harness; elapsed time never stops an agent.
+router.post('/api/agents/cancel', (req, res) => {
+  const { agentId, signal = 'SIGTERM' } = req.body || {};
+  if (!agentId) return res.status(400).json({ error: 'agentId is required' });
+  if (!['SIGTERM', 'SIGINT', 'SIGKILL'].includes(signal)) {
+    return res.status(400).json({ error: 'Unsupported cancellation signal' });
+  }
+  const cancelled = cancelHarnessAgent(agentId, signal);
+  res.json({ success: cancelled, agentId, signal, message: cancelled ? 'Cancellation requested' : 'No running harness found' });
 });
 
 // Standard direct spawn via HR

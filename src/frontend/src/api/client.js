@@ -77,6 +77,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ agentId, status })
     }),
+  cancelAgent: (agentId, signal = 'SIGTERM') =>
+    req('/api/agents/cancel', {
+      method: 'POST',
+      body: JSON.stringify({ agentId, signal })
+    }),
   getStartupSetup: () => req('/api/startup-setup'),
   saveStartupSetup: ({ ceoModel, topLevelAssignments }) =>
     req('/api/startup-setup', {

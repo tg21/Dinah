@@ -1,15 +1,85 @@
 import fs from 'fs';
-import { execFile, execFileSync } from 'child_process';
+import { spawn } from 'child_process';
 import { findHarnessBinary } from '../harness/index.js';
 import { createProjectFolder, getProjectFolder } from './projectService.js';
 import { loadHrSystem } from './hrService.js';
 import { appendAgentThought } from './messageService.js';
+import { broadcastAgentEvent } from './eventBus.js';
 import { createMcpInvocationConfig, mcpPromptContext, cleanupMcpInvocation } from '../mcp/index.js';
 import { buildAgentPrompt } from './agentDefinitions.js';
 
-export function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+function resolveProjectDir(projectId, workspaceDir) {
   const projectDir = workspaceDir || getProjectFolder(projectId);
-  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
+  if (projectId !== 'global' && !fs.existsSync(projectDir)) createProjectFolder(projectId, projectDir);
+  return projectDir;
+}
+
+function runHarnessProcess(command, args, options = {}) {
+  const { agentId, harness, onOutput, processKey, ...spawnOptions } = options;
+  const captureLimit = 10 * 1024 * 1024;
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { ...spawnOptions, stdio: ['ignore', 'pipe', 'pipe'] });
+    if (processKey) activeHarnessProcesses.set(processKey, child);
+    broadcastAgentEvent({
+      type: 'harness_started',
+      agentId,
+      harness,
+      pid: child.pid
+    });
+
+    let stdout = '';
+    let stderr = '';
+    const capture = (stream, chunk) => {
+      const text = chunk.toString();
+      if (stream === 'stdout' && stdout.length < captureLimit) stdout += text.slice(0, captureLimit - stdout.length);
+      if (stream === 'stderr' && stderr.length < captureLimit) stderr += text.slice(0, captureLimit - stderr.length);
+      onOutput?.(stream, text);
+      broadcastAgentEvent({
+        type: 'harness_output',
+        agentId,
+        harness,
+        stream,
+        snippet: text.slice(-500)
+      });
+    };
+    child.stdout.on('data', (chunk) => capture('stdout', chunk));
+    child.stderr.on('data', (chunk) => capture('stderr', chunk));
+    child.once('error', (error) => {
+      if (processKey) activeHarnessProcesses.delete(processKey);
+      error.stdout = stdout;
+      error.stderr = stderr;
+      broadcastAgentEvent({ type: 'harness_failed', agentId, harness, error: error.message });
+      reject(error);
+    });
+    child.once('close', (code, signal) => {
+      if (processKey) activeHarnessProcesses.delete(processKey);
+      if (code === 0) {
+        broadcastAgentEvent({ type: 'harness_completed', agentId, harness, code });
+        resolve({ stdout, stderr });
+        return;
+      }
+      const error = new Error(`Harness exited with code ${code ?? 'unknown'}${signal ? ` (${signal})` : ''}`);
+      error.code = code;
+      error.signal = signal;
+      error.stdout = stdout;
+      error.stderr = stderr;
+      broadcastAgentEvent({ type: 'harness_failed', agentId, harness, code, signal });
+      reject(error);
+    });
+  });
+}
+
+const activeHarnessProcesses = new Map();
+
+export function cancelHarnessAgent(agentId, signal = 'SIGTERM') {
+  const child = activeHarnessProcesses.get(agentId);
+  if (!child) return false;
+  broadcastAgentEvent({ type: 'harness_cancel_requested', agentId, pid: child.pid, signal });
+  return child.kill(signal);
+}
+
+export async function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = resolveProjectDir(projectId, workspaceDir);
   const harnessBin = findHarnessBinary('agy') || findHarnessBinary('antigravity');
 
   if (!harnessBin) {
@@ -27,16 +97,17 @@ export function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation,
     const args = [];
     if (agent?.model) args.push('--model', agent.model);
     args.push('--dangerously-skip-permissions', '-p', prompt);
-    const output = execFileSync(harnessBin, args, {
+    const { stdout } = await runHarnessProcess(harnessBin, args, {
       cwd: projectDir,
-      encoding: 'utf-8',
-      timeout: 45000,
-      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' }
+      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' },
+      agentId,
+      harness: 'antigravity',
+      processKey: agentId
     });
     appendAgentThought(agentId, 'ANTIGRAVITY_SUCCESS', `Antigravity CLI (agy) execution completed.`);
     return {
       success: true,
-      output: (output || '').trim(),
+      output: (stdout || '').trim(),
       agentId,
       harness: 'antigravity',
       model: agent?.model
@@ -48,14 +119,7 @@ export function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation,
 }
 
 export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
-  const projectDir = workspaceDir || getProjectFolder(projectId);
-  // Isolated evals and callers with a custom workspace pass the target path
-  // directly. Ensure it exists before execFileSync uses it as cwd; otherwise
-  // Node reports the misleading `spawnSync ... ENOENT` and OpenCode never
-  // gets far enough to initialize MCP or evaluate permissions.
-  if (projectId !== 'global' && !fs.existsSync(projectDir)) {
-    createProjectFolder(projectId, projectDir);
-  }
+  const projectDir = resolveProjectDir(projectId, workspaceDir);
   const harnessBin = findHarnessBinary('opencode');
 
   if (!harnessBin) {
@@ -77,29 +141,16 @@ export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocati
     const args = ['run', '--auto'];
     if (agent?.model) args.push('-m', agent.model);
     args.push('--dir', projectDir, prompt);
-    const output = await new Promise((resolve, reject) => {
-      execFile(harnessBin, args, {
-        cwd: projectDir,
-        encoding: 'utf-8',
-        // Tool-using manager turns can include model latency plus several MCP
-        // round trips. Thirty seconds consistently terminated valid OpenCode
-        // sessions before they could finish their first action.
-        timeout: 120000,
-        maxBuffer: 10 * 1024 * 1024,
-        env: {
-          ...process.env,
-          DND_MCP_CONFIG: mcpInvocation?.file || '',
-          OPENCODE_CONFIG: mcpInvocation?.opencodeFile || ''
-        }
-      }, (error, stdout, stderr) => {
-        if (error) {
-          error.stdout = stdout;
-          error.stderr = stderr;
-          reject(error);
-          return;
-        }
-        resolve(stdout);
-      });
+    const { stdout: output } = await runHarnessProcess(harnessBin, args, {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        DND_MCP_CONFIG: mcpInvocation?.file || '',
+        OPENCODE_CONFIG: mcpInvocation?.opencodeFile || ''
+      },
+      agentId,
+      harness: 'opencode',
+      processKey: agentId
     });
     appendAgentThought(agentId, 'OPENCODE_SUCCESS', `OpenCode execution completed.`);
     return { success: true, output, agentId, harness: 'opencode', model: agent?.model };
@@ -122,9 +173,8 @@ export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocati
   }
 }
 
-export function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
-  const projectDir = workspaceDir || getProjectFolder(projectId);
-  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
+export async function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = resolveProjectDir(projectId, workspaceDir);
   const harnessBin = findHarnessBinary('claude-code') || findHarnessBinary('claude');
 
   if (!harnessBin) {
@@ -136,11 +186,12 @@ export function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation, 
     const agent = hrSystem[agentId];
     const args = ['-p', prompt, '--workdir', projectDir];
     if (mcpInvocation?.mcps?.length) args.push('--mcp-config', mcpInvocation.file);
-    const output = execFileSync(harnessBin, args, {
+    const { stdout: output } = await runHarnessProcess(harnessBin, args, {
       cwd: projectDir,
-      encoding: 'utf-8',
-      timeout: 30000,
-      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' }
+      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' },
+      agentId,
+      harness: 'claude-code',
+      processKey: agentId
     });
     return { success: true, output, agentId, harness: 'claude-code', model: agent?.model };
   } catch (error) {
@@ -148,9 +199,8 @@ export function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation, 
   }
 }
 
-export function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
-  const projectDir = workspaceDir || getProjectFolder(projectId);
-  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
+export async function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = resolveProjectDir(projectId, workspaceDir);
   const harnessBin = findHarnessBinary('codex') || findHarnessBinary('openai');
 
   if (!harnessBin) {
@@ -165,11 +215,12 @@ export function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation, works
     const args = ['exec'];
     if (agent?.model) args.push('--model', agent.model);
     args.push('--cd', projectDir, prompt);
-    const output = execFileSync(harnessBin, args, {
+    const { stdout: output } = await runHarnessProcess(harnessBin, args, {
       cwd: projectDir,
-      encoding: 'utf-8',
-      timeout: 45000,
-      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' }
+      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' },
+      agentId,
+      harness: 'codex',
+      processKey: agentId
     });
     appendAgentThought(agentId, 'CODEX_SUCCESS', `Codex CLI execution completed.`);
     return { success: true, output, agentId, harness: 'codex', model: agent?.model };
@@ -179,9 +230,8 @@ export function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation, works
   }
 }
 
-export function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
-  const projectDir = workspaceDir || getProjectFolder(projectId);
-  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
+export async function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = resolveProjectDir(projectId, workspaceDir);
   const harnessBin = findHarnessBinary('gemini') || findHarnessBinary('gemini-cli');
 
   if (!harnessBin) {
@@ -192,11 +242,12 @@ export function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation, work
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
     const modelName = agent?.model || 'gemini-2.5-flash';
-    const output = execFileSync(harnessBin, ['--model', modelName, '--dir', projectDir, prompt], {
+    const { stdout: output } = await runHarnessProcess(harnessBin, ['--model', modelName, '--dir', projectDir, prompt], {
       cwd: projectDir,
-      encoding: 'utf-8',
-      timeout: 30000,
-      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' }
+      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' },
+      agentId,
+      harness: 'gemini',
+      processKey: agentId
     });
     return { success: true, output, agentId, harness: 'gemini', model: agent?.model };
   } catch (error) {
@@ -204,9 +255,8 @@ export function spawnGeminiAgent(projectId, prompt, agentId, mcpInvocation, work
   }
 }
 
-export function spawnOllamaAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
-  const projectDir = workspaceDir || getProjectFolder(projectId);
-  if (projectId !== 'global' && !workspaceDir) createProjectFolder(projectId);
+export async function spawnOllamaAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = resolveProjectDir(projectId, workspaceDir);
   const harnessBin = findHarnessBinary('ollama');
 
   if (!harnessBin) {
@@ -217,11 +267,12 @@ export function spawnOllamaAgent(projectId, prompt, agentId, mcpInvocation, work
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
     const modelName = agent?.model || 'llama3';
-    const output = execFileSync(harnessBin, ['run', modelName, prompt], {
+    const { stdout: output } = await runHarnessProcess(harnessBin, ['run', modelName, prompt], {
       cwd: projectDir,
-      encoding: 'utf-8',
-      timeout: 30000,
-      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' }
+      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' },
+      agentId,
+      harness: 'ollama',
+      processKey: agentId
     });
     return { success: true, output, agentId, harness: 'ollama', model: agent?.model };
   } catch (error) {
