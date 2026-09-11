@@ -1180,6 +1180,7 @@
     .network-empty { color: var(--text-muted); font-size: 11px; padding: 22px 8px; text-align: center; }
     .communication-list { display: flex; flex-direction: column; gap: 6px; }
     .communication-row { width: 92%; text-align: left; color: var(--text); cursor: pointer; background: rgba(45,45,70,.72); border: 1px solid var(--border); border-radius: 8px; padding: 8px 9px; transition: .18s ease; }
+    .communication-row.incoming { align-self: flex-start; }
     .communication-row.outgoing { align-self: flex-end; background: rgba(0,188,212,.12); border-color: rgba(0,188,212,.35); }
     .communication-row:hover, .communication-row.expanded { border-color: var(--cyan); transform: translateY(-1px); }
     .communication-row-meta { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; }

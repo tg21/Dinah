@@ -1,10 +1,30 @@
 import { useState } from 'react';
 import { useApp } from '../../store/AppContext.jsx';
+import { OVERSEER_IDS } from '../../constants/roles.js';
 
-function deliveryState(message, currentAgentId) {
-  const delivery = message.deliveries?.find((item) => item.recipientAgentId === currentAgentId) || message.deliveries?.[0];
-  if (message.senderAgentId === currentAgentId && !delivery) return 'sent';
+function deliveryState(message, effectiveAgentId) {
+  const delivery = message.deliveries?.find((item) => item.recipientAgentId === effectiveAgentId) || message.deliveries?.[0];
+  if (message.senderAgentId === effectiveAgentId && !delivery) return 'sent';
   return delivery?.status || message.status || 'queued';
+}
+
+function isInvolved(message, effectiveAgentId) {
+  if (!effectiveAgentId) return true;
+  if (message.senderAgentId === effectiveAgentId) return true;
+  if (message.recipientAgentId === effectiveAgentId) return true;
+  if (message.deliveries?.some((item) => item.recipientAgentId === effectiveAgentId)) return true;
+  // Project-channel broadcast (no direct recipient) is visible to everyone in the project.
+  if (!message.recipientAgentId) return true;
+  return false;
+}
+
+function isPrivilegedViewer(agent, effectiveAgentId) {
+  if (!agent && !effectiveAgentId) return false;
+  if (OVERSEER_IDS.includes(effectiveAgentId)) return true;
+  const role = agent?.role || '';
+  if (role === 'manager-bard') return true;
+  if (OVERSEER_IDS.includes(role)) return true;
+  return false;
 }
 
 function ticks(status) {
@@ -15,9 +35,14 @@ function ticks(status) {
 }
 
 export default function NetworkTab() {
-  const { messageActivity, allAgents, currentAgentId, currentProjectId } = useApp();
+  const { messageActivity, allAgents, currentAgentId, currentProjectId, drawerAgent } = useApp();
   const [expanded, setExpanded] = useState(null);
-  const messages = messageActivity.filter((message) => message.projectId === currentProjectId || message.projectId === 'global');
+  const effectiveAgentId = drawerAgent?.id || currentAgentId;
+  const effectiveAgent = (drawerAgent?.id ? drawerAgent : allAgents[effectiveAgentId]) || {};
+  const privileged = isPrivilegedViewer(effectiveAgent, effectiveAgentId);
+  const messages = messageActivity
+    .filter((message) => message.projectId === currentProjectId || message.projectId === 'global')
+    .filter((message) => privileged || isInvolved(message, effectiveAgentId));
 
   return (
     <>
@@ -31,11 +56,11 @@ export default function NetworkTab() {
       ) : (
         <div className="communication-list">
           {messages.map((message) => {
-            const outgoing = message.senderAgentId === currentAgentId;
+            const outgoing = message.senderAgentId === effectiveAgentId;
             const receiverId = message.recipientAgentId || message.deliveries?.[0]?.recipientAgentId;
             const sender = allAgents[message.senderAgentId]?.name || message.senderAgentId;
             const receiver = allAgents[receiverId]?.name || receiverId || 'Project channel';
-            const status = deliveryState(message, currentAgentId);
+            const status = deliveryState(message, effectiveAgentId);
             const open = expanded === message.messageId;
             return (
               <button className={`communication-row ${outgoing ? 'outgoing' : 'incoming'} ${open ? 'expanded' : ''}`} key={message.messageId} onClick={() => setExpanded(open ? null : message.messageId)}>
