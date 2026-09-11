@@ -38,6 +38,23 @@ export const STARTUP_SELECTION_AUDIT_FILE = path.join(
 );
 export const HR_SYSTEM_FILE = path.join(HR_SYSTEM_DIR, 'hr-system.json');
 
+// Task-dedupe window (plan: duplicate-assignment guard). Configured in the
+// workspace `.dinah` marker under `coordination.taskDedupeWindowMs` so it is
+// tunable without a code change; defaults to 15 minutes.
+export const DEFAULT_TASK_DEDUPE_WINDOW_MS = 15 * 60 * 1000;
+
+export function getTaskDedupeWindowMs() {
+  try {
+    if (fs.existsSync(DINAH_MARKER_FILE)) {
+      const value = Number(JSON.parse(fs.readFileSync(DINAH_MARKER_FILE, 'utf8'))?.coordination?.taskDedupeWindowMs);
+      if (Number.isFinite(value) && value > 0) return Math.floor(value);
+    }
+  } catch {
+    /* fall through to default */
+  }
+  return DEFAULT_TASK_DEDUPE_WINDOW_MS;
+}
+
 // React frontend (Vite). `npm run build:frontend` emits to dist/frontend;
 // the dev tree also keeps src/frontend/dist for local runs without a full build.
 export const FRONTEND_DIST_DIR = path.join(TOOL_DIR, 'dist', 'frontend');
@@ -50,7 +67,8 @@ function initialiseMarker() {
     initializedAt: new Date().toISOString(),
     toolRoot: TOOL_DIR,
     workingDirectory: WORKING_DIR,
-    runtime: { backendPort: Number(PORT) }
+    runtime: { backendPort: Number(PORT) },
+    coordination: { taskDedupeWindowMs: DEFAULT_TASK_DEDUPE_WINDOW_MS }
   };
   if (!fs.existsSync(DINAH_MARKER_FILE)) {
     fs.writeFileSync(DINAH_MARKER_FILE, JSON.stringify(defaults, null, 2));
@@ -58,10 +76,19 @@ function initialiseMarker() {
   }
   try {
     const marker = JSON.parse(fs.readFileSync(DINAH_MARKER_FILE, 'utf8'));
-    if (!marker.runtime?.backendPort) {
+    if (!marker.runtime?.backendPort || marker.coordination?.taskDedupeWindowMs === undefined) {
       fs.writeFileSync(
         DINAH_MARKER_FILE,
-        JSON.stringify({ ...defaults, ...marker, runtime: { ...defaults.runtime, ...marker.runtime } }, null, 2)
+        JSON.stringify(
+          {
+            ...defaults,
+            ...marker,
+            runtime: { ...defaults.runtime, ...marker.runtime },
+            coordination: { ...defaults.coordination, ...marker.coordination }
+          },
+          null,
+          2
+        )
       );
     }
   } catch (error) {

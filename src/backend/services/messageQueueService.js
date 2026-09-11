@@ -168,7 +168,7 @@ function createEnvelope({ projectId = 'global', senderAgentId, recipientAgentId 
 }
 
 export function enqueueDirectMessage(args) {
-  return createEnvelope({ ...args, senderAgentId: args.senderAgentId || args.fromAgentId, recipientAgentId: text(args.toAgentId, 'toAgentId'), summary: text(args.message, 'message'), payload: { message: text(args.message, 'message') } });
+  return createEnvelope({ ...args, senderAgentId: args.senderAgentId || args.fromAgentId, recipientAgentId: text(args.toAgentId, 'toAgentId'), summary: text(args.message, 'message'), payload: { message: text(args.message, 'message') }, type: args.type || 'request' });
 }
 
 export function publishProjectMessage({ projectId, senderAgentId, message, type = 'notification', idempotencyKey }) {

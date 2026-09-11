@@ -9,6 +9,7 @@ import { loadProjectsConfig } from './services/projectService.js';
 import { loadKnowledgeBase, startSeniorAnalystScheduler } from './services/knowledgeService.js';
 import { startMarshallScheduler } from './services/marshallService.js';
 import { startMessageDispatcher } from './services/messageDispatcher.js';
+import { runBootReconciliation } from './services/bootReconciliation.js';
 import { createApp } from './app.js';
 
 export const app = createApp();
@@ -25,6 +26,16 @@ app.listen(PORT, async () => {
     startSeniorAnalystScheduler();
     startMarshallScheduler();
     startMessageDispatcher();
+    // Boot sweep: nudge managers/HR with unfinished work so projects resume
+    // without a human ping. Best-effort; must never break startup.
+    try {
+      const boot = runBootReconciliation();
+      console.log(
+        `🔁 Boot reconciliation: managers [${boot.managersNotified.join(', ') || 'none'}]${boot.hrNotified ? ' + hr-mind-flayer' : ''}`
+      );
+    } catch (error) {
+      console.error('Boot reconciliation failed:', error.message);
+    }
   } catch (error) {
     console.error('Backend initialization failed:', error);
   }

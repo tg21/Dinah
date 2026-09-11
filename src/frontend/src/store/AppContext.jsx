@@ -14,7 +14,7 @@ export function AppProvider({ children }) {
   const [models, setModels] = useState([]);
   const [harnesses, setHarnesses] = useState([]);
   const [mcps, setMcps] = useState([]);
-  const [defaultHarness, setDefaultHarness] = useState('antigravity');
+  const [defaultHarness, setDefaultHarness] = useState('opencode');
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
   const [drawerAgent, setDrawerAgent] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
@@ -32,6 +32,12 @@ export function AppProvider({ children }) {
       setModels(m.models || []);
       setHarnesses(h.harnesses || []);
       setMcps(mc.mcps || []);
+      // Keep the user's explicit choice when still detected; otherwise prefer
+      // opencode, else the first detected harness — never a hardcoded vendor.
+      const ids = (h.harnesses || []).map((x) => x.id);
+      if (ids.length) {
+        setDefaultHarness((cur) => (ids.includes(cur) ? cur : ids.includes('opencode') ? 'opencode' : ids[0]));
+      }
     } catch (err) {
       console.error('Error loading dynamic system models:', err);
     }

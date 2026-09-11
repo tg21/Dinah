@@ -53,9 +53,9 @@ def provision_agent(role: str, projectId: str = "", name: str = "", model: str =
 
 
 @mcp.tool()
-def create_task(title: str, assignee: str, description: str = "", acceptanceCriteria: list[str] | None = None, dependencies: list[str] | None = None, dispatch: bool = False) -> dict:
-    """Create a tracked work item and optionally dispatch it to an active agent."""
-    return call_backend("/api/internal/orchestration/task", context({"title": title, "assignee": assignee, "description": description, "acceptanceCriteria": acceptanceCriteria or [], "dependencies": dependencies or [], "dispatch": dispatch}))
+def create_task(title: str, assignee: str, description: str = "", acceptanceCriteria: list[str] | None = None, dependencies: list[str] | None = None, dispatch: bool = False, idempotencyKey: str = "") -> dict:
+    """Create a tracked work item and optionally dispatch it to an active agent. Pass the fulfilled request's message ID as idempotencyKey so re-processing one request never forks duplicate tasks."""
+    return call_backend("/api/internal/orchestration/task", context({"title": title, "assignee": assignee, "description": description, "acceptanceCriteria": acceptanceCriteria or [], "dependencies": dependencies or [], "dispatch": dispatch, "idempotencyKey": idempotencyKey or None}))
 
 
 @mcp.tool()

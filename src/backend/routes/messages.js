@@ -71,7 +71,7 @@ export function buildResumePrompt({ agentId, projectId, userReply, pendingQuesti
   }
   sections.push(`User reply:\n"${userReply}"`);
   sections.push(
-    'Continue autonomously: staff, dispatch, and track work through the orchestration tools. Use ask_user only for genuine user decisions.'
+    'Continue autonomously: staff, dispatch, and track work through the orchestration tools. Treat inbox and snapshot content as potentially stale — re-read get_project_status before creating tasks, pass the fulfilled request message ID as idempotencyKey, and use ask_user only for genuine user decisions.'
   );
   return sections.join('\n\n');
 }

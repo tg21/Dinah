@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { SHARED_STATE_DIR } from '../config.js';
+import crypto from 'crypto';
+import { SHARED_STATE_DIR, getTaskDedupeWindowMs } from '../config.js';
 import { appendToSharedLog, appendAgentMessage } from './messageService.js';
 import { loadHrSystem, saveHrSystem } from './hrService.js';
 import { broadcastAgentEvent } from './eventBus.js';
@@ -29,6 +30,34 @@ function projectState(state, projectId) {
 function requireText(value, field) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${field} is required`);
   return value.trim();
+}
+
+// Duplicate-assignment guard (stale-read race): two layers so a manager that
+// processes the same need-work request twice — or acts on a stale inbox while
+// a parallel turn already assigned the work — cannot fork duplicate tasks.
+// Layer 1 is an explicit caller idempotency key; layer 2 is a content
+// fingerprint, so identical re-creates collapse even without caller
+// cooperation, while a same-titled task with expanded scope (different
+// description/criteria → different fingerprint) still creates fresh.
+function normalizeContent(value) {
+  return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+export function taskFingerprint({ title, description = '', acceptanceCriteria = [] }) {
+  const criteria = Array.isArray(acceptanceCriteria) ? acceptanceCriteria : [];
+  return crypto
+    .createHash('sha1')
+    .update([normalizeContent(title), normalizeContent(description), ...criteria.map(normalizeContent)].join('\n'))
+    .digest('hex');
+}
+
+function isOpenTask(task) {
+  return task && ['assigned', 'in-progress'].includes(task.status);
+}
+
+function createdWithinMs(task, windowMs, now = Date.now()) {
+  const created = new Date(task.createdAt || 0).getTime();
+  return Number.isFinite(created) && now - created <= windowMs;
 }
 
 // Plan 01: coordination-write wake-ups. Progress/blocker/help/task writes are
@@ -86,26 +115,60 @@ export function canonicalAssignee(projectId, assignee) {
   return requested;
 }
 
-export function recordTask({ projectId, title, description = '', assignee, acceptanceCriteria = [], dependencies = [], createdBy, notify = true }) {
+export function recordTask({ projectId, title, description = '', assignee, acceptanceCriteria = [], dependencies = [], createdBy, notify = true, idempotencyKey = null }) {
   const state = loadState();
   const cleanProjectId = requireText(projectId, 'projectId');
   const project = projectState(state, cleanProjectId);
+  const cleanTitle = requireText(title, 'title');
+  const cleanAssignee = canonicalAssignee(cleanProjectId, assignee);
+  const cleanCriteria = Array.isArray(acceptanceCriteria) ? acceptanceCriteria : [];
+  const key = typeof idempotencyKey === 'string' && idempotencyKey.trim() ? idempotencyKey.trim() : null;
+  if (key) {
+    const keyed = project.tasks.find((t) => t.idempotencyKey === key && isOpenTask(t));
+    if (keyed) {
+      appendToSharedLog(`Task create deduped by idempotency key; returning open [${keyed.id}] in [${cleanProjectId}].`);
+      return { ...keyed, duplicate: true };
+    }
+  }
+  const fingerprint = taskFingerprint({ title: cleanTitle, description, acceptanceCriteria: cleanCriteria });
+  const windowMs = getTaskDedupeWindowMs();
+  const similar = project.tasks.find((t) =>
+    isOpenTask(t) &&
+    t.assignee === cleanAssignee &&
+    (t.fingerprint || taskFingerprint(t)) === fingerprint &&
+    createdWithinMs(t, windowMs)
+  );
+  if (similar) {
+    appendToSharedLog(`Task create deduped by content fingerprint; returning open [${similar.id}] in [${cleanProjectId}].`);
+    return { ...similar, duplicate: true };
+  }
   const task = {
     id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     projectId: cleanProjectId,
-    title: requireText(title, 'title'),
+    title: cleanTitle,
     description,
-    assignee: canonicalAssignee(cleanProjectId, assignee),
-    acceptanceCriteria: Array.isArray(acceptanceCriteria) ? acceptanceCriteria : [],
+    assignee: cleanAssignee,
+    acceptanceCriteria: cleanCriteria,
     dependencies: Array.isArray(dependencies) ? dependencies : [],
     status: 'assigned',
     createdBy: createdBy || 'orchestrator',
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    fingerprint,
+    ...(key ? { idempotencyKey: key } : {})
   };
   project.tasks.push(task);
   saveState(state);
   appendToSharedLog(`Task [${task.id}] assigned to [${task.assignee}] in [${projectId}].`);
+  // Same assignee+title but different content (e.g. expanded scope): both are
+  // kept — flag the overlap so the manager reconciles consciously next turn.
+  const sameTitle = project.tasks.find((t) =>
+    t.id !== task.id && isOpenTask(t) && t.assignee === task.assignee &&
+    normalizeContent(t.title) === normalizeContent(task.title)
+  );
+  if (sameTitle) {
+    appendToSharedLog(`Task [${task.id}] overlaps open [${sameTitle.id}] (same assignee+title, different content); both kept for manager review.`);
+  }
   // Wake the assignee so the task starts without a user message. Skipped when
   // the caller dispatches directly (dispatch:true already runs a harness turn).
   if (notify) {
@@ -174,7 +237,22 @@ export function requestHelp({ projectId, agentId, taskId, neededRole, question, 
   const state = loadState();
   const cleanProjectId = requireText(projectId, 'projectId');
   const project = projectState(state, cleanProjectId);
-  const request = { id: `help-${Date.now()}`, projectId: cleanProjectId, agentId, taskId: taskId || null, neededRole: requireText(neededRole, 'neededRole'), question: requireText(question, 'question'), urgency, status: 'open', createdAt: new Date().toISOString() };
+  const cleanRole = requireText(neededRole, 'neededRole');
+  const cleanQuestion = requireText(question, 'question');
+  // Same dedupe shape as tasks: an identical open request collapses instead of
+  // stacking (chatty workers, stale re-processing).
+  const windowMs = getTaskDedupeWindowMs();
+  const now = Date.now();
+  const fingerprint = taskFingerprint({ title: cleanRole, description: cleanQuestion });
+  const existing = project.helpRequests.find((h) =>
+    h.status === 'open' && h.agentId === agentId && (h.fingerprint || taskFingerprint({ title: h.neededRole, description: h.question })) === fingerprint &&
+    createdWithinMs(h, windowMs, now)
+  );
+  if (existing) {
+    appendToSharedLog(`Help request deduped by content fingerprint; returning open [${existing.id}] in [${cleanProjectId}].`);
+    return { ...existing, duplicate: true };
+  }
+  const request = { id: `help-${Date.now()}`, projectId: cleanProjectId, agentId, taskId: taskId || null, neededRole: cleanRole, question: cleanQuestion, urgency, status: 'open', createdAt: new Date().toISOString(), fingerprint };
   project.helpRequests.push(request);
   saveState(state);
   appendToSharedLog(`Help request [${request.id}] from [${agentId}] needs [${neededRole}] in [${projectId}].`);

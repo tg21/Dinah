@@ -61,13 +61,17 @@ export function loadHrSystem() {
     }
 
     // Dynamic model reconciliation:
-    // If an agent has no model, or references a hardcoded model not present on the host system,
-    // match them with the best available model discovered on the host.
+    // - Missing model: pick the best discovered model for the role (new agents).
+    // - Explicit model that is currently undiscovered (detection skew at boot,
+    //   provider hiccup, renamed id): KEEP it untouched. Re-picking here used
+    //   to silently flip agents to a different provider+harness, overriding
+    //   deliberate configuration. A stale-but-explicit model fails loudly at
+    //   dispatch time instead of surprising everyone with a new provider.
+    // - Discovered model with a mismatched harness field: align the field.
     for (const agentId of Object.keys(data)) {
       const agent = data[agentId];
-      const modelExists = agent.model && getModelById(agent.model);
-      if (!modelExists) {
-        const bestModel = selectBestModelForRole(agent.role, agent.model);
+      if (!agent.model) {
+        const bestModel = selectBestModelForRole(agent.role);
         if (bestModel) {
           agent.model = bestModel.id;
           agent.harness = bestModel.source.harness;
@@ -76,11 +80,12 @@ export function loadHrSystem() {
           }
           modified = true;
         }
-      } else {
+      }
+      const modelExists = getModelById(agent.model);
+      if (modelExists) {
         // Ensure harness is aligned with model's actual harness
-        const found = getModelById(agent.model);
-        if (found && agent.harness !== found.source.harness) {
-          agent.harness = found.source.harness;
+        if (agent.harness !== modelExists.source.harness) {
+          agent.harness = modelExists.source.harness;
           modified = true;
         }
       }

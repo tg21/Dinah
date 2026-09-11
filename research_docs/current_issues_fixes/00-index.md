@@ -105,6 +105,22 @@ pointer, lines 2–9 are the 8 issues). RCA was performed against the code at co
   refresh the lease on matching-token use, and still reject wrong tokens;
   claim/ack/complete/fail/release/message-status return JSON 404/409.
   Tests: +3 (`npm test` 58/58).
+- **Dispatcher claim-settling fix — DONE 2026-09-11**. Live `working-area`
+  showed the boot digest stuck `claimed` (attempts climbing, no work): the
+  manager's `antigravity` harness was quota-failing into simulator fallback,
+  which never settled the claim, so lease expiry re-queued it forever.
+  `dispatchAgent` now completes every claim post-turn, or fails retryable on
+  simulator-fallback-of-broken-harness (dead-letters after 3, with
+  thought+shared-log audibility).   Tests: +2 (`npm test` 68/68).
+- **Sticky model/harness fix — DONE 2026-09-11**. Live `working-area`
+  showed the manager flipped to `antigravity` despite opencode config:
+  `loadHrSystem` re-picked model+harness whenever the explicit model id was
+  momentarily undiscovered (detection skew), and manager hints (`pro`)
+  match agy models. Reconciliation now only fills missing models and aligns
+  harness for discovered ones — explicit pairs are never re-picked. UI
+  `defaultHarness` no longer hardcoded to agy (detected list, opencode
+  preferred; ad-hoc fallback only, never overrides per-agent dispatch).
+  Tests: `npm test` 71/71 (new `tests/backend/hr-model-sticky.test.js`).
 - **Harness sessions follow-up — Codex DONE 2026-09-11**. `codex exec --json`
   + `exec resume <thread-id>` wired in `spawnCodexAgent` (thread persisted on
   HR record, stale-thread retry, `--skip-git-repo-check` always since project
@@ -114,6 +130,33 @@ pointer, lines 2–9 are the 8 issues). RCA was performed against the code at co
   binaries absent on host. Tests: +2 parser cases (`npm test` 55/55).
 - **08**: per-project KB schema + `get/update_project_knowledge` tools +
   synthesizer cycle + drop fantasy seed + modal check.
+- **Boot reconciliation + stale-read race guard — DONE 2026-09-11**.
+  `runBootReconciliation` (`services/bootReconciliation.js`, wired in
+  `server.js` startup): one `boot-reconciliation` digest per manager of a dirty
+  project + HR for pending confirmations/HR tasks; workers never swept, clean
+  projects / paused recipients / stacked digests skipped. `recordTask` is
+  idempotent via explicit `idempotencyKey` (`create_task` passthrough) +
+  content-fingerprint (`sha1` title+description+criteria) within
+  `coordination.taskDedupeWindowMs` from workspace `.dinah` (default 15 min,
+  `getTaskDedupeWindowMs`, never hardcoded); same-title scope growth still
+  creates + logs overlap; `requestHelp` dedupes the same way. Fresh-read +
+  key-passing rules added to dispatcher/resume prompts (templates untouched).
+  Tests: `npm test` 67/67 (new `tests/backend/boot-reconciliation.test.js`,
+  9 tests).
+- **Boot digest supersede fix — DONE 2026-09-11**. Live restart proved the
+  double-restart guard wrong: the old digest kept re-queuing via lease expiry
+  (failing agy turns), and the sweep skipped the fresh send because "a queued
+  digest exists" — log showed `notified [none]` with open work pending.
+  Stale queued digests are now retired (completed as superseded) so the fresh
+  snapshot always wins; only an in-flight (claimed) digest skips the
+  recipient.   Tests: +1 (`npm test` 72/72).
+- **Sweep misdelivery fix — DONE 2026-09-11**. Live `working-area` showed
+  digests for legacy project `hello world` (open tasks owned by
+  `hello world-manager-bard`, opencode) routed to the slug twin
+  `hello-world-manager-bard` (owning nothing, agy-broken → dead-letter):
+  the sweep resolved via slug-guarantee `ensureProjectManager`. It now
+  prefers the manager on the exact project string, slug guarantee only as
+  fallback. Tests: +2 (`npm test` 74/74).
 
 ## Shared implementation rules (from `AGENTS.md`, apply to every plan)
 

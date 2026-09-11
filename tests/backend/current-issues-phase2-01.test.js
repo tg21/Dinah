@@ -47,7 +47,9 @@ vi.mock('../../src/backend/config.js', () => ({
   WORKING_DIR: testPaths.workingDir,
   USING_DEFAULT_WORKING_AREA: false,
   ensureBaseDirs: () => {},
-  resolveFrontendDistDir: () => null
+  resolveFrontendDistDir: () => null,
+  getTaskDedupeWindowMs: () => 900000,
+  DEFAULT_TASK_DEDUPE_WINDOW_MS: 900000
 }));
 
 // Stub harness turns (count them) but keep the real opencode JSON parser.
@@ -64,7 +66,7 @@ vi.mock('../../src/backend/services/harnessRunner.js', async (importOriginal) =>
 });
 
 import { buildResumePrompt } from '../../src/backend/routes/messages.js';
-import { parseOpencodeJsonOutput, parseCodexJsonOutput } from '../../src/backend/services/harnessRunner.js';
+import { parseOpencodeJsonOutput, parseCodexJsonOutput, spawnHarnessAgent } from '../../src/backend/services/harnessRunner.js';
 import { saveHrSystem, loadHrSystem } from '../../src/backend/services/hrService.js';
 import { clearAgentEventQueue, getAgentEventQueue } from '../../src/backend/services/eventBus.js';
 import {
@@ -260,6 +262,27 @@ describe('Phase 2/01: bounded continuation loop', () => {
     expect(turns).toBe(2);
     expect(harnessStub.calls.length).toBe(2);
     expect(getQueuedAgents()).not.toContain('auto-proj-manager-bard');
+    // Real turns settle their claims instead of leaving them for lease expiry.
+    const done = listInbox({ agentId: 'auto-proj-manager-bard', includeCompleted: true });
+    expect(done.filter((m) => m.deliveryStatus === 'completed').length).toBe(2);
+  });
+
+  it('simulator-fallback turns re-queue, then dead-letter instead of looping forever', async () => {
+    // Broken-but-configured harness (like quota-blocked agy): fallback must
+    // re-queue, not complete. A pure system-simulator agent would complete.
+    const hr = loadHrSystem();
+    hr['auto-proj-manager-bard'].harness = 'antigravity';
+    saveHrSystem(hr);
+    const { message } = enqueueDirectMessage({ fromAgentId: 'user', toAgentId: 'auto-proj-manager-bard', projectId: 'auto-proj', message: 'broken harness' });
+    spawnHarnessAgent.mockResolvedValueOnce({ success: true, output: 'sim', simulated: true, agentId: 'auto-proj-manager-bard', harness: 'antigravity' });
+    spawnHarnessAgent.mockResolvedValueOnce({ success: true, output: 'sim', simulated: true, agentId: 'auto-proj-manager-bard', harness: 'antigravity' });
+    spawnHarnessAgent.mockResolvedValueOnce({ success: true, output: 'sim', simulated: true, agentId: 'auto-proj-manager-bard', harness: 'antigravity' });
+    const { turns } = await runContinuation('auto-proj-manager-bard', 5);
+    expect(turns).toBe(3);
+    expect(getQueuedAgents()).not.toContain('auto-proj-manager-bard');
+    const final = listInbox({ agentId: 'auto-proj-manager-bard', includeCompleted: true })
+      .find((m) => m.messageId === message.messageId);
+    expect(final.deliveryStatus).toBe('dead-lettered');
   });
 
   it('stops early on a fresh ask_user hold', async () => {

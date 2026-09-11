@@ -1,7 +1,7 @@
 import { loadHrSystem } from './hrService.js';
 import { spawnHarnessAgent } from './harnessRunner.js';
-import { appendAgentThought } from './messageService.js';
-import { claimMessage, getQueuedAgents, listInbox, failMessage } from './messageQueueService.js';
+import { appendAgentThought, appendToSharedLog } from './messageService.js';
+import { claimMessage, completeMessage, getQueuedAgents, listInbox, failMessage } from './messageQueueService.js';
 
 const activeWakeups = new Set();
 let timer;
@@ -25,18 +25,52 @@ async function dispatchAgent(agentId) {
     'You have been woken by the Dinah durable message dispatcher.',
     `Claimed message ${claim.message.messageId} with lease token ${claim.leaseToken}.`,
     'Acknowledge it with acknowledge_message, process the request, then call complete_message with the same lease token. If you cannot process it, call fail_message or release_message.',
+    'Inbox items are hints and may be stale (retries, restarts, parallel turns): FIRST call get_project_status for a fresh read, then act on current state, not on the message text alone.',
+    'When creating a task to fulfill a request, pass that request message ID as idempotencyKey so re-processing never forks duplicates. If the worker already has an open task covering the need, complete the request with the task reference instead of creating.',
     'Bounded inbox batch:',
     JSON.stringify(messages.map(({ messageId, deliveryId, projectId, senderAgentId, type, summary, payload }) => ({ messageId, deliveryId, projectId, senderAgentId, type, summary, payload })), null, 2)
   ].join('\n\n');
   try {
     appendAgentThought(agentId, 'MESSAGE_WAKE', `Dispatcher claimed ${claim.message.messageId}.`);
-    await spawnHarnessAgent(agent.harness || 'opencode', agent.project || 'global', prompt, agentId);
+    const result = await spawnHarnessAgent(agent.harness || 'opencode', agent.project || 'global', prompt, agentId);
+    settleClaim({ agentId, claim, result, harness: agent.harness || 'opencode' });
     return true;
   } catch (error) {
     try { failMessage({ messageId: claim.message.messageId, agentId, leaseToken: claim.leaseToken, reason: error.message, retryable: true }); } catch { /* lease recovery handles a crash */ }
     return false;
   } finally {
     activeWakeups.delete(agentId);
+  }
+}
+
+// Every dispatcher turn must settle its claim. Before this, a turn whose
+// harness hard-failed (simulator fallback: canned text, zero MCP calls) left
+// the delivery claimed-but-unfinished, so lease expiry re-queued it and the
+// dispatcher burned turns on it forever (attempts climbing, no work done).
+function settleClaim({ agentId, claim, result, harness }) {
+  // The turn itself may have settled via MCP tools — never touch those.
+  let current;
+  try {
+    current = listInbox({ agentId, limit: 20, includeCompleted: true })
+      .find((m) => m.messageId === claim.message.messageId);
+  } catch {
+    return;
+  }
+  if (!current || ['completed', 'dead-lettered'].includes(current.deliveryStatus)) return;
+  const args = { messageId: claim.message.messageId, agentId, leaseToken: claim.leaseToken };
+  try {
+    if (result?.simulated === true && harness !== 'system-simulator') {
+      // The configured harness failed; the fallback did no tool work. Fail
+      // retryable so a later turn (quota back, harness fixed) redelivers, and
+      // dead-letters after MAX_ATTEMPTS instead of looping forever.
+      failMessage({ ...args, reason: `Harness ${harness} failed; simulator fallback made no tool calls.`, retryable: true });
+      appendAgentThought(agentId, 'DISPATCH_UNPRODUCTIVE', `Turn fell back to simulator; claim re-queued (attempt ${current.attemptCount}).`);
+      appendToSharedLog(`Dispatcher: [${agentId}] harness [${harness}] failed, simulator fallback did no work; message re-queued (attempt ${current.attemptCount}).`);
+    } else {
+      completeMessage({ ...args, result: 'Consumed by dispatcher turn.' });
+    }
+  } catch {
+    /* already settled inside the turn; idempotent paths cover the rest */
   }
 }
 

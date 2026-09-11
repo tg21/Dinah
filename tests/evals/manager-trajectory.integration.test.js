@@ -46,7 +46,9 @@ vi.mock('../../src/backend/config.js', () => ({
   WORKING_DIR: testPaths.workingDir,
   USING_DEFAULT_WORKING_AREA: false,
   ensureBaseDirs: () => {},
-  resolveFrontendDistDir: () => null
+  resolveFrontendDistDir: () => null,
+  getTaskDedupeWindowMs: () => 900000,
+  DEFAULT_TASK_DEDUPE_WINDOW_MS: 900000
 }));
 
 import trajectoryScenario from './fixtures/manager-trajectory.golden.json';
