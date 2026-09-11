@@ -120,13 +120,13 @@ def claim_message(messageId: str, leaseMs: int = 120000) -> dict:
 
 @mcp.tool()
 def acknowledge_message(messageId: str, leaseToken: str) -> dict:
-    """Acknowledge receipt and mark a claimed delivery as processing."""
+    """Acknowledge receipt and mark a claimed delivery as processing. Call immediately after claiming, before doing the work; accepts a message or delivery ID."""
     return call_backend("/api/internal/orchestration/acknowledge", context({"messageId": messageId, "leaseToken": leaseToken}))
 
 
 @mcp.tool()
 def complete_message(messageId: str, leaseToken: str, result: str = "") -> dict:
-    """Mark a delivery complete. Only the current lease holder may complete it."""
+    """Mark a delivery complete. Only the current lease holder may complete it; accepts a message or delivery ID."""
     return call_backend("/api/internal/orchestration/complete", context({"messageId": messageId, "leaseToken": leaseToken, "result": result or None}))
 
 

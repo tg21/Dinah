@@ -75,12 +75,43 @@ pointer, lines 2–9 are the 8 issues). RCA was performed against the code at co
 - **AGENTS.md**: updated `/api/mcps?agentId=`, generic staffing-visibility rule
   (no per-pair helpers), MCP-defaults rule, slug/ID rule, queue-projection rule.
 
-## Next (Phase 2, NOT started)
+## Next (Phase 2, 07 DONE — 01 + 08 remain)
 
-- **07 + 01**: post-confirm/spawn inbox seed → dispatcher wake; canonical
-  dispatch lookup (partially done); resume-prompt enrichment + bounded
-  continuation loop (harness-native first) + `awaiting-user` watchdog +
-  durable reply + strict `agentId` + simulated badge.
+- **07 spawn wake — DONE 2026-09-11**. `seedPostSpawnInbox` in
+  `agentLifecycle.js`: post-confirm/post-spawn inbox seed via
+  `enqueueDirectMessage` (first `assigned` task incl. role-name fallback, else
+  check-in nudge) → existing 5s dispatcher wakes. No sync `spawnHarnessAgent`,
+  no pre-approval wake. `dispatch:true` canonical lookup was already landed
+  (verified, no change needed). Tests: `npm test` 41/41 (new
+  `tests/backend/current-issues-phase2-07.test.js`, 6 tests).
+- **Spike (harness-native continuation) — DONE 2026-09-11**. `opencode run`
+  has `-c/--continue` + `-s/--session` (+ `--fork`); `codex exec` has
+  `resume`/`fork` subcommands; `agy` has `-c/--continue` + `--conversation`.
+  Dinah runs all three one-shot today. Plan 01 must prefer native resume
+  (plus session-ID tracking) over a custom loop; custom fallback stays
+  event-based per user decision.
+- **01**: DONE 2026-09-11 — resume-prompt enrichment + native-session
+  continuation (spike above) + `awaiting-user` watchdog + durable reply +
+  strict `agentId` + simulated badge. Coordination writes now wake via queue
+  (progress→creator, blocker/help→manager, task→assignee); `runContinuation`
+  drains follow-ups (max 5, stops on fresh `ask_user`); opencode `--format
+  json` + per-agent `-s` resume verified live (nonce recall); Marshall
+  re-broadcasts holds ≥10 min without clearing. Tests: `npm test` 53/53 (new
+  `tests/backend/current-issues-phase2-01.test.js`, 12 tests).
+- **Queue lease crash fix — DONE 2026-09-11**. Uncaught `acknowledge_message`
+  throws (terminal stack + HTML 500) came from two causes: agents passing
+  `deliveryId` where only `messageId` resolved, and late acks after long turns
+  past the 2-min lease. Lease ops now resolve either id (recipient-scoped),
+  refresh the lease on matching-token use, and still reject wrong tokens;
+  claim/ack/complete/fail/release/message-status return JSON 404/409.
+  Tests: +3 (`npm test` 58/58).
+- **Harness sessions follow-up — Codex DONE 2026-09-11**. `codex exec --json`
+  + `exec resume <thread-id>` wired in `spawnCodexAgent` (thread persisted on
+  HR record, stale-thread retry, `--skip-git-repo-check` always since project
+  dirs lack `.git`; `resume` reuses thread cwd, no `--cd`). Nonce recall
+  verified live twice (both arg orders). `agy` stays one-shot (live probe hit
+  subscription quota, conversation-ID format unverified); claude/gemini/ollama
+  binaries absent on host. Tests: +2 parser cases (`npm test` 55/55).
 - **08**: per-project KB schema + `get/update_project_knowledge` tools +
   synthesizer cycle + drop fantasy seed + modal check.
 

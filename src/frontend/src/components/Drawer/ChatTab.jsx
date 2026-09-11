@@ -100,6 +100,14 @@ export default function ChatTab({ engineRef }) {
               <div className="msg-header">
                 <strong>{m.role === 'user' ? 'You (Overseer)' : agent.name || 'Agent'}</strong>
                 <span>{time}</span>
+                {m.simulated && (
+                  <span
+                    title="Produced by the fallback simulator, not a live harness run"
+                    style={{ fontSize: 9, background: 'rgba(255,193,7,0.2)', color: 'var(--amber, #ffc107)', padding: '1px 6px', borderRadius: 4, marginLeft: 6 }}
+                  >
+                    simulated
+                  </span>
+                )}
               </div>
             <LogText value={m.content || m.text || m.request || ''} />
             </div>

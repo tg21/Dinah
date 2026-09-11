@@ -2,7 +2,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import { findHarnessBinary } from '../harness/index.js';
 import { createProjectFolder, getProjectFolder } from './projectService.js';
-import { loadHrSystem } from './hrService.js';
+import { loadHrSystem, saveHrSystem } from './hrService.js';
 import { appendAgentThought } from './messageService.js';
 import { broadcastAgentEvent } from './eventBus.js';
 import { createMcpInvocationConfig, mcpPromptContext, cleanupMcpInvocation } from '../mcp/index.js';
@@ -128,6 +128,32 @@ export async function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvoc
   }
 }
 
+// Parse `opencode run --format json` (JSONL) output: collect assistant text
+// parts in order plus the session id. Falls back to raw stdout when the
+// output isn't JSONL (older CLI), so behavior never regresses.
+export function parseOpencodeJsonOutput(stdout) {
+  const raw = (stdout || '').trim();
+  if (!raw) return { output: raw, sessionId: null };
+  const lines = raw.split('\n');
+  let sessionId = null;
+  const texts = [];
+  let jsonLines = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+    try {
+      const event = JSON.parse(trimmed);
+      jsonLines += 1;
+      if (!sessionId && typeof event.sessionID === 'string') sessionId = event.sessionID;
+      if (event.type === 'text' && typeof event.part?.text === 'string') texts.push(event.part.text);
+    } catch {
+      /* not a JSON event line; ignore */
+    }
+  }
+  if (!jsonLines) return { output: raw, sessionId: null };
+  return { output: texts.join('').trim() || raw, sessionId };
+}
+
 export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
   const projectDir = resolveProjectDir(projectId, workspaceDir);
   const harnessBin = findHarnessBinary('opencode');
@@ -136,22 +162,21 @@ export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocati
     return simulateHarnessExecution('opencode', projectId, prompt, agentId);
   }
 
-  try {
+  // Native session continuation (plan 01 spike, verified 2026-09-11):
+  // `opencode run --format json` emits per-event sessionIDs; passing a known
+  // id back via `-s` resumes that agent's session. `-s` with an unknown id
+  // errors ("Session not found") instead of creating, so the first turn runs
+  // without `-s` and persists the returned id for later turns.
+  const storedSessionId = loadHrSystem()[agentId]?.harnessSessions?.opencode || null;
+
+  const runOnce = async (sessionId) => {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
-    appendAgentThought(
-      agentId,
-      'OPENCODE_INVOKE',
-      `Invoking OpenCode harness [${agent?.model || 'default'}] in ${projectDir}`
-    );
-    // Dinah agents are non-interactive and must be able to use the enabled
-    // orchestration MCP tools without waiting for a human approval prompt.
-    // The invocation still uses a temporary, token-scoped MCP config and the
-    // orchestration server enforces the agent/project boundary.
-    const args = ['run', '--auto'];
+    const args = ['run', '--auto', '--format', 'json'];
+    if (sessionId) args.push('-s', sessionId);
     if (agent?.model) args.push('-m', agent.model);
     args.push('--dir', projectDir, prompt);
-    const { stdout: output } = await runHarnessProcess(harnessBin, args, {
+    const { stdout } = await runHarnessProcess(harnessBin, args, {
       cwd: projectDir,
       env: {
         ...process.env,
@@ -162,8 +187,60 @@ export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocati
       harness: 'opencode',
       processKey: agentId
     });
+    return parseOpencodeJsonOutput(stdout);
+  };
+
+  const persistSessionId = (sessionId) => {
+    if (!sessionId) return;
+    try {
+      const hrSystem = loadHrSystem();
+      if (!hrSystem[agentId]) return;
+      hrSystem[agentId].harnessSessions = { ...(hrSystem[agentId].harnessSessions || {}), opencode: sessionId };
+      saveHrSystem(hrSystem);
+    } catch {
+      /* session tracking must never break a harness turn */
+    }
+  };
+
+  try {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
+    appendAgentThought(
+      agentId,
+      'OPENCODE_INVOKE',
+      `Invoking OpenCode harness [${agent?.model || 'default'}] in ${projectDir}` +
+        (storedSessionId ? ` (resuming session ${storedSessionId})` : ' (new session)')
+    );
+    // Dinah agents are non-interactive and must be able to use the enabled
+    // orchestration MCP tools without waiting for a human approval prompt.
+    // The invocation still uses a temporary, token-scoped MCP config and the
+    // orchestration server enforces the agent/project boundary.
+    let parsed;
+    try {
+      parsed = await runOnce(storedSessionId);
+      // Some CLI versions report a missing session on stdout with exit 0.
+      if (storedSessionId && /session not found/i.test(parsed.output || '')) {
+        throw Object.assign(new Error('Session not found'), { stdout: parsed.output });
+      }
+    } catch (error) {
+      // Stale session id (e.g. pruned server-side): retry once as a new session.
+      if (storedSessionId && /session not found/i.test(String(error.message || '') + String(error.stderr || ''))) {
+        appendAgentThought(agentId, 'OPENCODE_SESSION_RESET', `Stored session ${storedSessionId} not found; starting a new session.`);
+        try {
+          const hr = loadHrSystem();
+          if (hr[agentId]?.harnessSessions?.opencode) {
+            delete hr[agentId].harnessSessions.opencode;
+            saveHrSystem(hr);
+          }
+        } catch { /* best effort */ }
+        parsed = await runOnce(null);
+      } else {
+        throw error;
+      }
+    }
+    persistSessionId(parsed.sessionId);
     appendAgentThought(agentId, 'OPENCODE_SUCCESS', `OpenCode execution completed.`);
-    return { success: true, output, agentId, harness: 'opencode', model: agent?.model };
+    return { success: true, output: parsed.output, agentId, harness: 'opencode', model: agent?.model, sessionId: parsed.sessionId || undefined };
   } catch (error) {
     const stderr = Buffer.isBuffer(error.stderr) ? error.stderr.toString('utf8') : String(error.stderr || '');
     const stdout = Buffer.isBuffer(error.stdout) ? error.stdout.toString('utf8') : String(error.stdout || '');
@@ -209,6 +286,33 @@ export async function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvoca
   }
 }
 
+// Parse `codex exec --json` (JSONL) output: thread id plus assistant message
+// text. Falls back to raw stdout when the output isn't JSONL.
+export function parseCodexJsonOutput(stdout) {
+  const raw = (stdout || '').trim();
+  if (!raw) return { output: raw, sessionId: null };
+  const lines = raw.split('\n');
+  let sessionId = null;
+  const texts = [];
+  let jsonLines = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+    try {
+      const event = JSON.parse(trimmed);
+      jsonLines += 1;
+      if (!sessionId && typeof event.thread_id === 'string') sessionId = event.thread_id;
+      if (event.type === 'item.completed' && event.item?.type === 'agent_message' && typeof event.item.text === 'string') {
+        texts.push(event.item.text);
+      }
+    } catch {
+      /* not a JSON event line; ignore */
+    }
+  }
+  if (!jsonLines) return { output: raw, sessionId: null };
+  return { output: texts.join('\n').trim() || raw, sessionId };
+}
+
 export async function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
   const projectDir = resolveProjectDir(projectId, workspaceDir);
   const harnessBin = findHarnessBinary('codex') || findHarnessBinary('openai');
@@ -217,23 +321,78 @@ export async function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation,
     return simulateHarnessExecution('codex', projectId, prompt, agentId);
   }
 
-  try {
+  // Native session continuation (verified live 2026-09-11): `codex exec
+  // --json` emits `thread.started` with a thread_id; `codex exec resume
+  // <thread-id> <prompt>` continues it (nonce recall confirmed). A stale id
+  // exits 1 with "no rollout found", so retry once as a new thread.
+  const storedSessionId = loadHrSystem()[agentId]?.harnessSessions?.codex || null;
+
+  const runOnce = async (sessionId) => {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
     // Codex uses the non-interactive `exec` subcommand and `--cd`; `--dir`
     // belongs to OpenCode and is rejected by current Codex CLI releases.
-    const args = ['exec'];
+    // `--skip-git-repo-check` lets project workspaces without a .git run.
+    // `resume` reuses the thread's recorded cwd and rejects `--cd`, so it is
+    // only passed on new threads (same-project resumes share the cwd anyway).
+    const args = sessionId ? ['exec', 'resume', sessionId] : ['exec'];
     if (agent?.model) args.push('--model', agent.model);
-    args.push('--cd', projectDir, prompt);
-    const { stdout: output } = await runHarnessProcess(harnessBin, args, {
+    args.push('--json', '--skip-git-repo-check');
+    if (!sessionId) args.push('--cd', projectDir);
+    args.push(prompt);
+    const { stdout } = await runHarnessProcess(harnessBin, args, {
       cwd: projectDir,
       env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' },
       agentId,
       harness: 'codex',
       processKey: agentId
     });
+    return parseCodexJsonOutput(stdout);
+  };
+
+  const persistSessionId = (sessionId) => {
+    if (!sessionId) return;
+    try {
+      const hrSystem = loadHrSystem();
+      if (!hrSystem[agentId]) return;
+      hrSystem[agentId].harnessSessions = { ...(hrSystem[agentId].harnessSessions || {}), codex: sessionId };
+      saveHrSystem(hrSystem);
+    } catch {
+      /* session tracking must never break a harness turn */
+    }
+  };
+
+  try {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
+    appendAgentThought(
+      agentId,
+      'CODEX_INVOKE',
+      `Invoking Codex harness [${agent?.model || 'default'}] in ${projectDir}` +
+        (storedSessionId ? ` (resuming thread ${storedSessionId})` : ' (new thread)')
+    );
+    let parsed;
+    try {
+      parsed = await runOnce(storedSessionId);
+    } catch (error) {
+      // Stale thread id (e.g. pruned server-side): retry once as a new thread.
+      if (storedSessionId && /no rollout found|not found/i.test(String(error.message || '') + String(error.stderr || ''))) {
+        appendAgentThought(agentId, 'CODEX_SESSION_RESET', `Stored thread ${storedSessionId} not found; starting a new thread.`);
+        try {
+          const hr = loadHrSystem();
+          if (hr[agentId]?.harnessSessions?.codex) {
+            delete hr[agentId].harnessSessions.codex;
+            saveHrSystem(hr);
+          }
+        } catch { /* best effort */ }
+        parsed = await runOnce(null);
+      } else {
+        throw error;
+      }
+    }
+    persistSessionId(parsed.sessionId);
     appendAgentThought(agentId, 'CODEX_SUCCESS', `Codex CLI execution completed.`);
-    return { success: true, output, agentId, harness: 'codex', model: agent?.model };
+    return { success: true, output: parsed.output, agentId, harness: 'codex', model: agent?.model, sessionId: parsed.sessionId || undefined };
   } catch (error) {
     appendAgentThought(agentId, 'CODEX_FALLBACK', `Harness note: ${error.message.slice(0, 120)}`);
     return simulateHarnessExecution('codex', projectId, prompt, agentId);

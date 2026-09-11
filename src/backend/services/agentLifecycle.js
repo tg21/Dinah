@@ -10,6 +10,66 @@ import {
 import { broadcastAgentEvent } from './eventBus.js';
 import { sanitizeMcpPermissions, seedDefaultPermissions } from '../mcp/index.js';
 import { enqueueDirectMessage } from './messageQueueService.js';
+import { getProjectCoordination } from './coordinationService.js';
+
+// Plan 07: post-spawn wake. New agents start with an empty inbox, so the 5s
+// dispatcher (messageDispatcher.js, queued-inbox only) never wakes them even
+// when tasks sit `assigned`. Seed one inbox item — first assigned task, or a
+// check-in nudge when nothing is assigned — and let the dispatcher wake the
+// agent within seconds. Best-effort: seeding must never break spawn/confirm.
+function findAssignedTask(projectId, agentId, role) {
+  try {
+    const coord = getProjectCoordination(projectId);
+    const tasks = coord?.tasks || [];
+    const exact = tasks.filter((t) => t.assignee === agentId && t.status === 'assigned');
+    if (exact.length) return exact[0];
+    // Legacy bare-role records (pre-plan-06): treat a role-name assignment as
+    // this agent's when roles match.
+    const roleMatch = tasks.filter((t) => t.assignee === role && t.status === 'assigned');
+    if (roleMatch.length) return roleMatch[0];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function seedPostSpawnInbox(agentId, agent, hrSystem) {
+  const task = findAssignedTask(agent.project, agentId, agent.role);
+  try {
+    if (task) {
+      const sender = task.createdBy && hrSystem[task.createdBy] ? task.createdBy : 'hr-mind-flayer';
+      const desc = task.description ? `\n\n${task.description}` : '';
+      const ac =
+        Array.isArray(task.acceptanceCriteria) && task.acceptanceCriteria.length
+          ? `\n\nAcceptance criteria:\n${task.acceptanceCriteria.join('\n')}`
+          : '';
+      enqueueDirectMessage({
+        fromAgentId: sender,
+        toAgentId: agentId,
+        projectId: agent.project,
+        message: `Task assignment [${task.id}] for [${agentId}]: ${task.title}${desc}${ac}`
+      });
+    } else {
+      enqueueDirectMessage({
+        fromAgentId: 'hr-mind-flayer',
+        toAgentId: agentId,
+        projectId: agent.project,
+        message: `No assigned tasks yet for [${agentId}] — check in with your manager for ${agent.project} via list_inbox / get_project_status.`
+      });
+    }
+  } catch {
+    /* seed is best-effort; dispatcher wake must never break spawn */
+  }
+  try {
+    appendAgentThought(
+      agentId,
+      'SPAWN_WAKE',
+      task ? `Inbox seeded with task ${task.id}; dispatcher will wake within seconds.` : 'Inbox seeded with check-in nudge (no assigned tasks).'
+    );
+  } catch {
+    /* thoughts must never break spawn */
+  }
+}
 
 export function calculateAgentCostEstimation(role, model, effortLevel = 'High') {
   const meta = AGENT_RPG_REGISTRY[role] || {};
@@ -190,6 +250,9 @@ export function confirmAgentSummoning(agentId, updatedParams = {}) {
     snippet: `${agent.name} materialized into arena`
   });
 
+  // Plan 07 wake: seed inbox so the dispatcher picks the agent up.
+  seedPostSpawnInbox(agentId, agent, hrSystem);
+
   return { agentId, agent };
 }
 
@@ -274,6 +337,9 @@ export function spawnAgentViaHr(role, projectId = 'global', customName = null, o
     });
     appendToSharedLog(`HR Mind Flayer spawned agent [${agentId}] for project [${cleanProjectId}]`);
   }
+
+  // Plan 07 wake: seed inbox so the dispatcher picks the agent up.
+  seedPostSpawnInbox(agentId, newAgent, hrSystem);
 
   return { agentId, agent: newAgent };
 }

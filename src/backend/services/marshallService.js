@@ -4,6 +4,7 @@ import { MARSHALL_AUDIT_FILE } from '../config.js';
 import { loadHrSystem, saveHrSystem } from './hrService.js';
 import { getProjectFolder } from './projectService.js';
 import { appendAgentThought, appendToSharedLog } from './messageService.js';
+import { broadcastAgentEvent } from './eventBus.js';
 
 export function loadMarshallAudit() {
   if (!fs.existsSync(MARSHALL_AUDIT_FILE)) {
@@ -79,6 +80,15 @@ export function runMarshallChecks() {
       appendToSharedLog(
         `[MARSHALL RECOVERY] Unstuck stalled agent [${agentId}] (idle for ${idleMinutes}m). Reset status to active.`
       );
+    }
+
+    // Plan 01: awaiting-user watchdog. The hold is never auto-cleared, but if
+    // the user-facing signal was missed (restart, dropped event), re-broadcast
+    // it so the UI hold signal stays visible. Cap: only re-broadcast, nothing else.
+    if (agent.status === 'awaiting-user' && agent.pendingUserQuestion && idleMinutes >= 10) {
+      const question = String(agent.pendingUserQuestion.question || '').slice(0, 80);
+      broadcastAgentEvent({ fromAgentId: agentId, toAgentId: 'user', projectId: agent.project, type: 'agent_needs_user', snippet: question });
+      appendToSharedLog(`[MARSHALL WATCHDOG] Re-broadcast user-input hold for [${agentId}] (waiting ${idleMinutes}m). Hold preserved.`);
     }
   }
 

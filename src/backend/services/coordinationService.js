@@ -31,6 +31,39 @@ function requireText(value, field) {
   return value.trim();
 }
 
+// Plan 01: coordination-write wake-ups. Progress/blocker/help/task writes are
+// otherwise invisible to the dispatcher (queued-inbox only), so the manager
+// never learns that workers moved. Notify the interested party through the
+// durable queue; the dispatcher wakes them within seconds. Best-effort and
+// self-notify-safe: never wake the writer about their own write, and never
+// queue for paused/retired agents (the dispatcher would skip them anyway).
+function findProjectManagerId(projectId) {
+  try {
+    const entry = Object.entries(loadHrSystem()).find(([, agent]) =>
+      agent.project === projectId && agent.role === 'manager-bard' && agent.status !== 'retired'
+    );
+    return entry ? entry[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+function notifyAgent({ fromAgentId, toAgentId, projectId, message }) {
+  if (!toAgentId || toAgentId === fromAgentId) return;
+  let status;
+  try {
+    status = loadHrSystem()[toAgentId]?.status;
+  } catch {
+    return;
+  }
+  if (!['active', 'working', 'awaiting-user'].includes(status)) return;
+  try {
+    enqueueDirectMessage({ fromAgentId, toAgentId, projectId, message });
+  } catch {
+    /* wake-ups must never break coordination writes */
+  }
+}
+
 export function canonicalAssignee(projectId, assignee) {
   const requested = requireText(assignee, 'assignee');
   const hr = loadHrSystem();
@@ -53,7 +86,7 @@ export function canonicalAssignee(projectId, assignee) {
   return requested;
 }
 
-export function recordTask({ projectId, title, description = '', assignee, acceptanceCriteria = [], dependencies = [], createdBy }) {
+export function recordTask({ projectId, title, description = '', assignee, acceptanceCriteria = [], dependencies = [], createdBy, notify = true }) {
   const state = loadState();
   const cleanProjectId = requireText(projectId, 'projectId');
   const project = projectState(state, cleanProjectId);
@@ -73,6 +106,18 @@ export function recordTask({ projectId, title, description = '', assignee, accep
   project.tasks.push(task);
   saveState(state);
   appendToSharedLog(`Task [${task.id}] assigned to [${task.assignee}] in [${projectId}].`);
+  // Wake the assignee so the task starts without a user message. Skipped when
+  // the caller dispatches directly (dispatch:true already runs a harness turn).
+  if (notify) {
+    notifyAgent({
+      fromAgentId: task.createdBy,
+      toAgentId: task.assignee,
+      projectId: cleanProjectId,
+      message: `New task [${task.id}] assigned to [${task.assignee}]: ${task.title}` +
+        (task.description ? `\n\n${task.description}` : '') +
+        (task.acceptanceCriteria.length ? `\n\nAcceptance criteria:\n${task.acceptanceCriteria.join('\n')}` : '')
+    });
+  }
   return task;
 }
 
@@ -97,6 +142,14 @@ export function updateTaskProgress({ projectId, taskId, agentId, status, summary
   if (!task.projectId) task.projectId = cleanProjectId;
   project.updates.push({ agentId, taskId, projectId: cleanProjectId, status: task.status, summary: task.summary, at: task.updatedAt });
   saveState(state);
+  // Wake the task creator (usually the manager) so dependent work can be
+  // allocated as soon as this update lands. Self-updates stay silent.
+  notifyAgent({
+    fromAgentId: agentId,
+    toAgentId: task.createdBy,
+    projectId: cleanProjectId,
+    message: `Progress on [${task.id}] "${task.title}" by [${agentId}]: status=${task.status} — ${task.summary}`
+  });
   return task;
 }
 
@@ -108,6 +161,12 @@ export function reportBlocker({ projectId, agentId, taskId, blocker, severity = 
   project.blockers.push(item);
   saveState(state);
   appendToSharedLog(`Blocker [${item.id}] reported by [${agentId}] in [${projectId}].`);
+  notifyAgent({
+    fromAgentId: agentId,
+    toAgentId: findProjectManagerId(cleanProjectId),
+    projectId: cleanProjectId,
+    message: `Blocker [${item.id}] reported by [${agentId}]${taskId ? ` on [${taskId}]` : ''} (severity=${severity}): ${item.blocker}`
+  });
   return item;
 }
 
@@ -119,6 +178,12 @@ export function requestHelp({ projectId, agentId, taskId, neededRole, question, 
   project.helpRequests.push(request);
   saveState(state);
   appendToSharedLog(`Help request [${request.id}] from [${agentId}] needs [${neededRole}] in [${projectId}].`);
+  notifyAgent({
+    fromAgentId: agentId,
+    toAgentId: findProjectManagerId(cleanProjectId),
+    projectId: cleanProjectId,
+    message: `Help request [${request.id}] from [${agentId}] needs [${neededRole}] (urgency=${urgency}): ${request.question}`
+  });
   return request;
 }
 

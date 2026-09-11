@@ -12,6 +12,69 @@ import {
 } from '../services/messageService.js';
 import { broadcastAgentEvent } from '../services/eventBus.js';
 import { spawnHarnessAgent } from '../services/harnessRunner.js';
+import { getProjectCoordination } from '../services/coordinationService.js';
+import { runContinuation } from '../services/messageDispatcher.js';
+import {
+  claimMessage,
+  completeMessage,
+  enqueueDirectMessage,
+  failMessage,
+  listInbox
+} from '../services/messageQueueService.js';
+
+// Plan 01: resume-prompt enrichment. A bare user reply (e.g. "proper
+// engineering") carries none of the stalled context, so the resumed turn gets
+// the original question + project brief + coordination snapshot + inbox batch.
+export function buildResumePrompt({ agentId, projectId, userReply, pendingQuestion }) {
+  const sections = [];
+  if (pendingQuestion?.question) {
+    sections.push(
+      `You previously paused with a question for the user${pendingQuestion.taskId ? ` (task ${pendingQuestion.taskId})` : ''}${pendingQuestion.askedAt ? ` at ${pendingQuestion.askedAt}` : ''}:\n"${pendingQuestion.question}"`
+    );
+  }
+  try {
+    const projCfg = loadProjectsConfig()[projectId];
+    if (projCfg?.description) sections.push(`Project brief for ${projectId}:\n${String(projCfg.description).slice(0, 1000)}`);
+  } catch {
+    /* brief is best-effort */
+  }
+  try {
+    const coord = getProjectCoordination(projectId);
+    const openTasks = (coord.tasks || []).filter((t) => ['assigned', 'in-progress'].includes(t.status)).slice(0, 10);
+    if (openTasks.length) {
+      sections.push(
+        `Open tasks (${openTasks.length}):\n` +
+          openTasks.map((t) => `- [${t.status}] ${t.title} (assignee=${t.assignee}, id=${t.id})`).join('\n')
+      );
+    }
+    const openBlockers = (coord.blockers || []).filter((b) => b.status === 'open').slice(0, 5);
+    if (openBlockers.length) {
+      sections.push(`Open blockers:\n` + openBlockers.map((b) => `- ${b.blocker} (by=${b.agentId})`).join('\n'));
+    }
+    const openHelp = (coord.helpRequests || []).filter((h) => h.status === 'open').slice(0, 5);
+    if (openHelp.length) {
+      sections.push(`Open help requests:\n` + openHelp.map((h) => `- ${h.question} (from=${h.agentId})`).join('\n'));
+    }
+  } catch {
+    /* snapshot is best-effort */
+  }
+  try {
+    const inbox = listInbox({ agentId, limit: 10 });
+    if (inbox.length) {
+      sections.push(
+        `Queued inbox (${inbox.length}):\n` +
+          inbox.map((m) => `- from=${m.senderAgentId} type=${m.type}: ${String(m.summary).slice(0, 200)}`).join('\n')
+      );
+    }
+  } catch {
+    /* inbox snapshot is best-effort */
+  }
+  sections.push(`User reply:\n"${userReply}"`);
+  sections.push(
+    'Continue autonomously: staff, dispatch, and track work through the orchestration tools. Use ask_user only for genuine user decisions.'
+  );
+  return sections.join('\n\n');
+}
 
 const router = Router();
 
@@ -62,13 +125,26 @@ router.post('/handleGetAgentStatus', (req, res) => {
 
 // Send message to agent
 router.post('/handleSendMessage', async (req, res) => {
-  const { agentId = 'ceo-warlock', projectId = 'project-alpha', message, harness = 'opencode' } = req.body;
+  const { agentId: requestedAgentId, projectId: requestedProjectId, message, harness = 'opencode' } = req.body;
 
   if (!message || !message.trim()) {
     return res.status(400).json({ error: 'Message cannot be empty' });
   }
 
-  // 1. Record user message
+  // Plan 01 routing honesty: unknown agentIds fail loudly instead of running
+  // a turn as the wrong agent while the real one waits forever.
+  const hrSystem = loadHrSystem();
+  const agentId = requestedAgentId || 'ceo-warlock';
+  const agentRecord = hrSystem[agentId];
+  if (!agentRecord) {
+    return res.status(400).json({ error: `Unknown agentId: ${agentId}` });
+  }
+  const projectId = requestedProjectId || agentRecord.project || 'project-alpha';
+
+  // Capture the pending question BEFORE clearing so it can enrich the resume.
+  const pendingQuestion = agentRecord.pendingUserQuestion || null;
+
+  // 1. Record user message (drawer projection)
   appendAgentMessage(agentId, {
     from: 'User (Overseer)',
     role: 'user',
@@ -87,8 +163,21 @@ router.post('/handleSendMessage', async (req, res) => {
     snippet: message.slice(0, 50)
   });
 
+  // 1b. Durable reply so the agent's list_inbox can see the user's answer.
+  let userMessageId = null;
+  try {
+    const queued = enqueueDirectMessage({
+      fromAgentId: 'user',
+      toAgentId: agentId,
+      projectId,
+      message: `User (Overseer) reply: ${message}`
+    });
+    userMessageId = queued.message?.messageId || null;
+  } catch {
+    /* drawer projection above already recorded the reply */
+  }
+
   // 2. Update agent activity & token usage
-  const hrSystem = loadHrSystem();
   if (hrSystem[agentId]) {
     hrSystem[agentId].last_activity_ms = Date.now();
     if (hrSystem[agentId].status === 'awaiting-user') {
@@ -111,25 +200,66 @@ router.post('/handleSendMessage', async (req, res) => {
     }
   }
 
-  // 3. Dispatch to harness
+  // 2b. Claim the durable reply for this sync turn so the 5s dispatcher does
+  // not run a duplicate turn for the same message.
+  let leaseToken = null;
+  if (userMessageId) {
+    try {
+      leaseToken = claimMessage({ messageId: userMessageId, agentId }).leaseToken;
+    } catch {
+      leaseToken = null;
+    }
+  }
+
+  // 3. Dispatch to harness with the enriched resume prompt
+  const resumePrompt = buildResumePrompt({ agentId, projectId, userReply: message, pendingQuestion });
   appendAgentThought(agentId, 'USER_INPUT', `Received prompt: "${message.slice(0, 80)}..."`);
   const effectiveHarness = hrSystem[agentId]?.harness || harness;
-  const harnessResult = await spawnHarnessAgent(effectiveHarness, projectId, message, agentId);
+  let harnessResult;
+  try {
+    harnessResult = await spawnHarnessAgent(effectiveHarness, projectId, resumePrompt, agentId);
+  } catch (error) {
+    if (userMessageId && leaseToken) {
+      try {
+        failMessage({ messageId: userMessageId, agentId, leaseToken, reason: error.message, retryable: true });
+      } catch { /* lease recovery handles it */ }
+    }
+    throw error;
+  }
 
-  // 4. Record agent reply
+  // 3b. This sync turn consumed the reply; mark it complete for the waker.
+  if (userMessageId && leaseToken) {
+    try {
+      completeMessage({ messageId: userMessageId, agentId, leaseToken, result: 'Consumed by handleSendMessage turn.' });
+    } catch { /* already completed via MCP tools inside the turn */ }
+  }
+
+  // 4. Record agent reply (simulated turns stay distinguishable in the UI)
   appendAgentMessage(agentId, {
     from: hrSystem[agentId]?.name || agentId,
     role: 'agent',
     project: projectId,
     request: harnessResult.output,
-    path: getProjectFolder(projectId)
+    path: getProjectFolder(projectId),
+    simulated: harnessResult.simulated === true
   });
+
+  // 5. Bounded continuation: drain follow-up inbox items from this resume
+  // (coordination wake-ups other agents produced during the turn).
+  let continuedTurns = 0;
+  try {
+    continuedTurns = (await runContinuation(agentId, 5)).turns;
+  } catch {
+    /* continuation is best-effort */
+  }
 
   return res.json({
     success: true,
     agentReply: harnessResult.output,
     harness: harnessResult.harness,
-    agentId
+    agentId,
+    simulated: harnessResult.simulated === true,
+    continuedTurns
   });
 });
 

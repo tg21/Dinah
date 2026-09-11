@@ -194,16 +194,32 @@ export function listInbox({ agentId, projectId, limit = 20, includeCompleted = f
   return deliveries.map((delivery) => publicMessage(state.messages.find((item) => item.messageId === delivery.messageId), delivery));
 }
 
+function findDelivery(state, { messageId, agentId }) {
+  const identifier = text(messageId, 'messageId');
+  const agent = text(agentId, 'agentId');
+  // Agents see both ids (get_message_status accepts either), so lease ops
+  // resolve either one — scoped to the recipient so only the holder may mutate.
+  return (
+    state.deliveries.find((item) => item.messageId === identifier && item.recipientAgentId === agent) ||
+    state.deliveries.find((item) => item.deliveryId === identifier && item.recipientAgentId === agent)
+  );
+}
+
 function leaseAction({ messageId, agentId, leaseToken, status }) {
   const state = loadState();
-  recoverExpired(state);
-  const delivery = state.deliveries.find((item) => item.messageId === messageId && item.recipientAgentId === agentId);
+  const delivery = findDelivery(state, { messageId, agentId });
   if (!delivery) throw new Error('Message delivery not found');
-  if (delivery.status === 'completed') return { message: state.messages.find((item) => item.messageId === messageId), delivery, idempotent: true };
-  if (delivery.leaseToken !== leaseToken || delivery.leaseExpiresAt <= Date.now()) throw new Error('Message lease is missing or expired');
+  if (delivery.status === 'completed') return { message: state.messages.find((item) => item.messageId === delivery.messageId), delivery, idempotent: true };
+  // The matching holder may refresh even after the lease timestamp passed, as
+  // long as the delivery was never reassigned (expiry recovery nulls the
+  // token, so a matching token proves ownership). Only mismatched/missing
+  // tokens are rejected — long harness turns otherwise fail their late ack.
+  if (!leaseToken || delivery.leaseToken !== leaseToken) {
+    throw new Error('Message lease is missing or expired');
+  }
   delivery.status = status;
   delivery.leaseExpiresAt = Date.now() + DEFAULT_LEASE_MS;
-  const message = state.messages.find((item) => item.messageId === messageId);
+  const message = state.messages.find((item) => item.messageId === delivery.messageId);
   message.status = status;
   saveState(state);
   return { message, delivery, idempotent: false };
@@ -212,9 +228,9 @@ function leaseAction({ messageId, agentId, leaseToken, status }) {
 export function claimMessage({ messageId, agentId, leaseMs = DEFAULT_LEASE_MS }) {
   const state = loadState();
   if (recoverExpired(state)) saveState(state);
-  const delivery = state.deliveries.find((item) => item.messageId === text(messageId, 'messageId') && item.recipientAgentId === text(agentId, 'agentId'));
+  const delivery = findDelivery(state, { messageId, agentId });
   if (!delivery) throw new Error('Message delivery not found');
-  if (delivery.status === 'completed') return { message: state.messages.find((item) => item.messageId === messageId), delivery, idempotent: true };
+  if (delivery.status === 'completed') return { message: state.messages.find((item) => item.messageId === delivery.messageId), delivery, idempotent: true };
   if (!['queued'].includes(delivery.status)) throw new Error('Message is already claimed or processing');
   const now = Date.now();
   delivery.status = 'claimed';
@@ -222,7 +238,7 @@ export function claimMessage({ messageId, agentId, leaseMs = DEFAULT_LEASE_MS })
   delivery.claimedAt = new Date(now).toISOString();
   delivery.leaseExpiresAt = now + Math.max(1000, Math.min(600000, Number(leaseMs) || DEFAULT_LEASE_MS));
   delivery.leaseToken = crypto.randomBytes(24).toString('hex');
-  const message = state.messages.find((item) => item.messageId === messageId);
+  const message = state.messages.find((item) => item.messageId === delivery.messageId);
   message.status = 'claimed'; message.attemptCount = delivery.attemptCount; message.claimedAt = delivery.claimedAt;
   saveState(state);
   projectDeliveryToDrawer(delivery.recipientAgentId, message, delivery, 'claimed');
@@ -233,8 +249,8 @@ export function acknowledgeMessage(args) { return leaseAction({ ...args, status:
 export function completeMessage({ messageId, agentId, leaseToken, result = null }) {
   const outcome = leaseAction({ messageId, agentId, leaseToken, status: 'completed' });
   const state = loadState();
-  const message = state.messages.find((item) => item.messageId === messageId);
-  const delivery = state.deliveries.find((item) => item.messageId === messageId && item.recipientAgentId === agentId);
+  const delivery = findDelivery(state, { messageId, agentId });
+  const message = state.messages.find((item) => item.messageId === delivery.messageId);
   delivery.completedAt = new Date().toISOString(); delivery.result = result;
   message.completedAt = delivery.completedAt; message.result = result; message.status = 'completed';
   saveState(state);
@@ -243,11 +259,11 @@ export function completeMessage({ messageId, agentId, leaseToken, result = null 
 }
 export function failMessage({ messageId, agentId, leaseToken, reason, retryable = true }) {
   const state = loadState();
-  const delivery = state.deliveries.find((item) => item.messageId === messageId && item.recipientAgentId === agentId);
-  if (!delivery || delivery.leaseToken !== leaseToken || delivery.leaseExpiresAt <= Date.now()) throw new Error('Message lease is missing or expired');
+  const delivery = findDelivery(state, { messageId, agentId });
+  if (!delivery || !leaseToken || delivery.leaseToken !== leaseToken) throw new Error('Message lease is missing or expired');
   delivery.lastError = text(reason, 'reason'); delivery.leaseToken = null; delivery.leaseExpiresAt = null;
   delivery.status = retryable && delivery.attemptCount < MAX_ATTEMPTS ? 'queued' : 'dead-lettered';
-  const message = state.messages.find((item) => item.messageId === messageId); message.status = delivery.status;
+  const message = state.messages.find((item) => item.messageId === delivery.messageId); message.status = delivery.status;
   saveState(state);
   return { message: publicMessage(message, delivery), retrying: delivery.status === 'queued' };
 }

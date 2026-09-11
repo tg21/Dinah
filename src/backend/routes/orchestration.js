@@ -70,7 +70,9 @@ router.post('/api/internal/orchestration/provision', guard, (req, res) => {
 });
 
 router.post('/api/internal/orchestration/task', guard, async (req, res) => {
-  const task = recordTask({ ...req.body, createdBy: req.body.agentId });
+  // dispatch:true runs a harness turn directly, which already carries the task
+  // content — skip the queue wake-up so the worker isn't woken twice.
+  const task = recordTask({ ...req.body, createdBy: req.body.agentId, notify: req.body.dispatch !== true });
   if (req.body.dispatch === true) {
     const hr = loadHrSystem();
     // Resolve role names via canonicalAssignee so dispatch:true works with
@@ -99,11 +101,26 @@ router.post('/api/internal/orchestration/message', guard, (req, res) => res.json
 router.post('/api/internal/orchestration/project-message', guard, (req, res) => res.json(publishProjectMessage(req.body)));
 router.post('/api/internal/orchestration/subscribe', guard, (req, res) => res.json(subscribeToProject(req.body)));
 router.post('/api/internal/orchestration/inbox', guard, (req, res) => res.json({ messages: listInbox(req.body) }));
-router.post('/api/internal/orchestration/claim', guard, (req, res) => res.json(claimMessage(req.body)));
-router.post('/api/internal/orchestration/acknowledge', guard, (req, res) => res.json(acknowledgeMessage(req.body)));
-router.post('/api/internal/orchestration/complete', guard, (req, res) => res.json(completeMessage(req.body)));
-router.post('/api/internal/orchestration/fail', guard, (req, res) => res.json(failMessage(req.body)));
-router.post('/api/internal/orchestration/release', guard, (req, res) => res.json(releaseMessage(req.body)));
-router.post('/api/internal/orchestration/message-status', guard, (req, res) => res.json(getMessageStatus(req.body)));
+
+// Queue lease ops throw on stale callers (expired lease, double claim). Map to
+// structured JSON so harness agents get a retryable error instead of an HTML
+// 500 + terminal stack trace.
+function queueRoute(fn) {
+  return (req, res) => {
+    try {
+      res.json(fn(req.body));
+    } catch (error) {
+      const message = error.message || 'Queue operation failed';
+      const status = /not found/i.test(message) ? 404 : /already claimed|lease/i.test(message) ? 409 : 400;
+      res.status(status).json({ error: message });
+    }
+  };
+}
+router.post('/api/internal/orchestration/claim', guard, queueRoute((body) => claimMessage(body)));
+router.post('/api/internal/orchestration/acknowledge', guard, queueRoute((body) => acknowledgeMessage(body)));
+router.post('/api/internal/orchestration/complete', guard, queueRoute((body) => completeMessage(body)));
+router.post('/api/internal/orchestration/fail', guard, queueRoute((body) => failMessage(body)));
+router.post('/api/internal/orchestration/release', guard, queueRoute((body) => releaseMessage(body)));
+router.post('/api/internal/orchestration/message-status', guard, queueRoute((body) => getMessageStatus(body)));
 
 export default router;

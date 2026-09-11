@@ -7,17 +7,17 @@ const activeWakeups = new Set();
 let timer;
 
 async function dispatchAgent(agentId) {
-  if (activeWakeups.has(agentId)) return;
+  if (activeWakeups.has(agentId)) return false;
   const agent = loadHrSystem()[agentId];
-  if (!agent || !['active', 'working'].includes(agent.status)) return;
+  if (!agent || !['active', 'working'].includes(agent.status)) return false;
   const inbox = listInbox({ agentId, limit: 10 });
   const next = inbox.find((message) => message.deliveryStatus === 'queued');
-  if (!next) return;
+  if (!next) return false;
   let claim;
   try {
     claim = claimMessage({ messageId: next.messageId, agentId });
   } catch (error) {
-    return;
+    return false;
   }
   activeWakeups.add(agentId);
   const messages = listInbox({ agentId, limit: 10 }).filter((message) => message.deliveryStatus === 'claimed' || message.deliveryStatus === 'queued');
@@ -31,11 +31,29 @@ async function dispatchAgent(agentId) {
   try {
     appendAgentThought(agentId, 'MESSAGE_WAKE', `Dispatcher claimed ${claim.message.messageId}.`);
     await spawnHarnessAgent(agent.harness || 'opencode', agent.project || 'global', prompt, agentId);
+    return true;
   } catch (error) {
     try { failMessage({ messageId: claim.message.messageId, agentId, leaseToken: claim.leaseToken, reason: error.message, retryable: true }); } catch { /* lease recovery handles a crash */ }
+    return false;
   } finally {
     activeWakeups.delete(agentId);
   }
+}
+
+// Plan 01 continuation: drain an agent's queued inbox with bounded turns.
+// Each turn is event-grounded (a queued delivery exists); stops early when the
+// agent pauses for the user (fresh ask_user hold) or the queue empties.
+// No wall-clock timeouts — the cap is turns, not time.
+export async function runContinuation(agentId, maxTurns = 5) {
+  let turns = 0;
+  while (turns < maxTurns) {
+    const status = loadHrSystem()[agentId]?.status;
+    if (status === 'awaiting-user') break;
+    const ran = await dispatchAgent(agentId);
+    if (!ran) break;
+    turns += 1;
+  }
+  return { turns };
 }
 
 export async function dispatchQueuedMessages() {
