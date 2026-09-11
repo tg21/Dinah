@@ -7,6 +7,7 @@ import {
   spawnAgentViaHr
 } from '../services/agentLifecycle.js';
 import { appendToSharedLog } from '../services/messageService.js';
+import { broadcastAgentEvent } from '../services/eventBus.js';
 import { sanitizeMcpPermissions } from '../mcp/index.js';
 import { cancelHarnessAgent } from '../services/harnessRunner.js';
 
@@ -72,6 +73,12 @@ router.post('/api/agents/update', (req, res) => {
 
   saveHrSystem(hrSystem);
   appendToSharedLog(`Configured agent [${agentId}] (${agent.name}) with updated parameters.`);
+  broadcastAgentEvent({
+    fromAgentId: 'system',
+    toAgentId: agentId,
+    type: 'agent_updated',
+    snippet: `Agent ${agentId} updated`
+  });
   res.json({ success: true, agent });
 });
 
@@ -86,6 +93,12 @@ router.post('/api/agents/set-status', (req, res) => {
   hrSystem[agentId].status = status;
   saveHrSystem(hrSystem);
   appendToSharedLog(`Agent [${agentId}] status changed to [${status}].`);
+  broadcastAgentEvent({
+    fromAgentId: 'system',
+    toAgentId: agentId,
+    type: 'agent_status_changed',
+    snippet: `Agent ${agentId} → ${status}`
+  });
   res.json({ success: true, agentId, status });
 });
 

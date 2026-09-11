@@ -70,26 +70,46 @@ export function AppProvider({ children }) {
   }, [currentProjectId]);
 
   const seenEvents = useRef(new Set());
+  const lastRosterRefresh = useRef(0);
   useEffect(() => {
     loadMessageActivity();
     const activityTimer = window.setInterval(loadMessageActivity, 4000);
-    const eventTimer = window.setInterval(async () => {
-      const data = await api.getEvents().catch(() => null);
-      for (const event of data?.events || []) {
-        if (seenEvents.current.has(event.id)) continue;
-        seenEvents.current.add(event.id);
-        if (event.type !== 'courier_message' || event.fromAgentId === 'user') continue;
-        if (event.projectId && event.projectId !== currentProjectId) continue;
+
+    const handleLiveEvent = (event) => {
+      if (!event || seenEvents.current.has(event.id)) return;
+      seenEvents.current.add(event.id);
+      if (event.projectId && event.projectId !== currentProjectId && event.projectId !== 'global') return;
+      if (event.type === 'courier_message') {
+        if (event.fromAgentId === 'user') return;
         const flight = { ...event, expiresAt: Date.now() + 30000 };
         setMailFlights((current) => [...current.filter((item) => item.messageId !== event.messageId), flight]);
         window.setTimeout(() => setMailFlights((current) => current.filter((item) => item.id !== event.id)), 30000);
+        // New durable traffic is visible now; don't wait for the next poll.
+        loadMessageActivity();
+        return;
       }
-    }, 1500);
+      // Roster-invalidating events: agent-driven staffing (request_staff /
+      // provision_agent) has no modal to trigger loadAgents(), so the SSE
+      // push is the only thing that makes awaiting-confirmation appear.
+      if (['summon_requested', 'summon_confirmed', 'agent_spawned', 'agent_updated', 'agent_status_changed'].includes(event.type)) {
+        const now = Date.now();
+        if (now - lastRosterRefresh.current < 1000) return;
+        lastRosterRefresh.current = now;
+        loadAgents();
+      }
+    };
+
+    // One-shot catch-up for events missed while disconnected, then live SSE.
+    api.getEvents().then((data) => {
+      for (const event of data?.events || []) handleLiveEvent(event);
+    }).catch(() => null);
+    const unsubscribe = api.subscribeEvents(handleLiveEvent);
+
     return () => {
       window.clearInterval(activityTimer);
-      window.clearInterval(eventTimer);
+      unsubscribe();
     };
-  }, [currentProjectId, loadMessageActivity]);
+  }, [currentProjectId, loadMessageActivity, loadAgents]);
 
   const loadAgentDrawer = useCallback(
     async (agentId) => {

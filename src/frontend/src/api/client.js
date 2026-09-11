@@ -50,6 +50,20 @@ export const api = {
   getHarnesses: () => req('/api/harnesses'),
   getMcps: (agentId) => req(agentId ? `/api/mcps?agentId=${encodeURIComponent(agentId)}` : '/api/mcps'),
   getEvents: () => req('/api/events'),
+  // Live event stream (SSE, same origin/port). Resolves roster/message
+  // staleness without polling: backend pushes summon/spawn/status +
+  // courier events as they happen. Returns an unsubscribe function.
+  subscribeEvents: (onEvent) => {
+    const source = new EventSource('/api/events/stream');
+    source.onmessage = (e) => {
+      try {
+        onEvent(JSON.parse(e.data));
+      } catch {
+        /* ignore malformed frames */
+      }
+    };
+    return () => source.close();
+  },
   getMessageActivity: (projectId) => req(`/api/message-activity?projectId=${encodeURIComponent(projectId || 'global')}`),
   searchMcps: (q) => req(`/api/mcps/search?q=${encodeURIComponent(q)}`),
   installMcp: ({ serverName, version }) =>

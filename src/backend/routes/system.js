@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import { DINAH_MARKER_FILE, TOOL_DIR, WORKING_DIR, USING_DEFAULT_WORKING_AREA } from '../config.js';
-import { getAgentEventQueue } from '../services/eventBus.js';
+import { addSseClient, getAgentEventQueue, removeSseClient } from '../services/eventBus.js';
 import { loadHrSystem } from '../services/hrService.js';
 import { getSharedStateLogFile, loadAgentThoughts } from '../services/messageService.js';
 import { ROLE_THOUGHT_POOLS } from '../data/rpgRegistry.js';
@@ -42,6 +42,37 @@ router.post('/handleGetSharedLog', (req, res) => {
 // Inter-Agent Event Stream
 router.get('/api/events', (req, res) => {
   res.json({ events: getAgentEventQueue() });
+});
+
+// Live event stream (SSE, same origin/port — no extra socket server).
+// Frontend subscribes once and invalidates roster/activity on roster events
+// instead of polling. Vite dev proxy forwards /api, so no extra port.
+router.get('/api/events/stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive'
+  });
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+  // Initial comment keeps intermediaries from buffering the stream.
+  res.write(': connected\n\n');
+  addSseClient(res);
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': heartbeat\n\n');
+    } catch {
+      /* client gone; close handler cleans up */
+    }
+  }, 15000);
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    removeSseClient(res);
+    try {
+      res.end();
+    } catch {
+      /* already closed */
+    }
+  });
 });
 
 router.get('/api/message-activity', (req, res) => {

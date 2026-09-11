@@ -357,6 +357,13 @@ export function spawnAgentViaHr(role, projectId = 'global', customName = null, o
   // Plan 07 wake: seed inbox so the dispatcher picks the agent up.
   seedPostSpawnInbox(agentId, newAgent, hrSystem);
 
+  broadcastAgentEvent({
+    fromAgentId: 'hr-mind-flayer',
+    toAgentId: agentId,
+    type: 'agent_spawned',
+    snippet: `${newAgent.name} spawned into ${cleanProjectId}`
+  });
+
   return { agentId, agent: newAgent };
 }
 

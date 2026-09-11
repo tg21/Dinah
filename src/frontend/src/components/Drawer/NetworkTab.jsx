@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useApp } from '../../store/AppContext.jsx';
-import { OVERSEER_IDS } from '../../constants/roles.js';
 
 function deliveryState(message, effectiveAgentId) {
-  const delivery = message.deliveries?.find((item) => item.recipientAgentId === effectiveAgentId) || message.deliveries?.[0];
+  const delivery = message.deliveries?.find((item) => item.recipientAgentId === effectiveAgentId);
   if (message.senderAgentId === effectiveAgentId && !delivery) return 'sent';
   return delivery?.status || message.status || 'queued';
 }
@@ -18,15 +17,6 @@ function isInvolved(message, effectiveAgentId) {
   return false;
 }
 
-function isPrivilegedViewer(agent, effectiveAgentId) {
-  if (!agent && !effectiveAgentId) return false;
-  if (OVERSEER_IDS.includes(effectiveAgentId)) return true;
-  const role = agent?.role || '';
-  if (role === 'manager-bard') return true;
-  if (OVERSEER_IDS.includes(role)) return true;
-  return false;
-}
-
 function ticks(status) {
   if (status === 'completed') return <span className="message-ticks blue">✓✓</span>;
   if (['claimed', 'processing'].includes(status)) return <span className="message-ticks">✓✓</span>;
@@ -38,11 +28,11 @@ export default function NetworkTab() {
   const { messageActivity, allAgents, currentAgentId, currentProjectId, drawerAgent } = useApp();
   const [expanded, setExpanded] = useState(null);
   const effectiveAgentId = drawerAgent?.id || currentAgentId;
-  const effectiveAgent = (drawerAgent?.id ? drawerAgent : allAgents[effectiveAgentId]) || {};
-  const privileged = isPrivilegedViewer(effectiveAgent, effectiveAgentId);
+  // Every agent — overseers included — sees only traffic it participates in
+  // (sender / recipient / delivery-holder) plus project-channel broadcasts.
   const messages = messageActivity
     .filter((message) => message.projectId === currentProjectId || message.projectId === 'global')
-    .filter((message) => privileged || isInvolved(message, effectiveAgentId));
+    .filter((message) => isInvolved(message, effectiveAgentId));
 
   return (
     <>

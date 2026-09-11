@@ -17,6 +17,7 @@ pointer, lines 2–9 are the 8 issues). RCA was performed against the code at co
 | `06-coordination-ids.md` | L7 — `"hello world-manager-bard"` concatenation | Shared slug helper + stronger `canonicalAssignee` + denormalized `projectId`; write-path only |
 | `07-spawn-wake.md` | L8 — spawned specialists never start | Post-confirm/spawn inbox seed → dispatcher wake; canonical dispatch lookup |
 | `08-knowledge-base.md` | L9–10 — junk in `knowledge-base.json` | Confluence-style per-project team docs; synthesizer cycle; drop hardcoded seed |
+| `09-duplicate-progress-ownership.md` | live 500s — `Task not found or agent is not its assignee` under duplicate specialists | RCA record only (concrete-ID task rejects role-sibling; progress route uncaught vs queue JSON); no behavior change |
 
 ## Agreed decisions (locked before implementation)
 
