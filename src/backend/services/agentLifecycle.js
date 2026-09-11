@@ -13,6 +13,18 @@ import { loadAgentDefinition, listAgentDefinitions } from './agentDefinitions.js
 import { enqueueDirectMessage } from './messageQueueService.js';
 import { getProjectCoordination } from './coordinationService.js';
 
+// Appearance is cosmetic-only: a soft-palette index + variant persisted on
+// the HR record so each agent looks unique and survives restarts. A
+// recreated agent gets a fresh look. Frontend resolves legacy records
+// without this field via a stable hash fallback.
+const APPEARANCE_PALETTE_COUNT = 8;
+export function randomAppearance() {
+  return {
+    paletteId: Math.floor(Math.random() * APPEARANCE_PALETTE_COUNT),
+    variant: Math.floor(Math.random() * 3)
+  };
+}
+
 // Plan 07: post-spawn wake. New agents start with an empty inbox, so the 5s
 // dispatcher (messageDispatcher.js, queued-inbox only) never wakes them even
 // when tasks sit `assigned`. Seed one inbox item — first assigned task, or a
@@ -156,6 +168,7 @@ export function requestAgentSummoning(role, projectId = 'project-alpha', customO
     role,
     project: cleanProjectId,
     status: 'awaiting-confirmation',
+    appearance: customOptions.appearance || randomAppearance(),
     harness,
     model,
     effortLevel,
@@ -315,6 +328,7 @@ export function spawnAgentViaHr(role, projectId = 'global', customName = null, o
     role,
     project: cleanProjectId,
     status: 'active',
+    appearance: options.appearance || randomAppearance(),
     harness,
     model,
     effortLevel,
