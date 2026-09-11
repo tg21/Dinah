@@ -23,8 +23,12 @@ router.post('/api/agents/request-summon', (req, res) => {
   const { role, projectId = 'project-alpha', name, model, harness, effortLevel, promptOverride, requesterId } = req.body;
   if (!role) return res.status(400).json({ error: 'Agent role is required' });
 
-  const result = requestAgentSummoning(role, projectId, { name, model, harness, effortLevel, promptOverride, requesterId });
-  res.json({ success: true, ...result });
+  try {
+    const result = requestAgentSummoning(role, projectId, { name, model, harness, effortLevel, promptOverride, requesterId });
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // Confirm Summoning (manifests agent into active status)
@@ -102,8 +106,12 @@ router.post('/api/agents/spawn', (req, res) => {
   if (!role) {
     return res.status(400).json({ error: 'Agent role is required' });
   }
-  const result = spawnAgentViaHr(role, projectId, customName, { model, harness, effortLevel, promptOverride });
-  res.json({ success: true, ...result });
+  try {
+    const result = spawnAgentViaHr(role, projectId, customName, { model, harness, effortLevel, promptOverride });
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 export default router;

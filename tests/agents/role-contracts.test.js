@@ -43,4 +43,36 @@ describe('agent role contracts', () => {
       'send_agent_message'
     ]));
   });
+
+  it('falls back to baseline worker tools for unknown/generic roles', () => {
+    for (const role of ['frontend-dev', 'code-reviewer', 'qa-engineer', 'does-not-exist-role']) {
+      const tools = seedDefaultPermissions(role).mcp['dinah-orchestration'].allowedTools;
+      expect(tools).toEqual(expect.arrayContaining([
+        'get_project_status',
+        'update_progress',
+        'report_blocker',
+        'request_help',
+        'send_agent_message',
+        'list_inbox',
+        'claim_message',
+        'complete_message'
+      ]));
+      // Baseline must not grant manager-only powers.
+      expect(tools).not.toContain('request_staff');
+      expect(tools).not.toContain('create_task');
+      expect(tools).not.toContain('provision_agent');
+    }
+  });
+
+  it('gives every shipped template the baseline worker coordination tools', () => {
+    for (const definition of listAgentDefinitions()) {
+      expect(definition.coordination?.requiredTools || []).toEqual(expect.arrayContaining([
+        'get_project_status',
+        'update_progress',
+        'report_blocker',
+        'request_help',
+        'send_agent_message'
+      ]));
+    }
+  });
 });

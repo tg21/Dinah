@@ -42,13 +42,13 @@ def get_project_status(projectId: str = "") -> dict:
 
 @mcp.tool()
 def request_staff(role: str, projectId: str = "", name: str = "", model: str = "", promptOverride: str = "") -> dict:
-    """Ask HR to provision a specialist; returns an awaiting-confirmation staffing request."""
+    """Ask HR to provision a specialist; returns an awaiting-confirmation staffing request. Role must be an exact agent-template name (e.g. backend-dev-cleric, frontend-dev-sorcerer, qa-engineer-rogue, code-reviewer-justicar, tech-writer-scribe); unknown names are rejected with the valid list."""
     return call_backend("/api/internal/orchestration/staff", context({"role": role, "projectId": projectId or os.environ["DND_PROJECT_ID"], "name": name or None, "model": model or None, "promptOverride": promptOverride or None}))
 
 
 @mcp.tool()
 def provision_agent(role: str, projectId: str = "", name: str = "", model: str = "", harness: str = "", effortLevel: str = "", promptOverride: str = "") -> dict:
-    """Provision an active specialist. Backend authorizes this tool only for HR Mind Flayer."""
+    """Provision an active specialist. Backend authorizes this tool only for HR Mind Flayer. Role must be an exact agent-template name; unknown names are rejected with the valid list."""
     return call_backend("/api/internal/orchestration/provision", context({"role": role, "projectId": projectId or os.environ["DND_PROJECT_ID"], "name": name or None, "model": model or None, "harness": harness or None, "effortLevel": effortLevel or None, "promptOverride": promptOverride or None}))
 
 

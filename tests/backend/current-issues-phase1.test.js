@@ -172,8 +172,23 @@ describe('Phase 1: staffing visibility + HR drawer (plans 02+03)', () => {
     expect(loadAgentMessages('hr-mind-flayer').messages.length).toBe(hrCountAfterCreate);
   });
 
-  it('queue claim/complete projection appears once (no duplicates on re-read)', () => {
-    saveHrSystem({
+  it('staffing rejects unknown roles with the valid template list', () => {
+    for (const role of ['frontend-dev', 'code-reviewer', 'qa-engineer', 'tech-writer', 'does-not-exist']) {
+      expect(() => requestAgentSummoning(role, 'phase1-proj', { requesterId: 'manager-bard' })).toThrow(/Unknown role.*Valid roles/s);
+      expect(() => spawnAgentViaHr(role, 'phase1-proj', null, {})).toThrow(/Unknown role.*Valid roles/s);
+    }
+    // Nothing persisted for rejected roles.
+    expect(loadHrSystem()['phase1-proj-frontend-dev']).toBeUndefined();
+  });
+
+  it('staffing accepts the new review/docs templates', () => {
+    const review = requestAgentSummoning('code-reviewer-justicar', 'phase1-proj', { requesterId: 'manager-bard' });
+    expect(review.agent.role).toBe('code-reviewer-justicar');
+    const docs = spawnAgentViaHr('tech-writer-scribe', 'phase1-proj', 'Scribe', {});
+    expect(docs.agent.role).toBe('tech-writer-scribe');
+  });
+
+  it('queue claim/complete projection appears once (no duplicates on re-read)', () => {    saveHrSystem({
       'phase1-proj-manager-bard': agent('Manager', 'manager-bard'),
       'phase1-proj-backend-dev-cleric': agent('Worker', 'backend-dev-cleric'),
       'hr-mind-flayer': agent('HR Mind Flayer', 'hr-mind-flayer', 'global')

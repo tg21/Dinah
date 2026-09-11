@@ -295,6 +295,60 @@ const AGENT_RPG_REGISTRY = {
     ],
     inventory: ['Staff of Helm & Terraform', 'Armor of 99.999% SLA', 'Totem of Prometheus'],
     traits: ['Damage Resistance (Outages)', 'Breath Weapon', 'Infrastructure As Code']
+  },
+  'code-reviewer-justicar': {
+    name: 'Code Reviewer Justicar',
+    role: 'code-reviewer-justicar',
+    class: 'Justicar (Oath of Review)',
+    level: 12,
+    hp: 90,
+    maxHp: 90,
+    ac: 17,
+    avatarColor: 0x7f8c8d,
+    requiredCapabilities: ['tools'],
+    roleFocus: 'correctness-security-style-review',
+    effortLevel: 'Medium',
+    contextCapacity: 128000,
+    tokensPerSec: 90,
+    sweBenchScore: '68.0%',
+    instructionAlignment: '98.7%',
+    costPer1kInput: 0.002,
+    costPer1kOutput: 0.01,
+    stats: { STR: 10, DEX: 14, CON: 14, INT: 18, WIS: 16, CHA: 12 },
+    spells: [
+      { name: 'Zone of Truth (Acceptance)', dice: '3d8', desc: 'Acceptance criteria pass or the verdict is guilty.' },
+      { name: 'Detect Injection', dice: '4d6', desc: 'Reveals unsanitized inputs and unsafe paths.' },
+      { name: 'Verdict of Approval', dice: 'Special', desc: 'Approves only when no open defects remain.' }
+    ],
+    inventory: ['Gavel of Approval', 'Lens of Diff Inspection', 'Seal of No Open Defects'],
+    traits: ['Impartial Verdict', 'Security Scrutiny', 'Defect Loopback']
+  },
+  'tech-writer-scribe': {
+    name: 'Tech Writer Scribe',
+    role: 'tech-writer-scribe',
+    class: 'Scribe (College of Lore)',
+    level: 10,
+    hp: 75,
+    maxHp: 75,
+    ac: 13,
+    avatarColor: 0xd4ac0d,
+    requiredCapabilities: ['tools'],
+    roleFocus: 'documentation-runbooks-accuracy',
+    effortLevel: 'Medium',
+    contextCapacity: 128000,
+    tokensPerSec: 100,
+    sweBenchScore: '63.0%',
+    instructionAlignment: '98.5%',
+    costPer1kInput: 0.002,
+    costPer1kOutput: 0.01,
+    stats: { STR: 8, DEX: 12, CON: 12, INT: 16, WIS: 15, CHA: 14 },
+    spells: [
+      { name: 'Tome of Run Instructions', dice: '3d6', desc: 'README that actually runs on a fresh machine.' },
+      { name: 'Cartography (File Map)', dice: '2d8', desc: 'Maps every shipped file to its purpose.' },
+      { name: 'Chronicle of Trade-offs', dice: '1d10', desc: 'Records decisions and next steps faithfully.' }
+    ],
+    inventory: ['Quill of Accurate Docs', 'Verified Command Ledger', 'Glossary of Terms'],
+    traits: ['Docs Match Code', 'Verified Commands', 'Last But Thorough']
   }
 };
 
@@ -375,6 +429,20 @@ const ROLE_THOUGHT_POOLS = {
     "Inspecting system vital signs for stuck loops...",
     "Running scheduled 5-minute sentinel audit...",
     "Ranking agents by context consumption..."
+  ],
+  'code-reviewer-justicar': [
+    "Weighing implementation against acceptance criteria...",
+    "Inspecting diffs for injection and path flaws...",
+    "Verifying checks and live runs before verdict...",
+    "Filing defects back to implementation tasks...",
+    "Withholding approval while issues stay open..."
+  ],
+  'tech-writer-scribe': [
+    "Verifying run commands against shipped code...",
+    "Mapping shipped files to their purpose...",
+    "Recording trade-offs and next steps...",
+    "Drafting README and run instructions...",
+    "Proofreading docs until they match the code..."
   ]
 };
 

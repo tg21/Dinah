@@ -24,8 +24,10 @@ export const ROLE_CONFIGS = {
   'legal-compliance-inquisitor': { icon: '⚖️', color: '#7f8c8d', hat: 'mitre', tool: 'scroll', cloth: '#5d6d7e', hair: '#273746', pants: '#34495e' },
   'cleaner-facilities-barbarian': { icon: '🪓', color: '#e74c3c', hat: 'horns', tool: 'axe', cloth: '#922b21', hair: '#641e16', pants: '#4a235a' },
   'excel-admin-druid': { icon: '📊', color: '#2ecc71', hat: 'wreath', tool: 'staff', cloth: '#229954', hair: '#196f3d', pants: '#145a32' },
-  'consultants-vampires': { icon: '🧛', color: '#8e44ad', hat: 'cape', tool: 'chalice', cloth: '#5b2c6f', hair: '#17202a', pants: '#4a235a' },
-  'interns-kobolds-goblins': { icon: '🦎', color: '#27ae60', hat: 'none', tool: 'wrench', cloth: '#1e8449', hair: '#145a32', pants: '#239b56' }
+  'consultant-vampires': { icon: '🧛', color: '#8e44ad', hat: 'cape', tool: 'chalice', cloth: '#5b2c6f', hair: '#17202a', pants: '#4a235a' },
+  'interns-kobolds-goblins': { icon: '🦎', color: '#27ae60', hat: 'none', tool: 'wrench', cloth: '#1e8449', hair: '#145a32', pants: '#239b56' },
+  'code-reviewer-justicar': { icon: '🔎', color: '#7f8c8d', hat: 'hood', tool: 'scroll', cloth: '#5d6d7e', hair: '#273746', pants: '#34495e' },
+  'tech-writer-scribe': { icon: '📝', color: '#d4ac0d', hat: 'spectacles', tool: 'quill', cloth: '#7d6608', hair: '#566573', pants: '#6e2c00' }
 };
 
 export const OVERSEER_IDS = [
@@ -53,8 +55,10 @@ export const SPAWNABLE_ROLES = [
   ['legal-compliance-inquisitor', 'Legal Inquisitor'],
   ['cleaner-facilities-barbarian', 'Cleaner Barbarian'],
   ['excel-admin-druid', 'Excel Admin Druid'],
-  ['consultants-vampires', 'Consultant Vampire'],
-  ['interns-kobolds-goblins', 'Intern Kobold / Goblin']
+  ['consultant-vampires', 'Consultant Vampire'],
+  ['interns-kobolds-goblins', 'Intern Kobold / Goblin'],
+  ['code-reviewer-justicar', 'Code Reviewer Justicar'],
+  ['tech-writer-scribe', 'Tech Writer Scribe']
 ];
 
 export function roleConf(role) {

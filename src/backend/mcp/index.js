@@ -17,6 +17,7 @@ export {
   seedDefaultPermissions,
   ensureAgentMcpDefaults,
   resolveEffectiveMcps,
-  buildToolToServerMap
+  buildToolToServerMap,
+  DEFAULT_WORKER_TOOLS
 } from './permissions.js';
 export { createMcpInvocationConfig, mcpPromptContext, cleanupMcpInvocation } from './invocation.js';

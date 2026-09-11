@@ -28,4 +28,14 @@ describe('agent definitions', () => {
     expect(prompt).toContain('Active specialization override: Focus on accessibility acceptance criteria.');
     expect(prompt).toContain('Task:\nCoordinate the release.');
   });
+
+  it('lists exact staffable template IDs for staffing-capable roles only', () => {
+    const managerPrompt = buildAgentPrompt('manager-bard', 'Staff the sprint.', { project: 'demo-project' });
+    expect(managerPrompt).toContain('Staffable roles');
+    expect(managerPrompt).toContain('code-reviewer-justicar');
+    expect(managerPrompt).toContain('tech-writer-scribe');
+
+    const workerPrompt = buildAgentPrompt('backend-dev-cleric', 'Build the API.', { project: 'demo-project' });
+    expect(workerPrompt).not.toContain('Staffable roles');
+  });
 });

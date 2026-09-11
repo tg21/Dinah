@@ -9,6 +9,7 @@ import {
 } from './messageService.js';
 import { broadcastAgentEvent } from './eventBus.js';
 import { sanitizeMcpPermissions, seedDefaultPermissions } from '../mcp/index.js';
+import { loadAgentDefinition, listAgentDefinitions } from './agentDefinitions.js';
 import { enqueueDirectMessage } from './messageQueueService.js';
 import { getProjectCoordination } from './coordinationService.js';
 
@@ -97,7 +98,21 @@ export function calculateAgentCostEstimation(role, model, effortLevel = 'High') 
   };
 }
 
+// Staffing is template-only: every provisioned agent must match an
+// `agent-templates/<role>.json` definition. Unknown roles used to spawn
+// silently degraded agents (generic prompt, inbox-only tools, no progress
+// reporting). Fail closed with the valid list so the requester retries with
+// a real template name instead of homebrewing one.
+export function assertKnownRole(role) {
+  if (typeof role === 'string' && loadAgentDefinition(role)) return role;
+  const valid = listAgentDefinitions().map((definition) => definition.name).sort();
+  throw new Error(
+    `Unknown role [${role}]. Staffing accepts only agent-template names. Valid roles: ${valid.join(', ')}`
+  );
+}
+
 export function requestAgentSummoning(role, projectId = 'project-alpha', customOptions = {}) {
+  assertKnownRole(role);
   const hrSystem = loadHrSystem();
   const cleanProjectId = projectId === 'global' ? 'global' : slugifyProjectId(projectId);
   const baseId = cleanProjectId === 'global' ? role : `${cleanProjectId}-${role}`;
@@ -257,6 +272,7 @@ export function confirmAgentSummoning(agentId, updatedParams = {}) {
 }
 
 export function spawnAgentViaHr(role, projectId = 'global', customName = null, options = {}) {
+  assertKnownRole(role);
   const hrSystem = loadHrSystem();
   const cleanProjectId = projectId === 'global' ? 'global' : slugifyProjectId(projectId);
   const baseId = cleanProjectId === 'global' ? role : `${cleanProjectId}-${role}`;

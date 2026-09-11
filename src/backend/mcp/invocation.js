@@ -1,16 +1,23 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { resolveAgentMcps } from './permissions.js';
+import { resolveAgentMcps, DEFAULT_WORKER_TOOLS } from './permissions.js';
 import { issueOrchestrationToken, revokeOrchestrationToken } from '../services/orchestrationAuth.js';
 import { PORT, TOOL_DIR } from '../config.js';
 import { loadAgentDefinition } from '../services/agentDefinitions.js';
 
 function orchestrationTools(agent) {
   const definition = loadAgentDefinition(agent.role);
-  return [...new Set([
+  const templateTools = [...new Set([
     ...(definition?.coordination?.requiredTools || []),
-    ...(definition?.coordination?.managerTools || []),
+    ...(definition?.coordination?.managerTools || [])
+  ])];
+  // Unknown roles have no template: fall back to baseline worker tools so
+  // ad-hoc specialists still get get_project_status/update_progress/etc.
+  // (read-all + write-own; no manager-only tools).
+  const base = templateTools.length ? templateTools : [...DEFAULT_WORKER_TOOLS];
+  return [...new Set([
+    ...base,
     // Every invoked agent needs the delivery protocol to consume a wake-up.
     'list_inbox', 'claim_message', 'acknowledge_message', 'complete_message',
     'fail_message', 'release_message', 'get_message_status',

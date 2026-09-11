@@ -44,15 +44,19 @@ router.post('/api/internal/orchestration/create-project', guard, (req, res) => {
 });
 
 router.post('/api/internal/orchestration/staff', guard, (req, res) => {
-  const result = requestAgentSummoning(req.body.role, req.body.projectId, {
-    name: req.body.name,
-    model: req.body.model,
-    harness: req.body.harness,
-    effortLevel: req.body.effortLevel,
-    promptOverride: req.body.promptOverride,
-    requesterId: req.body.agentId
-  });
-  res.json(result);
+  try {
+    const result = requestAgentSummoning(req.body.role, req.body.projectId, {
+      name: req.body.name,
+      model: req.body.model,
+      harness: req.body.harness,
+      effortLevel: req.body.effortLevel,
+      promptOverride: req.body.promptOverride,
+      requesterId: req.body.agentId
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
 router.post('/api/internal/orchestration/provision', guard, (req, res) => {
@@ -60,13 +64,17 @@ router.post('/api/internal/orchestration/provision', guard, (req, res) => {
   if (req.body.agentId !== 'hr-mind-flayer' || hr?.role !== 'hr-mind-flayer') {
     return res.status(403).json({ error: 'Only HR Mind Flayer may provision agents' });
   }
-  const result = spawnAgentViaHr(req.body.role, req.body.projectId, req.body.name || null, {
-    model: req.body.model,
-    harness: req.body.harness,
-    effortLevel: req.body.effortLevel,
-    promptOverride: req.body.promptOverride
-  });
-  res.json(result);
+  try {
+    const result = spawnAgentViaHr(req.body.role, req.body.projectId, req.body.name || null, {
+      model: req.body.model,
+      harness: req.body.harness,
+      effortLevel: req.body.effortLevel,
+      promptOverride: req.body.promptOverride
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
 router.post('/api/internal/orchestration/task', guard, async (req, res) => {

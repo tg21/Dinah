@@ -31,6 +31,13 @@ export function buildAgentPrompt(role, task, agent = {}, options = {}) {
   const definition = loadAgentDefinition(role);
   const basePrompt = definition?.basePrompt ||
     'Act as a careful specialist. Inspect the repository and requirements before making changes. Explain decisions, verify your work, and report blockers honestly.';
+  // Staffing-capable roles get the live template roster so they request exact
+  // role IDs instead of inventing shorthand (which staffing now rejects).
+  const staffingTools = definition?.coordination?.managerTools || [];
+  const canStaff = staffingTools.includes('request_staff') || staffingTools.includes('provision_agent');
+  const staffableRoles = canStaff
+    ? listAgentDefinitions().map((entry) => entry.name).sort().join(', ')
+    : null;
   const runtime = [
     `Role: ${role}`,
     `Job: ${definition?.job || 'Specialist agent'}`,
@@ -39,6 +46,7 @@ export function buildAgentPrompt(role, task, agent = {}, options = {}) {
     agent.effortLevel ? `Effort level: ${agent.effortLevel}` : null,
     agent.promptOverride ? `Active specialization override: ${agent.promptOverride}` : null,
     `Coordination protocol: ${definition?.coordination?.operatingRule || 'Publish progress, report blockers, and request help through the available coordination tools.'}`,
+    staffableRoles ? `Staffable roles (request_staff/provision_agent accept ONLY these exact IDs): ${staffableRoles}` : null,
     `Workspace: ${options.workspaceDir || (agent.project === 'global' ? APP_DIR : path.join(APP_DIR, 'projects', agent.project || 'global'))}`,
     options.includeToolRoot === false ? null : `Tool root: ${TOOL_DIR}`,
     `Backend port: ${PORT}`,

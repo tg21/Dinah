@@ -57,18 +57,40 @@ export function buildToolToServerMap(registry = loadMcpRegistry()) {
 }
 
 /**
+ * Baseline worker coordination tools. Unknown/generic roles (e.g. manager-shorthand
+ * `frontend-dev`, `code-reviewer`) have no template, but still need to read fresh
+ * project state, publish progress, and message the manager. Read-all + write-own:
+ * `update_progress` is auth-scoped to assignee/creator, so this cannot hijack
+ * others' work. Manager-only tools (`request_staff`, `create_task`,
+ * `provision_agent`) are deliberately excluded here.
+ */
+export const DEFAULT_WORKER_TOOLS = [
+  'get_project_status',
+  'update_progress',
+  'report_blocker',
+  'request_help',
+  'send_agent_message'
+];
+
+/**
  * Build default MCP permissions for a role from its template
  * `coordination.requiredTools + coordination.managerTools`.
  * Tools owned by non-orchestration servers enable those servers;
  * unknown tools are returned as warnings (never a crash).
+ * Unknown roles fall back to DEFAULT_WORKER_TOOLS so ad-hoc specialists
+ * can still coordinate (read fresh state, publish own progress).
  */
 export function seedDefaultPermissions(role) {
   const definition = loadAgentDefinition(role);
   const required = definition?.coordination?.requiredTools || [];
   const manager = definition?.coordination?.managerTools || [];
-  const wanted = [...new Set([...required, ...manager])];
-  const { map, ambiguous } = buildToolToServerMap();
+  let wanted = [...new Set([...required, ...manager])];
   const warnings = [];
+  if (!wanted.length && role) {
+    wanted = [...DEFAULT_WORKER_TOOLS];
+    warnings.push(`No template for role [${role}]; fell back to baseline worker tools`);
+  }
+  const { map, ambiguous } = buildToolToServerMap();
   for (const tool of ambiguous) {
     if (wanted.includes(tool)) warnings.push(`Ambiguous tool [${tool}] resolved to dinah-orchestration`);
   }
