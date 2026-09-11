@@ -34,6 +34,55 @@ pointer, lines 2–9 are the 8 issues). RCA was performed against the code at co
 4. **Knowledge base (plan 08)**: Confluence model — team-maintained project docs
    (overview, architecture, decisions, glossary, runbooks), NOT task/updates/blockers
    telemetry.
+5. **Visibility (plans 02+03, revised during implementation)**: NO per-pair helpers
+   (no `logStaffingExchange`/`logHrAudit`). All agent→agent exchanges go through the
+   durable queue (`enqueueDirectMessage`), which projects into BOTH drawers, emits
+   `courier_message`, writes the shared log, and shows in message-activity.
+   `ensureProjectManager` stays silent on no-op re-checks (no HR spam).
+
+## Progress (2026-09-11 session — Phase 1 DONE)
+
+- **02+03 staffing/HR visibility — DONE (generic path)**. `requestAgentSummoning`
+  sends requester→HR, HR confirm/spawn sends HR→agent, both via
+  `enqueueDirectMessage` (`agentLifecycle.js`). `createEnvelope`
+  (`messageQueueService.js`) projects into both sender (`To X: …`) and recipient
+  drawers with `deliveryId`/`messageId` dedup, emits `courier_message`, writes
+  shared log. Claim/complete also project bounded snippets. Caller `agentId`
+  threaded through `POST /api/internal/orchestration/staff` as `requesterId`;
+  public `POST /api/agents/request-summon` accepts optional `requesterId`.
+  Verified against `working-area/`: 4x `request_staff` at 21:05:35 + help
+  `help-1789074621359` existed in log/coordination but HR drawer was `[]` —
+  the exact bug fixed.
+- **04+05 MCP defaults/role tools — DONE**. `seedDefaultPermissions(role)`
+  + `ensureAgentMcpDefaults` + `resolveEffectiveMcps` in `mcp/permissions.js`
+  (union `requiredTools`+`managerTools`+delivery protocol → orchestration entry;
+  other-server tools via `mcp/registry.json`; unknown → warning). All creation
+  paths seed instead of `{}`; `loadHrSystem` backfills legacy; explicit
+  `enabled:false` wins; invocation force-inject kept as safety net.
+  `GET /api/mcps?agentId=` returns effective set with `persisted|default`;
+  both modals render source labels (`McpManagementModal.jsx`,
+  `AgentEditModal.jsx`; `api.getMcps(agentId)`).
+- **06 coordination IDs — DONE**. `slugifyProjectId` in `projectService.js`
+  used by ID factory, CEO `create-project`, `createProjectFolder`/
+  `getProjectFolder` (reads tolerate both). `canonicalAssignee` exported, warns
+  on multi/no-match; task dispatch (`routes/orchestration.js`) resolves role
+  names. New task/blocker/help/update records carry denormalized `projectId`.
+- **Tests**: `npm test` 35/35. New `tests/backend/current-issues-phase1.test.js`
+  (15 tests: both-drawer staffing, courier contract, HR provision/confirm
+  records, queue dedup, persisted-vs-default, legacy backfill, per-role tools,
+  slug, canonicalization, `projectId` denorm, old-format tolerance) +
+  seeded-permission assertions in `tests/agents/role-contracts.test.js`.
+- **AGENTS.md**: updated `/api/mcps?agentId=`, generic staffing-visibility rule
+  (no per-pair helpers), MCP-defaults rule, slug/ID rule, queue-projection rule.
+
+## Next (Phase 2, NOT started)
+
+- **07 + 01**: post-confirm/spawn inbox seed → dispatcher wake; canonical
+  dispatch lookup (partially done); resume-prompt enrichment + bounded
+  continuation loop (harness-native first) + `awaiting-user` watchdog +
+  durable reply + strict `agentId` + simulated badge.
+- **08**: per-project KB schema + `get/update_project_knowledge` tools +
+  synthesizer cycle + drop fantasy seed + modal check.
 
 ## Shared implementation rules (from `AGENTS.md`, apply to every plan)
 

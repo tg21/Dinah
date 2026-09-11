@@ -65,6 +65,26 @@ function publicMessage(message, delivery) {
   };
 }
 
+function snippetBounded(text, len = 500) {
+  const s = String(text || '');
+  return s.length > len ? `${s.slice(0, len)}…` : s;
+}
+
+// Queue→projection (plan 02): mirror durable deliveries into the recipient's
+// msgs.json audit projection. Deduped by deliveryId; snippet-bounded.
+function projectDeliveryToDrawer(recipientAgentId, message, delivery, stage) {
+  try {
+    appendAgentMessage(recipientAgentId, {
+      from: message.senderAgentId,
+      project: message.projectId,
+      request: `[${stage}] ${snippetBounded(message.summary)}`,
+      role: 'agent',
+      deliveryId: `${delivery.deliveryId}#${stage}`,
+      messageId: message.messageId
+    });
+  } catch { /* projection must never break delivery */ }
+}
+
 function createEnvelope({ projectId = 'global', senderAgentId, recipientAgentId = null, threadId = null, type = 'request', payload, summary, idempotencyKey }) {
   const sender = text(senderAgentId, 'senderAgentId');
   const project = text(projectId || 'global', 'projectId');
@@ -110,7 +130,28 @@ function createEnvelope({ projectId = 'global', senderAgentId, recipientAgentId 
   saveState(state);
   const delivery = state.deliveries.find((item) => item.messageId === message.messageId && item.recipientAgentId === recipientAgentId);
   if (recipientAgentId) {
-    appendAgentMessage(recipientAgentId, { from: sender, project: project, request: message.summary, role: 'agent' });
+    // Generic visibility rule: every durable DM projects into BOTH drawers.
+    // Recipient gets the inbox copy (durable deliveryId); sender gets a sent
+    // copy so any agent→agent exchange is visible from either side with no
+    // per-pair logging helpers.
+    appendAgentMessage(recipientAgentId, {
+      from: sender,
+      project: project,
+      request: snippetBounded(message.summary),
+      role: 'agent',
+      deliveryId: delivery?.deliveryId,
+      messageId: message.messageId
+    });
+    if (sender !== recipientAgentId) {
+      appendAgentMessage(sender, {
+        from: sender,
+        project: project,
+        request: snippetBounded(`To ${recipientAgentId}: ${message.summary}`),
+        role: 'agent',
+        deliveryId: delivery ? `${delivery.deliveryId}#sent` : `${message.messageId}#sent-${sender}`,
+        messageId: message.messageId
+      });
+    }
     broadcastAgentEvent({
       fromAgentId: sender,
       toAgentId: recipientAgentId,
@@ -184,6 +225,7 @@ export function claimMessage({ messageId, agentId, leaseMs = DEFAULT_LEASE_MS })
   const message = state.messages.find((item) => item.messageId === messageId);
   message.status = 'claimed'; message.attemptCount = delivery.attemptCount; message.claimedAt = delivery.claimedAt;
   saveState(state);
+  projectDeliveryToDrawer(delivery.recipientAgentId, message, delivery, 'claimed');
   return { message: publicMessage(message, delivery), delivery, leaseToken: delivery.leaseToken };
 }
 
@@ -196,6 +238,7 @@ export function completeMessage({ messageId, agentId, leaseToken, result = null 
   delivery.completedAt = new Date().toISOString(); delivery.result = result;
   message.completedAt = delivery.completedAt; message.result = result; message.status = 'completed';
   saveState(state);
+  projectDeliveryToDrawer(agentId, message, delivery, 'completed');
   return { ...outcome, message: publicMessage(message, delivery) };
 }
 export function failMessage({ messageId, agentId, leaseToken, reason, retryable = true }) {

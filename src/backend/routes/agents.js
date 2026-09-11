@@ -20,10 +20,10 @@ router.get('/api/agents', (req, res) => {
 
 // Request Summoning (places agent in "awaiting-confirmation" state)
 router.post('/api/agents/request-summon', (req, res) => {
-  const { role, projectId = 'project-alpha', name, model, harness, effortLevel, promptOverride } = req.body;
+  const { role, projectId = 'project-alpha', name, model, harness, effortLevel, promptOverride, requesterId } = req.body;
   if (!role) return res.status(400).json({ error: 'Agent role is required' });
 
-  const result = requestAgentSummoning(role, projectId, { name, model, harness, effortLevel, promptOverride });
+  const result = requestAgentSummoning(role, projectId, { name, model, harness, effortLevel, promptOverride, requesterId });
   res.json({ success: true, ...result });
 });
 

@@ -1,14 +1,14 @@
 import { getModelById, selectBestModelForRole } from '../harness/index.js';
 import { AGENT_RPG_REGISTRY } from '../data/rpgRegistry.js';
 import { loadHrSystem, saveHrSystem } from './hrService.js';
-import { getProjectFolder } from './projectService.js';
+import { getProjectFolder, slugifyProjectId } from './projectService.js';
 import {
   appendAgentMessage,
   appendAgentThought,
   appendToSharedLog
 } from './messageService.js';
 import { broadcastAgentEvent } from './eventBus.js';
-import { sanitizeMcpPermissions } from '../mcp/index.js';
+import { sanitizeMcpPermissions, seedDefaultPermissions } from '../mcp/index.js';
 import { enqueueDirectMessage } from './messageQueueService.js';
 
 export function calculateAgentCostEstimation(role, model, effortLevel = 'High') {
@@ -39,7 +39,8 @@ export function calculateAgentCostEstimation(role, model, effortLevel = 'High') 
 
 export function requestAgentSummoning(role, projectId = 'project-alpha', customOptions = {}) {
   const hrSystem = loadHrSystem();
-  const baseId = projectId === 'global' ? role : `${projectId}-${role}`;
+  const cleanProjectId = projectId === 'global' ? 'global' : slugifyProjectId(projectId);
+  const baseId = cleanProjectId === 'global' ? role : `${cleanProjectId}-${role}`;
   let agentId = baseId;
   let counter = 1;
   while (hrSystem[agentId]) {
@@ -78,7 +79,7 @@ export function requestAgentSummoning(role, projectId = 'project-alpha', customO
   const awaitingAgent = {
     name: customOptions.name || rpgStats.name,
     role,
-    project: projectId,
+    project: cleanProjectId,
     status: 'awaiting-confirmation',
     harness,
     model,
@@ -92,15 +93,33 @@ export function requestAgentSummoning(role, projectId = 'project-alpha', customO
     stats: rpgStats,
     tasks_total: 5,
     tasks_completed: 0,
-    mcp: {}
+    mcp: seedDefaultPermissions(role).mcp
   };
 
   hrSystem[agentId] = awaitingAgent;
   saveHrSystem(hrSystem);
 
-  appendToSharedLog(
-    `Manager requested summoning for [${awaitingAgent.name}] (${role}) in [${projectId}]. Awaiting Overseer confirmation.`
-  );
+  const requesterId = customOptions.requesterId || customOptions.createdBy || 'manager-bard';
+  const staffingText =
+    `Staffing request from [${requesterId}] for [${awaitingAgent.name}] (${role}) in [${cleanProjectId}]. ` +
+    `Model=${model} Harness=${harness} Effort=${effortLevel}` +
+    (customOptions.promptOverride ? ` Specialization: ${String(customOptions.promptOverride).slice(0, 300)}` : '') +
+    ` Awaiting Overseer confirmation for [${agentId}].`;
+  // Generic path: a durable DM from requester → HR. The queue projects into
+  // BOTH drawers, emits the courier event, and shows in message-activity, so
+  // no staffing-specific logging helper is needed. HR's harness turn consumes
+  // this inbox item; whatever HR then does is visible the same way.
+  // Best-effort: staffing must never fail just because the queue write did.
+  try {
+    enqueueDirectMessage({
+      fromAgentId: requesterId,
+      toAgentId: 'hr-mind-flayer',
+      projectId: cleanProjectId,
+      message: staffingText
+    });
+  } catch {
+    appendToSharedLog(staffingText);
+  }
   broadcastAgentEvent({
     fromAgentId: 'hr-mind-flayer',
     toAgentId: agentId,
@@ -132,21 +151,37 @@ export function confirmAgentSummoning(agentId, updatedParams = {}) {
   if (updatedParams.effortLevel) agent.effortLevel = updatedParams.effortLevel;
   if (updatedParams.stats) agent.stats = { ...agent.stats, ...updatedParams.stats };
   if (updatedParams.mcp !== undefined) agent.mcp = sanitizeMcpPermissions(updatedParams.mcp);
+  // Backfill seeded defaults for legacy awaiting records (plans 04+05).
+  if (!agent.mcp || typeof agent.mcp !== 'object' || !agent.mcp['dinah-orchestration']) {
+    const { mcp: defaults } = seedDefaultPermissions(agent.role);
+    agent.mcp = { ...defaults, ...(agent.mcp || {}) };
+    if (!agent.mcp['dinah-orchestration']) agent.mcp['dinah-orchestration'] = defaults['dinah-orchestration'];
+  }
 
   agent.status = 'active';
   agent.costEstimation = calculateAgentCostEstimation(agent.role, agent.model, agent.effortLevel);
   saveHrSystem(hrSystem);
 
-  appendAgentMessage(agentId, {
-    from: 'hr-mind-flayer',
-    project: agent.project,
-    request: `Summoning confirmed! Agent ${agent.name} materialized into ${agent.project} via ${agent.model}.`,
-    path: getProjectFolder(agent.project),
-    role: 'system'
-  });
-
+  // Generic path: durable HR → agent confirmation. Queue projection handles
+  // both drawers + courier event; no HR-specific audit helper.
   appendAgentThought(agentId, 'SUMMONED', `Materialized into arena by Overseer confirmation.`);
-  appendToSharedLog(`✨ HR Mind Flayer materialized agent [${agentId}] into [${agent.project}]!`);
+  try {
+    enqueueDirectMessage({
+      fromAgentId: 'hr-mind-flayer',
+      toAgentId: agentId,
+      projectId: agent.project,
+      message: `Summoning confirmed! Agent ${agent.name} materialized into ${agent.project} via ${agent.model}/${agent.harness} effort=${agent.effortLevel}.`
+    });
+  } catch {
+    appendAgentMessage(agentId, {
+      from: 'hr-mind-flayer',
+      project: agent.project,
+      request: `Summoning confirmed! Agent ${agent.name} materialized into ${agent.project} via ${agent.model}.`,
+      path: getProjectFolder(agent.project),
+      role: 'system'
+    });
+    appendToSharedLog(`HR Mind Flayer materialized agent [${agentId}] into [${agent.project}]!`);
+  }
 
   broadcastAgentEvent({
     fromAgentId: 'hr-mind-flayer',
@@ -160,7 +195,8 @@ export function confirmAgentSummoning(agentId, updatedParams = {}) {
 
 export function spawnAgentViaHr(role, projectId = 'global', customName = null, options = {}) {
   const hrSystem = loadHrSystem();
-  const baseId = projectId === 'global' ? role : `${projectId}-${role}`;
+  const cleanProjectId = projectId === 'global' ? 'global' : slugifyProjectId(projectId);
+  const baseId = cleanProjectId === 'global' ? role : `${cleanProjectId}-${role}`;
   let agentId = baseId;
   let counter = 1;
   while (hrSystem[agentId]) {
@@ -198,7 +234,7 @@ export function spawnAgentViaHr(role, projectId = 'global', customName = null, o
   const newAgent = {
     name: customName || rpgStats.name,
     role,
-    project: projectId,
+    project: cleanProjectId,
     status: 'active',
     harness,
     model,
@@ -211,34 +247,49 @@ export function spawnAgentViaHr(role, projectId = 'global', customName = null, o
     stats: rpgStats,
     tasks_total: 5,
     tasks_completed: 0,
-    mcp: {}
+    mcp: seedDefaultPermissions(role).mcp
   };
 
   hrSystem[agentId] = newAgent;
   saveHrSystem(hrSystem);
 
-  appendAgentMessage(agentId, {
-    from: 'hr-mind-flayer',
-    project: projectId,
-    request: `Agent ${newAgent.name} successfully spawned and assigned to ${projectId}. System prompt initialized from template.`,
-    path: getProjectFolder(projectId),
-    role: 'system'
-  });
-
-  appendAgentThought(agentId, 'INITIALIZE', `Spawned into project ${projectId} by HR Mind Flayer.`);
-  appendToSharedLog(`HR Mind Flayer spawned agent [${agentId}] for project [${projectId}]`);
+  appendAgentThought(agentId, 'INITIALIZE', `Spawned into project ${cleanProjectId} by HR Mind Flayer.`);
+  // Generic path: durable HR → new-agent notice (model/harness/effort in body).
+  // Visible in both drawers via queue projection; no HR-specific helper.
+  try {
+    enqueueDirectMessage({
+      fromAgentId: 'hr-mind-flayer',
+      toAgentId: agentId,
+      projectId: cleanProjectId,
+      message: `Agent ${newAgent.name} spawned into ${cleanProjectId}: model=${model} harness=${harness} effort=${effortLevel}` +
+        (options.promptOverride ? ` specialization=${String(options.promptOverride).slice(0, 300)}` : '')
+    });
+  } catch {
+    appendAgentMessage(agentId, {
+      from: 'hr-mind-flayer',
+      project: cleanProjectId,
+      request: `Agent ${newAgent.name} successfully spawned and assigned to ${cleanProjectId}. System prompt initialized from template.`,
+      path: getProjectFolder(cleanProjectId),
+      role: 'system'
+    });
+    appendToSharedLog(`HR Mind Flayer spawned agent [${agentId}] for project [${cleanProjectId}]`);
+  }
 
   return { agentId, agent: newAgent };
 }
 
 // Project creation is idempotent: a project always has exactly one default manager.
 export function ensureProjectManager(projectId, options = {}) {
+  const cleanProjectId = projectId === 'global' ? 'global' : slugifyProjectId(projectId);
   const hrSystem = loadHrSystem();
   const existing = Object.entries(hrSystem).find(([, agent]) =>
-    agent.project === projectId && agent.role === 'manager-bard' && agent.status !== 'retired'
+    agent.project === cleanProjectId && agent.role === 'manager-bard' && agent.status !== 'retired'
   );
-  if (existing) return { agentId: existing[0], agent: existing[1], created: false };
-  return { ...spawnAgentViaHr('manager-bard', projectId, options.name || `Manager Bard (${projectId})`, options), created: true };
+  // Idempotent guarantee: no log spam when the manager already exists.
+  if (existing) {
+    return { agentId: existing[0], agent: existing[1], created: false };
+  }
+  return { ...spawnAgentViaHr('manager-bard', cleanProjectId, options.name || `Manager Bard (${cleanProjectId})`, options), created: true };
 }
 
 export function sendProjectBriefToManager(projectId, managerAgentId, brief, fromAgentId = 'ceo-warlock') {

@@ -2,6 +2,16 @@ import fs from 'fs';
 import path from 'path';
 import { APP_DIR, PROJECTS_DIR, PROJECTS_CONFIG_FILE } from '../config.js';
 
+export function slugifyProjectId(raw) {
+  const slug = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+  return slug || 'project';
+}
+
 export function loadProjectsConfig() {
   if (!fs.existsSync(PROJECTS_CONFIG_FILE)) {
     const defaultConfig = {};
@@ -22,15 +32,20 @@ export function saveProjectsConfig(cfg) {
 export function getProjectFolder(projectId) {
   if (!projectId || projectId === 'global') return APP_DIR;
   const cfg = loadProjectsConfig();
-  if (cfg[projectId] && cfg[projectId].path && fs.existsSync(cfg[projectId].path)) {
-    return cfg[projectId].path;
+  // Tolerate both raw and slugged keys (write-path now always slugs).
+  const slug = slugifyProjectId(projectId);
+  for (const key of [projectId, slug]) {
+    if (cfg[key] && cfg[key].path && fs.existsSync(cfg[key].path)) {
+      return cfg[key].path;
+    }
   }
-  return path.join(PROJECTS_DIR, projectId || 'project-alpha');
+  return path.join(PROJECTS_DIR, slug || 'project-alpha');
 }
 
 export function createProjectFolder(projectId, customPath = null) {
   if (!projectId || projectId === 'global') return APP_DIR;
-  const projectDir = customPath || path.join(PROJECTS_DIR, projectId);
+  const slug = slugifyProjectId(projectId);
+  const projectDir = customPath || path.join(PROJECTS_DIR, slug);
   if (!fs.existsSync(projectDir)) {
     fs.mkdirSync(projectDir, { recursive: true });
     const readmePath = path.join(projectDir, 'README.md');
@@ -40,14 +55,14 @@ export function createProjectFolder(projectId, customPath = null) {
     );
   }
   const cfg = loadProjectsConfig();
-  if (!cfg[projectId]) {
-    cfg[projectId] = {
+  if (!cfg[slug]) {
+    cfg[slug] = {
       path: projectDir,
       budgetUsd: 50.0,
       spentUsd: 0.0,
       maxTokens: 1000000,
       tokensUsed: 0,
-      description: `Project ${projectId}`
+      description: `Project ${slug}`
     };
     saveProjectsConfig(cfg);
   }

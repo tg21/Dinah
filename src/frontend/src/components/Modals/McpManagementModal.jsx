@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { useApp } from '../../store/AppContext.jsx';
 import { api } from '../../api/client.js';
@@ -9,10 +9,30 @@ export default function McpManagementModal() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState('');
+  const [effective, setEffective] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadEffective() {
+      if (!currentAgentId) return;
+      try {
+        const data = await api.getMcps(currentAgentId);
+        if (!cancelled) setEffective(data.mcps || []);
+      } catch {
+        if (!cancelled) setEffective([]);
+      }
+    }
+    loadEffective();
+    return () => { cancelled = true; };
+  }, [currentAgentId]);
 
   async function refresh() {
     const data = await api.getMcps();
     setMcps(data.mcps || []);
+    try {
+      const eff = await api.getMcps(currentAgentId);
+      setEffective(eff.mcps || []);
+    } catch { /* effective set is best-effort */ }
   }
 
   async function search() {
@@ -48,13 +68,18 @@ export default function McpManagementModal() {
     if (!agent) return;
     const permissions = { ...(agent.mcp || {}) };
     const mcp = mcps.find((m) => m.id === id);
-    permissions[id] = { enabled, allowedTools: (mcp?.tools || []).map((t) => t.name) };
+    permissions[id] = { enabled, allowedTools: enabled ? (mcp?.tools || []).map((t) => t.name) : (permissions[id]?.allowedTools || []) };
     const data = await api.updateAgent(currentAgentId, { mcp: permissions });
     await loadAgents();
     if (data.agent) await loadAgentDrawer(currentAgentId);
+    try {
+      const eff = await api.getMcps(currentAgentId);
+      setEffective(eff.mcps || []);
+    } catch { /* ignore */ }
   }
 
   const agent = allAgents[currentAgentId] || {};
+  const rows = effective.length ? effective : mcps;
 
   return (
     <Modal
@@ -116,21 +141,28 @@ export default function McpManagementModal() {
         <i className="fa-solid fa-shield-halved" /> Available MCPs
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 180, overflowY: 'auto' }}>
-        {!mcps.length && (
+        {!rows.length && (
           <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>No shared MCPs installed yet.</div>
         )}
-        {mcps.map((mcp) => {
-          const equipped = agent.mcp?.[mcp.id]?.enabled === true;
+        {rows.map((mcp) => {
+          const equipped = mcp.source
+            ? mcp.enabled === true
+            : agent.mcp?.[mcp.id]?.enabled === true;
+          const sourceLabel = mcp.source === 'persisted' ? 'Equipped' : mcp.source === 'default' ? (mcp.enabled ? 'Default-on' : 'Default-off') : null;
           return (
             <div
               key={mcp.id}
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 8px' }}
             >
               <div>
-                <strong style={{ color: '#fff', fontSize: 11 }}>{escapeHtml(mcp.name || mcp.id)}</strong>
+                <strong style={{ color: '#fff', fontSize: 11 }}>{escapeHtml(mcp.name || mcp.id)}</strong>{' '}
+                {sourceLabel && (
+                  <span style={{ fontSize: 9, color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px' }}>{sourceLabel}</span>
+                )}
                 <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                   {mcp.sourceType === 'shipped' ? 'Included with Dinah' : 'User-managed'} · {escapeHtml(mcp.description || 'MCP server')} · {mcp.tools?.length || 0} tools
                   discovered{mcp.discoveryError ? ` · ${escapeHtml(mcp.discoveryError)}` : ''}
+                  {mcp.id === 'dinah-orchestration' && ' · Always enabled at invocation'}
                 </div>
               </div>
               <button

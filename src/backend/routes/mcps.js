@@ -1,10 +1,18 @@
 import { Router } from 'express';
 import { appendToSharedLog } from '../services/messageService.js';
 import { installMcpFromCatalog, loadMcpRegistry, searchMcpCatalog } from '../mcp/index.js';
+import { resolveEffectiveMcps } from '../mcp/permissions.js';
+import { loadHrSystem } from '../services/hrService.js';
 
 const router = Router();
 
 router.get('/api/mcps', (req, res) => {
+  const { agentId } = req.query || {};
+  if (agentId) {
+    const agent = loadHrSystem()[String(agentId)];
+    if (!agent) return res.status(404).json({ error: `Agent ${agentId} not found` });
+    return res.json({ mcps: resolveEffectiveMcps(agent), agentId });
+  }
   res.json({ mcps: loadMcpRegistry() });
 });
 

@@ -13,6 +13,10 @@ export {
 export {
   normaliseAgentMcpPermissions,
   resolveAgentMcps,
-  sanitizeMcpPermissions
+  sanitizeMcpPermissions,
+  seedDefaultPermissions,
+  ensureAgentMcpDefaults,
+  resolveEffectiveMcps,
+  buildToolToServerMap
 } from './permissions.js';
 export { createMcpInvocationConfig, mcpPromptContext, cleanupMcpInvocation } from './invocation.js';

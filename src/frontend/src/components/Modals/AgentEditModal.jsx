@@ -108,12 +108,13 @@ export default function AgentEditModal() {
             const perm = perms[mcp.id] || (mcp.id === 'dinah-orchestration'
               ? { enabled: true, allowedTools: tools.map((tool) => tool.name) }
               : {});
+            const source = agent.mcp?.[mcp.id] || perms[mcp.id] ? 'persisted' : 'default';
             return (
               <div key={mcp.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700, color: '#fff', cursor: 'pointer' }}>
                   <input type="checkbox" checked={!!perm.enabled} onChange={(e) => toggleServer(mcp.id, e.target.checked)} />
-                  <span>{escapeHtml(mcp.name || mcp.id)} <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({mcp.sourceType === 'shipped' ? 'included' : 'user-managed'})</small></span>
-                  <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{escapeHtml(mcp.description || '')}</small>
+                  <span>{escapeHtml(mcp.name || mcp.id)} <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({mcp.sourceType === 'shipped' ? 'included' : 'user-managed'} · {source})</small></span>
+                  <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{escapeHtml(mcp.description || '')}{mcp.id === 'dinah-orchestration' ? ' · Always enabled at invocation' : ''}</small>
                 </label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, margin: '6px 0 0 22px' }}>
                   {tools.length ? (

@@ -31,7 +31,7 @@ function requireText(value, field) {
   return value.trim();
 }
 
-function canonicalAssignee(projectId, assignee) {
+export function canonicalAssignee(projectId, assignee) {
   const requested = requireText(assignee, 'assignee');
   const hr = loadHrSystem();
   if (hr[requested]?.project === projectId) return requested;
@@ -42,17 +42,27 @@ function canonicalAssignee(projectId, assignee) {
   const matches = Object.entries(hr).filter(([, agent]) =>
     agent.project === projectId && agent.role === requested && ['active', 'working'].includes(agent.status)
   );
-  return matches.length === 1 ? matches[0][0] : requested;
+  if (matches.length === 1) return matches[0][0];
+  // Multi/no-match: keep input verbatim so readers can still resolve it, but
+  // warn loudly instead of silently storing an unresolvable name (plan 06).
+  try {
+    appendToSharedLog(
+      `Assignee [${requested}] in [${projectId}] did not resolve to a unique agent (${matches.length} matches); storing verbatim.`
+    );
+  } catch { /* logging must never break task creation */ }
+  return requested;
 }
 
 export function recordTask({ projectId, title, description = '', assignee, acceptanceCriteria = [], dependencies = [], createdBy }) {
   const state = loadState();
-  const project = projectState(state, requireText(projectId, 'projectId'));
+  const cleanProjectId = requireText(projectId, 'projectId');
+  const project = projectState(state, cleanProjectId);
   const task = {
     id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    projectId: cleanProjectId,
     title: requireText(title, 'title'),
     description,
-    assignee: canonicalAssignee(projectId, assignee),
+    assignee: canonicalAssignee(cleanProjectId, assignee),
     acceptanceCriteria: Array.isArray(acceptanceCriteria) ? acceptanceCriteria : [],
     dependencies: Array.isArray(dependencies) ? dependencies : [],
     status: 'assigned',
@@ -68,7 +78,8 @@ export function recordTask({ projectId, title, description = '', assignee, accep
 
 export function updateTaskProgress({ projectId, taskId, agentId, status, summary, percent }) {
   const state = loadState();
-  const project = projectState(state, requireText(projectId, 'projectId'));
+  const cleanProjectId = requireText(projectId, 'projectId');
+  const project = projectState(state, cleanProjectId);
   const agent = loadHrSystem()[agentId];
   const task = project.tasks.find((item) =>
     item.id === taskId && (
@@ -83,15 +94,17 @@ export function updateTaskProgress({ projectId, taskId, agentId, status, summary
   task.summary = requireText(summary, 'summary');
   if (percent !== undefined) task.percent = Math.max(0, Math.min(100, Number(percent)));
   task.updatedAt = new Date().toISOString();
-  project.updates.push({ agentId, taskId, status: task.status, summary: task.summary, at: task.updatedAt });
+  if (!task.projectId) task.projectId = cleanProjectId;
+  project.updates.push({ agentId, taskId, projectId: cleanProjectId, status: task.status, summary: task.summary, at: task.updatedAt });
   saveState(state);
   return task;
 }
 
 export function reportBlocker({ projectId, agentId, taskId, blocker, severity = 'medium' }) {
   const state = loadState();
-  const project = projectState(state, requireText(projectId, 'projectId'));
-  const item = { id: `blocker-${Date.now()}`, agentId, taskId: taskId || null, blocker: requireText(blocker, 'blocker'), severity, status: 'open', createdAt: new Date().toISOString() };
+  const cleanProjectId = requireText(projectId, 'projectId');
+  const project = projectState(state, cleanProjectId);
+  const item = { id: `blocker-${Date.now()}`, projectId: cleanProjectId, agentId, taskId: taskId || null, blocker: requireText(blocker, 'blocker'), severity, status: 'open', createdAt: new Date().toISOString() };
   project.blockers.push(item);
   saveState(state);
   appendToSharedLog(`Blocker [${item.id}] reported by [${agentId}] in [${projectId}].`);
@@ -100,8 +113,9 @@ export function reportBlocker({ projectId, agentId, taskId, blocker, severity = 
 
 export function requestHelp({ projectId, agentId, taskId, neededRole, question, urgency = 'normal' }) {
   const state = loadState();
-  const project = projectState(state, requireText(projectId, 'projectId'));
-  const request = { id: `help-${Date.now()}`, agentId, taskId: taskId || null, neededRole: requireText(neededRole, 'neededRole'), question: requireText(question, 'question'), urgency, status: 'open', createdAt: new Date().toISOString() };
+  const cleanProjectId = requireText(projectId, 'projectId');
+  const project = projectState(state, cleanProjectId);
+  const request = { id: `help-${Date.now()}`, projectId: cleanProjectId, agentId, taskId: taskId || null, neededRole: requireText(neededRole, 'neededRole'), question: requireText(question, 'question'), urgency, status: 'open', createdAt: new Date().toISOString() };
   project.helpRequests.push(request);
   saveState(state);
   appendToSharedLog(`Help request [${request.id}] from [${agentId}] needs [${neededRole}] in [${projectId}].`);

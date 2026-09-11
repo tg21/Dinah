@@ -6,11 +6,12 @@ import {
 } from '../config.js';
 import { AGENT_RPG_REGISTRY } from '../data/rpgRegistry.js';
 import { getModelById, selectBestModelForRole } from '../harness/index.js';
+import { ensureAgentMcpDefaults } from '../mcp/permissions.js';
 
 export function createOverseerAgent(ovId) {
   const rpgStats = AGENT_RPG_REGISTRY[ovId] || {};
   const bestModel = selectBestModelForRole(ovId);
-  return {
+  const agent = {
     name: rpgStats.name || ovId,
     role: ovId,
     project: 'global',
@@ -25,6 +26,9 @@ export function createOverseerAgent(ovId) {
     stats: rpgStats,
     mcp: {}
   };
+  // Seed orchestration + role-derived tool defaults (plans 04+05).
+  ensureAgentMcpDefaults(agent);
+  return agent;
 }
 
 export function loadHrSystem() {
@@ -80,6 +84,10 @@ export function loadHrSystem() {
           modified = true;
         }
       }
+      // Backfill seeded MCP defaults for legacy records (plans 04+05).
+      // Explicit enabled:false is preserved by ensureAgentMcpDefaults.
+      const { applied } = ensureAgentMcpDefaults(agent);
+      if (applied) modified = true;
     }
 
     if (modified) {

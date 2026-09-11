@@ -48,7 +48,7 @@ export const api = {
     }),
   getModels: () => req('/api/models'),
   getHarnesses: () => req('/api/harnesses'),
-  getMcps: () => req('/api/mcps'),
+  getMcps: (agentId) => req(agentId ? `/api/mcps?agentId=${encodeURIComponent(agentId)}` : '/api/mcps'),
   getEvents: () => req('/api/events'),
   getMessageActivity: (projectId) => req(`/api/message-activity?projectId=${encodeURIComponent(projectId || 'global')}`),
   searchMcps: (q) => req(`/api/mcps/search?q=${encodeURIComponent(q)}`),

@@ -28,15 +28,19 @@ export function loadAgentMessages(agentId) {
   }
 }
 
-export function appendAgentMessage(agentId, { from, project, request, path: filePath, role = 'agent' }) {
+export function appendAgentMessage(agentId, { from, project, request, path: filePath, role = 'agent', deliveryId = null, messageId = null }) {
   const messages = loadAgentMessages(agentId);
+  // Guard against duplicate queue projections (delivery-ID marker).
+  if (deliveryId && messages.messages.some((m) => m.deliveryId === deliveryId)) return;
   messages.messages.push({
     from,
     role,
     project,
     request,
     path: filePath,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    ...(deliveryId ? { deliveryId } : {}),
+    ...(messageId ? { messageId } : {})
   });
   fs.writeFileSync(getAgentMessageFile(agentId), JSON.stringify(messages, null, 2));
 }

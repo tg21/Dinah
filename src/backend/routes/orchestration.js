@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { authenticateOrchestrationToken } from '../services/orchestrationAuth.js';
 import { loadHrSystem } from '../services/hrService.js';
 import { requestAgentSummoning, spawnAgentViaHr, ensureProjectManager, sendProjectBriefToManager } from '../services/agentLifecycle.js';
-import { createProjectFolder, loadProjectsConfig, saveProjectsConfig } from '../services/projectService.js';
-import { askUser } from '../services/coordinationService.js';
+import { createProjectFolder, loadProjectsConfig, saveProjectsConfig, slugifyProjectId } from '../services/projectService.js';
+import { askUser, canonicalAssignee } from '../services/coordinationService.js';
 import { spawnHarnessAgent } from '../services/harnessRunner.js';
 import { getProjectCoordination, recordTask, updateTaskProgress, reportBlocker, requestHelp, sendAgentMessage } from '../services/coordinationService.js';
 import {
@@ -32,8 +32,8 @@ router.post('/api/internal/orchestration/status', guard, (req, res) => {
 
 router.post('/api/internal/orchestration/create-project', guard, (req, res) => {
   if (req.body.agentId !== 'ceo-warlock') return res.status(403).json({ error: 'Only CEO Warlock may create projects through this tool' });
-  const projectId = String(req.body.newProjectId || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '');
-  if (!projectId) return res.status(400).json({ error: 'projectId is required; ask the user for a project name' });
+  const projectId = slugifyProjectId(req.body.newProjectId || '');
+  if (!projectId || projectId === 'project') return res.status(400).json({ error: 'projectId is required; ask the user for a project name' });
   createProjectFolder(projectId, req.body.customPath || null);
   const cfg = loadProjectsConfig();
   if (req.body.description) cfg[projectId].description = req.body.description;
@@ -49,7 +49,8 @@ router.post('/api/internal/orchestration/staff', guard, (req, res) => {
     model: req.body.model,
     harness: req.body.harness,
     effortLevel: req.body.effortLevel,
-    promptOverride: req.body.promptOverride
+    promptOverride: req.body.promptOverride,
+    requesterId: req.body.agentId
   });
   res.json(result);
 });
@@ -72,10 +73,19 @@ router.post('/api/internal/orchestration/task', guard, async (req, res) => {
   const task = recordTask({ ...req.body, createdBy: req.body.agentId });
   if (req.body.dispatch === true) {
     const hr = loadHrSystem();
-    const assignee = hr[req.body.assignee];
+    // Resolve role names via canonicalAssignee so dispatch:true works with
+    // roster role names instead of 404ing on exact IDs (plan 07 groundwork,
+    // plan 06 canonicalization).
+    let assigneeId;
+    try {
+      assigneeId = canonicalAssignee(req.body.projectId, req.body.assignee);
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+    const assignee = hr[assigneeId];
     if (!assignee) return res.status(404).json({ error: 'Assignee not found' });
     if (!['active', 'working'].includes(assignee.status)) return res.status(409).json({ error: 'Assignee is not active' });
-    const result = await spawnHarnessAgent(assignee.harness, req.body.projectId, `${task.title}\n\n${task.description}\n\nAcceptance criteria:\n${task.acceptanceCriteria.join('\n')}`, req.body.assignee);
+    const result = await spawnHarnessAgent(assignee.harness, req.body.projectId, `${task.title}\n\n${task.description}\n\nAcceptance criteria:\n${task.acceptanceCriteria.join('\n')}`, assigneeId);
     return res.json({ task, dispatch: result });
   }
   res.json({ task });
