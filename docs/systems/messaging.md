@@ -1,0 +1,22 @@
+# System — messaging (durable queue, dispatcher, live sync)
+
+## Durable queue is the source of truth
+
+`shared-state/message-queue.json` is the durable source of truth for direct/project messages, delivery leases, acknowledgements, retries, and dead letters; `agent-*.msgs.json` remains a UI/audit projection. Use the `dinah-orchestration` inbox/claim/acknowledge/complete/fail/release tools for delivery, and treat `send_agent_message` as queue acceptance only. The backend dispatcher wakes one active agent at a time with a bounded inbox batch and recovers expired leases.
+
+- **Message status identifiers**. `get_message_status` accepts either the durable `messageId` or the `deliveryId` returned by inbox/claim responses; claim/acknowledge/complete/fail/release accept either id too, but always require the current lease token. A matching holder may ack late (lease timestamp is refreshed on valid-token use; expiry only re-queues when the token no longer matches). Queue lease failures return JSON (`404` unknown id, `409` stale lease/double claim), never an uncaught throw.
+- **Queue→drawer projection**. `enqueueDirectMessage` plus claim/complete project bounded snippets into `agent-*.msgs.json` with `deliveryId`/`messageId` markers; `appendAgentMessage` dedups on `deliveryId`.
+
+## Dispatcher and `handleSendMessage`
+
+- **Manager autonomy loop**. Coordination writes wake the interested party via the durable queue: task progress → task creator (manager), blockers/help → project manager, new tasks → assignee (skipped for direct `dispatch:true` turns and self-writes).
+- **`POST /handleSendMessage`** enriches the resume prompt (pending question + brief + coordination snapshot + inbox + reply), consumes its durable reply via claim/complete so the dispatcher never double-turns, then drains follow-ups with bounded `runContinuation` (max 5 turns, stops on fresh `ask_user`). Unknown `agentId` → 400.
+- **Dispatcher settles every claim**. After each dispatcher turn, the claim is completed — or failed retryable when the turn fell back to the simulator while a real harness is configured (never silently left claimed; dead-letters after 3 attempts instead of looping forever).
+- **Agent messaging rule**. Agents must publish progress, report blockers, and request help through coordination tools instead of relying on periodic full-project scans.
+- **Token tracking**. Each message sent via `POST /handleSendMessage` increments `context_used` by `round(message.length * 1.5) + 350` tokens and adds `spentUsd` to the project budget.
+
+## UI projection
+
+- **Agent drawer payloads**. `/handleGetAgentStatus` returns `agent`, `messages`, `thoughts`, and `personalContext` as sibling fields. The frontend must merge those fields into drawer state; persisted messages use the backend `request` property.
+- **Messaging observability UI**. The drawer's Messages tab reads `/api/message-activity`; current-project messages render as cascaded incoming/outgoing bubbles with queued/claimed/processing/completed/dead-letter ticks. Every agent — managers/overseers included — sees only messages where it is sender/recipient/delivery-holder plus project-channel broadcasts (`recipientAgentId` null). Outgoing (`senderAgentId === drawer id`) aligns right, incoming aligns left. `/api/events` emits `courier_message` events, which the play area renders as clickable mail flights for 30 seconds; keep event payloads populated with `messageId`, `deliveryId`, `projectId`, sender, recipient, and summary.
+- **Live roster sync (SSE, no polling)**. The backend pushes every roster mutation over `GET /api/events/stream` (SSE, same Express port; dev Vite proxy forwards `/api`): `summon_requested` (request), `agent_spawned` (direct provision), `summon_confirmed`, `agent_updated`, `agent_status_changed`. The frontend subscribes once via `EventSource` (`api.subscribeEvents`), does a one-shot `GET /api/events` catch-up on connect, and calls `loadAgents()` (debounced ~1s, project-filtered) on those types; `courier_message` drives mail flights + `loadMessageActivity()`. Never add roster polling; every new HR mutation path must emit one of these events.
