@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { randomUUID } from 'crypto';
 import { spawn } from 'child_process';
 import { findHarnessBinary } from '../harness/index.js';
 import { createProjectFolder, getProjectFolder } from './projectService.js';
@@ -15,8 +16,9 @@ import { ensureProjectManager } from './agentLifecycle.js';
 // the HR record (`agent.harnessSessions.<key>`, persisted in
 // hr-system.json), not in process memory. Every follow-up message reuses
 // the same session via the harness's native resume flag (`opencode -s`,
-// `codex exec resume`, `agy --conversation`); only a missing/stale id (or
-// a harness/model switch, which clears the map) starts a new session.
+// `codex exec resume`, `agy --conversation`, `claude --resume`,
+// `copilot --resume`); only a missing/stale id (or a harness/model switch,
+// which clears the map) starts a new session.
 // CLIs are one-shot processes by design — "reuse" means resuming the
 // server-side session, not keeping a process alive.
 // ------------------------------------------------------------
@@ -24,7 +26,10 @@ const SESSION_HARNESS_KEYS = {
   opencode: 'opencode',
   codex: 'codex',
   agy: 'agy',
-  antigravity: 'agy'
+  antigravity: 'agy',
+  'claude-code': 'claude-code',
+  claude: 'claude-code',
+  copilot: 'copilot'
 };
 
 export function sessionKeyForHarness(harness) {
@@ -364,6 +369,34 @@ export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocati
   }
 }
 
+// Parse `claude -p --output-format json` output: a single result object
+// carrying the session id plus the assistant text. Falls back to raw stdout
+// when the output isn't JSON. Envelope verified live 2026-09-12
+// (`session_id` + `result` fields observed); resume recall is unverified
+// (no credits on this host), so treat the wiring as provisional.
+export function parseClaudeJsonOutput(stdout) {
+  const raw = (stdout || '').trim();
+  if (!raw) return { output: raw, sessionId: null, isError: false };
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+    try {
+      const event = JSON.parse(trimmed);
+      if (event.type === 'result') {
+        const text = typeof event.result === 'string' ? event.result.trim() : raw;
+        return {
+          output: text || raw,
+          sessionId: typeof event.session_id === 'string' ? event.session_id : null,
+          isError: event.is_error === true
+        };
+      }
+    } catch {
+      /* not the result line; keep scanning */
+    }
+  }
+  return { output: raw, sessionId: null, isError: false };
+}
+
 export async function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
   const projectDir = resolveProjectDir(projectId, workspaceDir);
   const harnessBin = findHarnessBinary('claude-code') || findHarnessBinary('claude');
@@ -372,21 +405,178 @@ export async function spawnClaudeCodeAgent(projectId, prompt, agentId, mcpInvoca
     return simulateHarnessExecution('claude-code', projectId, prompt, agentId);
   }
 
-  try {
+  // Native session continuation: `--output-format json` returns a result
+  // object with `session_id`; passing it back via `--resume` continues the
+  // conversation. New sessions get an explicit `--session-id` UUID so the id
+  // is known even if output parsing misses. The id lives on the HR record,
+  // so reuse survives server restarts.
+  const storedSessionId = getStoredSessionId(agentId, 'claude-code');
+  const newSessionId = storedSessionId || randomUUID();
+
+  const runOnce = async (sessionId, isNew) => {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
-    const args = ['-p', prompt, '--workdir', projectDir];
-    if (mcpInvocation?.mcps?.length) args.push('--mcp-config', mcpInvocation.file);
-    const { stdout: output } = await runHarnessProcess(harnessBin, args, {
+    const args = ['-p', prompt, '--output-format', 'json', '--dangerously-skip-permissions'];
+    if (isNew) args.push('--session-id', newSessionId);
+    else args.push('--resume', sessionId);
+    if (agent?.model) args.push('--model', agent.model);
+    if (mcpInvocation?.claudeFile) args.push('--mcp-config', mcpInvocation.claudeFile);
+    const { stdout, stderr } = await runHarnessProcess(harnessBin, args, {
       cwd: projectDir,
       env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' },
       agentId,
       harness: 'claude-code',
       processKey: agentId
     });
-    return { success: true, output, agentId, harness: 'claude-code', model: agent?.model };
+    return { parsed: parseClaudeJsonOutput(stdout), stderr };
+  };
+
+  try {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
+    appendAgentThought(
+      agentId,
+      'CLAUDE_INVOKE',
+      `Invoking Claude Code harness [${agent?.model || 'default'}] in ${projectDir}` +
+        (storedSessionId ? ` (resuming session ${storedSessionId})` : ' (new session)')
+    );
+    let parsed;
+    let stderr = '';
+    try {
+      ({ parsed, stderr } = await runOnce(storedSessionId, !storedSessionId));
+      // Stale session id: clear and retry once as a new session.
+      if (storedSessionId && !parsed.sessionId && /session.*(not found|not exist|invalid)|no .*session|not.*resum/i.test(`${parsed.output || ''} ${stderr || ''}`)) {
+        throw Object.assign(new Error('Session not found'), { staleSession: true });
+      }
+    } catch (error) {
+      if (storedSessionId && (error.staleSession || /session.*(not found|not exist|invalid)|not.*resum/i.test(String(error.message || '') + String(error.stderr || '')))) {
+        appendAgentThought(agentId, 'CLAUDE_SESSION_RESET', `Stored session ${storedSessionId} not found; starting a new session.`);
+        clearHarnessSession(agentId, 'claude-code');
+        ({ parsed, stderr } = await runOnce(null, true));
+      } else {
+        throw error;
+      }
+    }
+    persistHarnessSession(agentId, 'claude-code', parsed.sessionId || newSessionId);
+    appendAgentThought(agentId, 'CLAUDE_SUCCESS', `Claude Code execution completed.`);
+    if (parsed.isError) {
+      // Exit 0 with an API error (e.g. out of credits): the turn did no
+      // work. Fall back so the dispatcher re-queues instead of consuming.
+      const reason = `Claude Code reported an error: ${(parsed.output || 'unknown error').slice(0, 300)}`;
+      appendAgentThought(agentId, 'CLAUDE_FALLBACK', `Harness note: ${reason}`);
+      return { ...simulateHarnessExecution('claude-code', projectId, prompt, agentId), fallbackReason: reason };
+    }
+    return { success: true, output: parsed.output, agentId, harness: 'claude-code', model: agent?.model, sessionId: parsed.sessionId || newSessionId };
   } catch (error) {
+    appendAgentThought(agentId, 'CLAUDE_FALLBACK', `Harness note: ${error.message.slice(0, 120)}`);
     return simulateHarnessExecution('claude-code', projectId, prompt, agentId);
+  }
+}
+
+// Parse `copilot -p --output-format json` (JSONL) output: assistant text
+// from the final `assistant.message` (or joined `assistant.message_delta`
+// chunks) plus the session id from the closing `result` line. Falls back to
+// raw stdout when the output isn't JSONL. Verified live 2026-09-12 with a
+// nonce recall (`--resume=<id>` returns the same sessionId).
+export function parseCopilotJsonOutput(stdout) {
+  const raw = (stdout || '').trim();
+  if (!raw) return { output: raw, sessionId: null };
+  let sessionId = null;
+  let finalMessage = null;
+  const deltas = [];
+  let jsonLines = 0;
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+    try {
+      const event = JSON.parse(trimmed);
+      jsonLines += 1;
+      if (event.type === 'result' && typeof event.sessionId === 'string') sessionId = event.sessionId;
+      if (event.type === 'assistant.message' && typeof event.data?.content === 'string') {
+        finalMessage = event.data.content;
+      } else if (event.type === 'assistant.message_delta' && typeof event.data?.deltaContent === 'string') {
+        deltas.push(event.data.deltaContent);
+      }
+    } catch {
+      /* not a JSON event line; ignore */
+    }
+  }
+  if (!jsonLines) return { output: raw, sessionId: null };
+  const text = (finalMessage ?? deltas.join('')).trim() || raw;
+  return { output: text, sessionId };
+}
+
+export async function spawnCopilotAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
+  const projectDir = resolveProjectDir(projectId, workspaceDir);
+  const harnessBin = findHarnessBinary('copilot');
+
+  if (!harnessBin) {
+    return simulateHarnessExecution('copilot', projectId, prompt, agentId);
+  }
+
+  // Native session continuation (verified live 2026-09-12): `--output-format
+  // json` ends with a `result` line carrying `sessionId`;
+  // `--resume=<id>` continues it (nonce recall confirmed, same id back). A
+  // stale id exits 0 with `Error: No session, task, or name matched ...` on
+  // stderr and no JSON, so clear and retry once as a new session. New
+  // sessions get an explicit `--session-id` UUID. The id lives on the HR
+  // record, so reuse survives server restarts. Note: like codex, a resume
+  // reuses the session's recorded working directory (same-project resumes
+  // share the cwd anyway).
+  const storedSessionId = getStoredSessionId(agentId, 'copilot');
+  const newSessionId = storedSessionId || randomUUID();
+
+  const runOnce = async (sessionId, isNew) => {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
+    const args = ['-p', prompt, '--allow-all-tools', '--output-format', 'json'];
+    if (isNew) args.push(`--session-id=${newSessionId}`);
+    else args.push(`--resume=${sessionId}`);
+    if (agent?.model) args.push('--model', agent.model);
+    if (mcpInvocation?.copilotFile) args.push('--additional-mcp-config', mcpInvocation.copilotFile);
+    const { stdout, stderr } = await runHarnessProcess(harnessBin, args, {
+      cwd: projectDir,
+      env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' },
+      agentId,
+      harness: 'copilot',
+      processKey: agentId
+    });
+    return { parsed: parseCopilotJsonOutput(stdout), stderr };
+  };
+
+  try {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
+    appendAgentThought(
+      agentId,
+      'COPILOT_INVOKE',
+      `Invoking Copilot CLI [${agent?.model || 'default'}] in ${projectDir}` +
+        (storedSessionId ? ` (resuming session ${storedSessionId})` : ' (new session)')
+    );
+    let parsed;
+    let stderr = '';
+    try {
+      ({ parsed, stderr } = await runOnce(storedSessionId, !storedSessionId));
+      // Stale session id: no JSON result line, `Error: No session, task, or
+      // name matched ...` on stderr.
+      if (storedSessionId && !parsed.sessionId && /no session.*matched|not found/i.test(`${parsed.output || ''} ${stderr || ''}`)) {
+        throw Object.assign(new Error('Session not found'), { staleSession: true });
+      }
+    } catch (error) {
+      if (storedSessionId && (error.staleSession || /no session.*matched|not found|no .*session/i.test(String(error.message || '') + String(error.stderr || '')))) {
+        appendAgentThought(agentId, 'COPILOT_SESSION_RESET', `Stored session ${storedSessionId} not found; starting a new session.`);
+        clearHarnessSession(agentId, 'copilot');
+        ({ parsed } = await runOnce(null, true));
+      } else {
+        throw error;
+      }
+    }
+    persistHarnessSession(agentId, 'copilot', parsed.sessionId || newSessionId);
+    appendAgentThought(agentId, 'COPILOT_SUCCESS', `Copilot CLI execution completed.`);
+    return { success: true, output: parsed.output, agentId, harness: 'copilot', model: agent?.model, sessionId: parsed.sessionId || newSessionId };
+  } catch (error) {
+    appendAgentThought(agentId, 'COPILOT_FALLBACK', `Harness note: ${error.message.slice(0, 120)}`);
+    return simulateHarnessExecution('copilot', projectId, prompt, agentId);
   }
 }
 
@@ -613,9 +803,12 @@ export async function spawnHarnessAgent(harness = 'opencode', projectId, prompt,
       case 'opencode':
         return await spawnOpencodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'claude-code':
+      case 'claude':
         return await spawnClaudeCodeAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'codex':
         return await spawnCodexAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
+      case 'copilot':
+        return await spawnCopilotAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'gemini':
         return await spawnGeminiAgent(projectId, effectivePrompt, agentId, mcpInvocation, options.workspaceDir);
       case 'ollama':

@@ -54,6 +54,8 @@ import {
   clearHarnessSession,
   getStoredSessionId,
   parseAgyJsonOutput,
+  parseClaudeJsonOutput,
+  parseCopilotJsonOutput,
   persistHarnessSession,
   sessionKeyForHarness
 } from '../../src/backend/services/harnessRunner.js';
@@ -86,7 +88,9 @@ describe('harness session reuse', () => {
     expect(sessionKeyForHarness('codex')).toBe('codex');
     expect(sessionKeyForHarness('agy')).toBe('agy');
     expect(sessionKeyForHarness('antigravity')).toBe('agy');
-    expect(sessionKeyForHarness('claude-code')).toBeNull();
+    expect(sessionKeyForHarness('claude-code')).toBe('claude-code');
+    expect(sessionKeyForHarness('claude')).toBe('claude-code');
+    expect(sessionKeyForHarness('copilot')).toBe('copilot');
     expect(sessionKeyForHarness('gemini')).toBeNull();
     expect(sessionKeyForHarness('ollama')).toBeNull();
   });
@@ -142,6 +146,69 @@ describe('harness session reuse', () => {
   it('agy parser falls back to raw stdout for non-JSON output', () => {
     const parsed = parseAgyJsonOutput('plain agy output');
     expect(parsed.output).toBe('plain agy output');
+    expect(parsed.sessionId).toBeNull();
+  });
+
+  it('parses the claude --output-format json result envelope', () => {
+    const stdout = JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      session_id: '76e72018-1aad-40e4-b580-c8998223cc88',
+      result: 'Hello from Claude\n'
+    });
+    const parsed = parseClaudeJsonOutput(stdout);
+    expect(parsed.sessionId).toBe('76e72018-1aad-40e4-b580-c8998223cc88');
+    expect(parsed.output).toBe('Hello from Claude');
+    expect(parsed.isError).toBe(false);
+  });
+
+  it('flags claude api errors so the turn falls back instead of consuming', () => {
+    const stdout = JSON.stringify({
+      type: 'result',
+      is_error: true,
+      session_id: '76e72018-1aad-40e4-b580-c8998223cc88',
+      result: 'Credit balance is too low'
+    });
+    const parsed = parseClaudeJsonOutput(stdout);
+    expect(parsed.isError).toBe(true);
+    expect(parsed.sessionId).toBe('76e72018-1aad-40e4-b580-c8998223cc88');
+    expect(parsed.output).toBe('Credit balance is too low');
+  });
+
+  it('claude parser falls back to raw stdout for non-JSON output', () => {
+    const parsed = parseClaudeJsonOutput('plain claude output');
+    expect(parsed.output).toBe('plain claude output');
+    expect(parsed.sessionId).toBeNull();
+    expect(parsed.isError).toBe(false);
+  });
+
+  it('parses copilot --output-format json JSONL (final message + result sessionId)', () => {
+    const stdout = [
+      JSON.stringify({ type: 'assistant.message_delta', data: { messageId: 'm1', deltaContent: 'PLUTO' } }),
+      JSON.stringify({ type: 'assistant.message_delta', data: { messageId: 'm1', deltaContent: '77' } }),
+      JSON.stringify({ type: 'assistant.message', data: { messageId: 'm1', content: 'PLUTO77', phase: 'final_answer' } }),
+      JSON.stringify({ type: 'result', timestamp: '2026-09-12T19:57:58.333Z', sessionId: 'd73910a1-cb74-4e4f-a927-eb5247a43c77', exitCode: 0 })
+    ].join('\n');
+    const parsed = parseCopilotJsonOutput(stdout);
+    expect(parsed.sessionId).toBe('d73910a1-cb74-4e4f-a927-eb5247a43c77');
+    expect(parsed.output).toBe('PLUTO77');
+  });
+
+  it('copilot parser joins deltas when no final message is present', () => {
+    const stdout = [
+      JSON.stringify({ type: 'assistant.message_delta', data: { messageId: 'm1', deltaContent: 'Hi' } }),
+      JSON.stringify({ type: 'assistant.message_delta', data: { messageId: 'm1', deltaContent: '! How can I help?' } }),
+      JSON.stringify({ type: 'result', sessionId: 'sess-2', exitCode: 0 })
+    ].join('\n');
+    const parsed = parseCopilotJsonOutput(stdout);
+    expect(parsed.sessionId).toBe('sess-2');
+    expect(parsed.output).toBe('Hi! How can I help?');
+  });
+
+  it('copilot parser falls back to raw stdout for non-JSON output', () => {
+    const parsed = parseCopilotJsonOutput('plain copilot output');
+    expect(parsed.output).toBe('plain copilot output');
     expect(parsed.sessionId).toBeNull();
   });
 

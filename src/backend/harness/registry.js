@@ -11,6 +11,7 @@ import { discoverOllamaModels } from './providers/ollama.js';
 import { discoverClaudeCodeModels } from './providers/claude.js';
 import { discoverGeminiModels } from './providers/gemini.js';
 import { discoverCodexModels } from './providers/codex.js';
+import { discoverCopilotModels } from './providers/copilot.js';
 import { getSystemSimulatorModels } from './providers/simulator.js';
 
 /**
@@ -115,6 +116,21 @@ export async function initializeHarnessesAndModels(forceRefresh = false) {
       modelCount: codexModels.length
     });
     models.push(...codexModels);
+  }
+
+  // 6. Detect GitHub Copilot CLI
+  const copilotBin = findHarnessBinary('copilot');
+  if (copilotBin) {
+    console.log(`  ✓ Found GitHub Copilot CLI harness at: ${copilotBin}`);
+    const copilotModels = discoverCopilotModels(copilotBin);
+    harnesses.push({
+      id: 'copilot',
+      name: 'GitHub Copilot CLI',
+      status: 'active',
+      binaryPath: copilotBin,
+      modelCount: copilotModels.length
+    });
+    models.push(...copilotModels);
   }
 
   // Deduplicate models by ID

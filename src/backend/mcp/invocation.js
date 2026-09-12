@@ -101,7 +101,51 @@ export function createMcpInvocationConfig(agent, agentId, projectId) {
   };
   const opencodeFile = path.join(dir, 'opencode.json');
   fs.writeFileSync(opencodeFile, JSON.stringify(opencodeConfig, null, 2));
-  return { file, opencodeFile, dir, mcps, orchestrationToken };
+  // Claude Code consumes `--mcp-config` as { mcpServers: { name: { command,
+  // args, env } } }. The internal manifest above is not that format, so give
+  // it a native file too (previously the internal manifest was passed, which
+  // claude could not parse).
+  const claudeConfig = {
+    mcpServers: Object.fromEntries(
+      mcps.map((mcp) => [
+        mcp.id,
+        {
+          command: mcp.command,
+          args: mcp.args || [],
+          env: {
+            ...(mcp.env || {}),
+            ...(mcp.id === 'dinah-orchestration' ? orchestrationEnv : {})
+          }
+        }
+      ])
+    )
+  };
+  const claudeFile = path.join(dir, 'claude.json');
+  fs.writeFileSync(claudeFile, JSON.stringify(claudeConfig, null, 2));
+  // GitHub Copilot CLI consumes `--additional-mcp-config` as { mcpServers:
+  // { name: { type: 'local', command, args, tools, env } } } (verified via
+  // `copilot mcp add --json` 2026-09-12). Tool scoping stays server-side via
+  // the per-agent token, so expose all tools here like the OpenCode config.
+  const copilotConfig = {
+    mcpServers: Object.fromEntries(
+      mcps.map((mcp) => [
+        mcp.id,
+        {
+          type: 'local',
+          command: mcp.command,
+          args: mcp.args || [],
+          tools: ['*'],
+          env: {
+            ...(mcp.env || {}),
+            ...(mcp.id === 'dinah-orchestration' ? orchestrationEnv : {})
+          }
+        }
+      ])
+    )
+  };
+  const copilotFile = path.join(dir, 'copilot.json');
+  fs.writeFileSync(copilotFile, JSON.stringify(copilotConfig, null, 2));
+  return { file, opencodeFile, claudeFile, copilotFile, dir, mcps, orchestrationToken };
 }
 
 export function cleanupMcpInvocation(invocation) {
