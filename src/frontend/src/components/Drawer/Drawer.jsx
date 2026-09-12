@@ -13,7 +13,7 @@ const TABS = [
   ['stats', 'fa-shield-halved', 'Stats'],
   ['thoughts', 'fa-brain', 'BTS', 'Behind the scenes: agent reasoning + delivery mechanics'],
   ['context', 'fa-database', 'Context'],
-  ['network', 'fa-envelope-open-text', 'Messages']
+  ['network', 'fa-envelope-open-text', 'A-to-A', 'Agent-to-agent communication only']
 ];
 
 export default function Drawer({ engineRef }) {

@@ -49,7 +49,7 @@ export default function NetworkTab() {
   return (
     <>
       <div className="section-title">
-        <i className="fa-solid fa-envelope-open-text" /> Agent Communications
+        <i className="fa-solid fa-envelope-open-text" /> Agent-to-Agent
         <span className="network-live-pill"><i className="fa-solid fa-circle" /> LIVE</span>
       </div>
       <div className="network-subtitle">Agent-to-agent traffic only · user chat stays in Chat</div>
