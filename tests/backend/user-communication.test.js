@@ -53,7 +53,7 @@ vi.mock('../../src/backend/config.js', () => ({
 import { buildResumePrompt } from '../../src/backend/routes/messages.js';
 import { saveHrSystem, loadHrSystem } from '../../src/backend/services/hrService.js';
 import { clearAgentEventQueue, getAgentEventQueue } from '../../src/backend/services/eventBus.js';
-import { askUser, informUser } from '../../src/backend/services/coordinationService.js';
+import { askUser, informUser, answerUserQuestion } from '../../src/backend/services/coordinationService.js';
 import { loadAgentMessages } from '../../src/backend/services/messageService.js';
 import {
   enqueueDirectMessage,
@@ -128,6 +128,86 @@ describe('user communication: ask_user MCQ options', () => {
   });
 });
 
+describe('user communication: question ids + back-to-back holds', () => {
+  beforeAll(() => resetWorkspace());
+  afterAll(() => fs.rmSync(testPaths.workingDir, { recursive: true, force: true }));
+  beforeEach(() => {
+    resetWorkspace();
+    saveHrSystem({ 'auto-proj-manager-bard': agent('Manager', 'manager-bard') });
+    clearAgentEventQueue();
+  });
+
+  it('mints a questionId when omitted and honors an agent-supplied one', () => {
+    const auto = askUser({ projectId: 'auto-proj', agentId: 'auto-proj-manager-bard', question: 'first?' });
+    expect(auto.questionId).toMatch(/^q-/);
+    const named = askUser({ projectId: 'auto-proj', agentId: 'auto-proj-manager-bard', question: 'second?', questionId: 'scope-choice' });
+    expect(named.questionId).toBe('scope-choice');
+    const hr = loadHrSystem();
+    expect(hr['auto-proj-manager-bard'].pendingUserQuestions.filter((q) => q.status === 'open')).toHaveLength(2);
+    // Legacy singular hold tracks the latest open question.
+    expect(hr['auto-proj-manager-bard'].pendingUserQuestion.question).toBe('second?');
+    const msgs = loadAgentMessages('auto-proj-manager-bard').messages;
+    expect(msgs.at(-2).questionId).toBe(auto.questionId);
+    expect(msgs.at(-1).questionId).toBe('scope-choice');
+  });
+
+  it('repeating the same questionId does not fork a duplicate hold', () => {
+    askUser({ projectId: 'auto-proj', agentId: 'auto-proj-manager-bard', question: 'again?', questionId: 'dup' });
+    const repeat = askUser({ projectId: 'auto-proj', agentId: 'auto-proj-manager-bard', question: 'again?', questionId: 'dup' });
+    expect(repeat.duplicate).toBe(true);
+    const hr = loadHrSystem();
+    expect(hr['auto-proj-manager-bard'].pendingUserQuestions.filter((q) => q.status === 'open')).toHaveLength(1);
+  });
+
+  it('answering one of two holds keeps the other open and the hold status', () => {
+    const first = askUser({ projectId: 'auto-proj', agentId: 'auto-proj-manager-bard', question: 'first?', questionId: 'q1' });
+    askUser({ projectId: 'auto-proj', agentId: 'auto-proj-manager-bard', question: 'second?', questionId: 'q2' });
+    const outcome = answerUserQuestion({ agentId: 'auto-proj-manager-bard', questionId: first.questionId, answer: 'answer one' });
+    expect(outcome.answered.id).toBe('q1');
+    expect(outcome.remainingOpen).toBe(1);
+    const hr = loadHrSystem();
+    expect(hr['auto-proj-manager-bard'].status).toBe('awaiting-user');
+    expect(hr['auto-proj-manager-bard'].pendingUserQuestion.question).toBe('second?');
+    const done = answerUserQuestion({ agentId: 'auto-proj-manager-bard', questionId: 'q2', answer: 'answer two' });
+    expect(done.remainingOpen).toBe(0);
+    const hr2 = loadHrSystem();
+    expect(hr2['auto-proj-manager-bard'].status).toBe('working');
+    expect(hr2['auto-proj-manager-bard'].pendingUserQuestion).toBeNull();
+  });
+
+  it('a plain reply without questionId answers the oldest open hold', () => {
+    askUser({ projectId: 'auto-proj', agentId: 'auto-proj-manager-bard', question: 'oldest?', questionId: 'old' });
+    askUser({ projectId: 'auto-proj', agentId: 'auto-proj-manager-bard', question: 'newest?', questionId: 'new' });
+    const outcome = answerUserQuestion({ agentId: 'auto-proj-manager-bard', answer: 'plain text' });
+    expect(outcome.answered.id).toBe('old');
+    expect(outcome.remainingOpen).toBe(1);
+  });
+
+  it('migrates a legacy singular hold and resolves it on reply', () => {
+    const hr = loadHrSystem();
+    hr['auto-proj-manager-bard'].status = 'awaiting-user';
+    hr['auto-proj-manager-bard'].pendingUserQuestion = { question: 'legacy?', taskId: null, askedAt: new Date().toISOString() };
+    saveHrSystem(hr);
+    const outcome = answerUserQuestion({ agentId: 'auto-proj-manager-bard', answer: 'yes' });
+    expect(outcome.answered.question).toBe('legacy?');
+    const hr2 = loadHrSystem();
+    expect(hr2['auto-proj-manager-bard'].status).toBe('working');
+    expect(hr2['auto-proj-manager-bard'].pendingUserQuestion).toBeNull();
+  });
+
+  it('resume prompt names the answered question and lists remaining holds', () => {
+    const prompt = buildResumePrompt({
+      agentId: 'auto-proj-manager-bard',
+      projectId: 'auto-proj',
+      userReply: 'Proper',
+      answeredQuestion: { id: 'q1', question: 'quick or proper?', options: ['Quick', 'Proper'] },
+      openQuestions: [{ id: 'q2', question: 'which region?', options: [] }]
+    });
+    expect(prompt).toMatch(/\[q1\]/);
+    expect(prompt).toMatch(/Still-open questions/);
+    expect(prompt).toMatch(/\[q2\]/);
+  });
+});
 describe('user communication: inform_user is chat-only', () => {
   beforeAll(() => resetWorkspace());
   afterAll(() => fs.rmSync(testPaths.workingDir, { recursive: true, force: true }));

@@ -30,10 +30,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ agentId, projectId })
     }),
-  sendMessage: ({ agentId, projectId, message, harness }) =>
+  sendMessage: ({ agentId, projectId, message, harness, questionId }) =>
     req('/handleSendMessage', {
       method: 'POST',
-      body: JSON.stringify({ agentId, projectId, message, harness })
+      body: JSON.stringify({ agentId, projectId, message, harness, questionId })
     }),
   getProjects: () => req('/api/projects'),
   startProject: ({ projectId, customPath, budgetUsd }) =>

@@ -86,9 +86,12 @@ export function runMarshallChecks() {
     // the user-facing signal was missed (restart, dropped event), re-broadcast
     // it so the UI hold signal stays visible. Cap: only re-broadcast, nothing else.
     if (agent.status === 'awaiting-user' && agent.pendingUserQuestion && idleMinutes >= 10) {
+      const openCount = Array.isArray(agent.pendingUserQuestions)
+        ? agent.pendingUserQuestions.filter((q) => q.status === 'open').length
+        : 1;
       const question = String(agent.pendingUserQuestion.question || '').slice(0, 80);
-      broadcastAgentEvent({ fromAgentId: agentId, toAgentId: 'user', projectId: agent.project, type: 'agent_needs_user', snippet: question });
-      appendToSharedLog(`[MARSHALL WATCHDOG] Re-broadcast user-input hold for [${agentId}] (waiting ${idleMinutes}m). Hold preserved.`);
+      broadcastAgentEvent({ fromAgentId: agentId, toAgentId: 'user', projectId: agent.project, type: 'agent_needs_user', questionId: agent.pendingUserQuestion.id, snippet: question });
+      appendToSharedLog(`[MARSHALL WATCHDOG] Re-broadcast user-input hold for [${agentId}] (waiting ${idleMinutes}m, ${openCount} open). Hold preserved.`);
     }
   }
 

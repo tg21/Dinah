@@ -28,7 +28,7 @@ export function loadAgentMessages(agentId) {
   }
 }
 
-export function appendAgentMessage(agentId, { from, project, request, path: filePath, role = 'agent', deliveryId = null, messageId = null, simulated = false, kind = null, options = null }) {
+export function appendAgentMessage(agentId, { from, project, request, path: filePath, role = 'agent', deliveryId = null, messageId = null, simulated = false, kind = null, options = null, questionId = null }) {
   const messages = loadAgentMessages(agentId);
   // Guard against duplicate queue projections (delivery-ID marker).
   if (deliveryId && messages.messages.some((m) => m.deliveryId === deliveryId)) return;
@@ -43,9 +43,26 @@ export function appendAgentMessage(agentId, { from, project, request, path: file
     ...(messageId ? { messageId } : {}),
     ...(simulated ? { simulated: true } : {}),
     ...(kind ? { kind } : {}),
-    ...(Array.isArray(options) && options.length ? { options } : {})
+    ...(Array.isArray(options) && options.length ? { options } : {}),
+    ...(questionId ? { questionId } : {})
   });
   fs.writeFileSync(getAgentMessageFile(agentId), JSON.stringify(messages, null, 2));
+}
+
+// One-time legacy backfill: tag the latest untagged question bubble that
+// matches the migrated hold text so the UI can match bubble → question id.
+export function tagLatestQuestionMessage(agentId, text, questionId) {
+  if (!questionId || !text) return false;
+  const data = loadAgentMessages(agentId);
+  for (let i = data.messages.length - 1; i >= 0; i--) {
+    const m = data.messages[i];
+    if (m.kind === 'user-question' && !m.questionId && m.request === text) {
+      m.questionId = questionId;
+      fs.writeFileSync(getAgentMessageFile(agentId), JSON.stringify(data, null, 2));
+      return true;
+    }
+  }
+  return false;
 }
 
 export function loadAgentThoughts(agentId) {

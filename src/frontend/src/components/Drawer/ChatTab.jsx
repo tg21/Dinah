@@ -41,8 +41,27 @@ export default function ChatTab({ engineRef }) {
   const messages = agent.messages || [];
   const awaiting = agent.status === 'awaiting-confirmation';
   const pendingQuestion = agent.pendingUserQuestion || null;
-  const needsUser = agent.status === 'awaiting-user' && pendingQuestion?.question;
+  // All known holds: the array is the source of truth, the legacy singular
+  // object is the fallback for older records.
+  const questionHolds = Array.isArray(agent.pendingUserQuestions)
+    ? agent.pendingUserQuestions
+    : (pendingQuestion ? [{ ...pendingQuestion }] : []);
+  const openHolds = questionHolds.filter((q) => q.status !== 'answered' && q.question);
+  const needsUser = agent.status === 'awaiting-user' && openHolds.length > 0;
   const cost = agent.costEstimation || { estCostUsd: 0.015, estTotalTokens: 4500 };
+
+  // Is this question bubble already answered? Matched by questionId; legacy
+  // bubbles without an id fall back to text-matching against open holds.
+  // Unknown ids (pruned history) count as answered — they can't be reopened.
+  function isQuestionAnswered(m) {
+    const text = m.content || m.text || m.request || '';
+    if (m.questionId) {
+      const hold = questionHolds.find((q) => (q.id || q.questionId) === m.questionId);
+      if (!hold) return true;
+      return hold.status === 'answered';
+    }
+    return !openHolds.some((q) => q.question === text);
+  }
 
   // Always settle on the latest message when this panel is (re)opened or grows.
   useEffect(() => {
@@ -50,7 +69,7 @@ export default function ChatTab({ engineRef }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, optimistic.length, currentAgentId]);
 
-  async function send(text) {
+  async function send(text, opts = {}) {
     const msg = (text ?? input).trim();
     if (!msg || sending) return;
     setInput('');
@@ -64,7 +83,8 @@ export default function ChatTab({ engineRef }) {
         agentId: currentAgentId,
         projectId: currentProjectId,
         message: msg,
-        harness: defaultHarness
+        harness: defaultHarness,
+        ...(opts.questionId ? { questionId: opts.questionId } : {})
       });
       setOptimistic([]);
       await loadAgentDrawer(currentAgentId);
@@ -78,26 +98,29 @@ export default function ChatTab({ engineRef }) {
   }
 
   async function answerQuestion(answer) {
+    const questionId = activeQuestion?.id || null;
     setQuestionOpen(false);
     setActiveQuestion(null);
-    await send(answer);
+    await send(answer, { questionId });
   }
 
   function openQuestion(source) {
-    // Prefer the live pending question (has the freshest options); fall back
-    // to the clicked bubble's own content so old question cards stay openable
-    // even after the hold clears or drawer data goes stale.
-    const question = pendingQuestion?.question || source?.question || source?.request || '';
+    // Prefer the live open hold matching this id (freshest options); fall
+    // back to the clicked bubble's own content so old question cards stay
+    // openable even after the hold clears or drawer data goes stale.
+    const hold = source?.id ? openHolds.find((q) => (q.id || q.questionId) === source.id) : null;
+    const question = hold?.question || source?.question || source?.request || pendingQuestion?.question || '';
     if (!question) return;
-    const options = (pendingQuestion?.options?.length ? pendingQuestion.options : source?.options) || [];
-    setActiveQuestion({ question, options });
+    const options = (hold?.options?.length ? hold.options : source?.options || pendingQuestion?.options) || [];
+    setActiveQuestion({ id: hold?.id || hold?.questionId || source?.id || pendingQuestion?.id || null, question, options });
     setQuestionOpen(true);
   }
 
   function onQuestionBubbleClick(e, m) {
     // Let text-expand toggles / links inside the bubble behave normally.
     if (e.target?.closest?.('details, summary, a, button')) return;
-    openQuestion({ question: m.content || m.text || m.request || '', options: m.options });
+    if (isQuestionAnswered(m)) return;
+    openQuestion({ id: m.questionId, question: m.content || m.text || m.request || '', options: m.options });
   }
 
   async function confirmSummon() {
@@ -134,10 +157,16 @@ export default function ChatTab({ engineRef }) {
       )}
 
       {needsUser && (
-        <button className="user-question-banner" onClick={() => openQuestion({ question: pendingQuestion.question, options: pendingQuestion.options })}>
-          <strong><i className="fa-solid fa-circle-question" /> You have a question</strong>
+        <button
+          className="user-question-banner"
+          onClick={() => {
+            const latest = openHolds[openHolds.length - 1];
+            openQuestion({ id: latest.id || latest.questionId, question: latest.question, options: latest.options });
+          }}
+        >
+          <strong><i className="fa-solid fa-circle-question" /> {openHolds.length > 1 ? `You have ${openHolds.length} questions` : 'You have a question'}</strong>
           <div style={{ marginTop: 4, fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {pendingQuestion.question}
+            {openHolds[openHolds.length - 1].question}
           </div>
           <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2 }}>Click to answer…</div>
         </button>
@@ -149,15 +178,17 @@ export default function ChatTab({ engineRef }) {
           const kindCls = m.kind === 'user-question' ? ' agent-question' : m.kind === 'user-inform' ? ' agent-inform' : '';
           const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : '';
           const isQuestion = m.kind === 'user-question';
+          const answered = isQuestion ? isQuestionAnswered(m) : false;
           return (
             <div
               key={i}
-              className={`msg-bubble ${roleCls}${kindCls}${isQuestion ? ' clickable' : ''}`}
-              {...(isQuestion ? { onClick: (e) => onQuestionBubbleClick(e, m), title: 'Click to answer…', role: 'button', tabIndex: 0, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openQuestion({ question: m.content || m.text || m.request || '', options: m.options }); } } } : {})}
+              className={`msg-bubble ${roleCls}${kindCls}${isQuestion && !answered ? ' clickable' : ''}${answered ? ' answered' : ''}`}
+              {...(isQuestion && !answered ? { onClick: (e) => onQuestionBubbleClick(e, m), title: 'Click to answer…', role: 'button', tabIndex: 0, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onQuestionBubbleClick(e, m); } } } : {})}
             >  <div className="msg-header">
                 <strong>{m.role === 'user' ? 'You (Overseer)' : agent.name || 'Agent'}</strong>
                 <span>{time}</span>
-                {m.kind === 'user-question' && <span className="msg-kind-tag question">Question</span>}
+                {m.kind === 'user-question' && !answered && <span className="msg-kind-tag question">Question</span>}
+                {m.kind === 'user-question' && answered && <span className="msg-kind-tag answered">Answered ✓</span>}
                 {m.kind === 'user-inform' && <span className="msg-kind-tag inform">Update</span>}
                 {m.simulated && (
                   <span
@@ -174,7 +205,7 @@ export default function ChatTab({ engineRef }) {
                 Options: {m.options.join(' • ')}
               </div>
             )}
-            {isQuestion && (
+            {isQuestion && !answered && (
               <div style={{ marginTop: 6, fontSize: 10, fontWeight: 800, color: '#8f3d2b' }}>
                 <i className="fa-solid fa-circle-question" /> Click to answer…
               </div>

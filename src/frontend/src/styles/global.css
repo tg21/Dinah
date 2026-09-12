@@ -553,16 +553,18 @@ body.drawer-collapsed .drawer {
 .user-question-hint { font-size: 11px; color: var(--ink-soft); font-style: italic; }
 .user-question-options { display: flex; flex-direction: column; gap: 6px; }
 .user-question-option {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: flex-start; gap: 8px;
   background: rgba(255, 253, 244, 0.8); border: 2px solid var(--border);
   border-radius: 8px; padding: 7px 10px; font-size: 12px; cursor: pointer; color: var(--ink);
 }
 .user-question-option.selected { border-color: var(--ink); background: rgba(255,255,255,.9); }
-.user-question-option input { accent-color: var(--ink); }
+.user-question-option input { accent-color: var(--ink); flex-shrink: 0; margin-top: 2px; }
+.user-question-option span { white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.45; }
 .user-question-input {
   background: rgba(255,253,244,.9); border: 2px solid var(--ink); border-radius: 8px;
-  padding: 8px 10px; color: var(--ink); font-size: 12px; font-family: inherit;
-  outline: none; width: 100%; resize: vertical;
+  padding: 8px 10px; color: var(--ink); font-size: 12px; font-family: inherit; line-height: 1.45;
+  outline: none; width: 100%; resize: none; min-height: 30px; max-height: 160px; overflow-y: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .user-question-footer {
   padding: 10px 14px; border-top: 2px solid var(--ink);
@@ -582,5 +584,7 @@ body.drawer-collapsed .drawer {
 .msg-bubble.agent-inform { border-left: 5px solid var(--sage); }
 .msg-kind-tag { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; margin-left: 6px; padding: 1px 6px; border-radius: 4px; }
 .msg-kind-tag.question { background: rgba(201,106,90,.18); color: #8f3d2b; }
+.msg-kind-tag.answered { background: rgba(74,59,50,.1); color: var(--ink-soft); }
+.msg-bubble.agent-question.answered { opacity: 0.85; box-shadow: none; }
 .msg-kind-tag.inform { background: var(--mint-soft); color: var(--ink); }
 .user-inform-flash { animation: user-question-pulse 1.4s ease-in-out 3; }

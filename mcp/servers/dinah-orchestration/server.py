@@ -77,9 +77,9 @@ def request_help(neededRole: str, question: str, taskId: str = "", urgency: str 
 
 
 @mcp.tool()
-def ask_user(question: str, options: list[str] | None = None, taskId: str = "") -> dict:
-    """Pause this agent and send a question to the user. Resume when the user replies. Pass options as a list of short multiple-choice answers; leave it empty/omitted for a free-text answer. The UI shows options as radio buttons plus a free-text choice."""
-    return call_backend("/api/internal/orchestration/ask-user", context({"question": question, "options": options or [], "taskId": taskId or None}))
+def ask_user(question: str, options: list[str] | None = None, taskId: str = "", questionId: str = "") -> dict:
+    """Pause this agent and send a question to the user. Resume when the user replies. Pass options as a list of short multiple-choice answers; leave it empty/omitted for a free-text answer. The UI shows options as radio buttons plus a free-text choice. Pass a short stable questionId (e.g. 'scope-choice') when asking several questions so each answer is matched to its question; omit it to auto-generate one. The user's reply always comes back with its questionId."""
+    return call_backend("/api/internal/orchestration/ask-user", context({"question": question, "options": options or [], "taskId": taskId or None, "questionId": questionId or None}))
 
 
 @mcp.tool()

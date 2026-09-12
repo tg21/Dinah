@@ -165,5 +165,5 @@ export function mcpPromptContext(agent, invocation) {
   const tools = mcps.flatMap((mcp) =>
     (mcp.allowedTools || []).map((tool) => `${mcp.id}.${tool}`)
   );
-  return `\n\nAvailable MCP tools for this invocation: ${tools.join(', ')}. Use them as the authoritative coordination channel: publish progress after meaningful work, report blockers immediately, request help when blocked, and check project status before planning. To reach the user: ask_user pauses for a decision (options=[] free text, options=[...] multiple choice), inform_user sends a chat-only notice without pausing. Use only enabled tools. The harness has configured these tools; do not inspect or read MCP configuration files.`;
+  return `\n\nAvailable MCP tools for this invocation: ${tools.join(', ')}. Use them as the authoritative coordination channel: publish progress after meaningful work, report blockers immediately, request help when blocked, and check project status before planning. To reach the user: ask_user pauses for a decision (options=[] free text, options=[...] multiple choice; pass a stable questionId when asking several questions so each reply is matched); inform_user sends a chat-only notice without pausing. Use only enabled tools. The harness has configured these tools; do not inspect or read MCP configuration files.`;
 }

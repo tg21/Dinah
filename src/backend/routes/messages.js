@@ -12,7 +12,7 @@ import {
 } from '../services/messageService.js';
 import { broadcastAgentEvent } from '../services/eventBus.js';
 import { spawnHarnessAgent } from '../services/harnessRunner.js';
-import { getProjectCoordination } from '../services/coordinationService.js';
+import { getProjectCoordination, answerUserQuestion } from '../services/coordinationService.js';
 import { runContinuation } from '../services/messageDispatcher.js';
 import {
   claimMessage,
@@ -25,13 +25,26 @@ import {
 // Plan 01: resume-prompt enrichment. A bare user reply (e.g. "proper
 // engineering") carries none of the stalled context, so the resumed turn gets
 // the original question + project brief + coordination snapshot + inbox batch.
-export function buildResumePrompt({ agentId, projectId, userReply, pendingQuestion }) {
+export function buildResumePrompt({ agentId, projectId, userReply, pendingQuestion, answeredQuestion, openQuestions }) {
   const sections = [];
-  if (pendingQuestion?.question) {
+  if (answeredQuestion?.question) {
+    const opts = Array.isArray(answeredQuestion.options) ? answeredQuestion.options.filter(Boolean) : [];
+    sections.push(
+      `The user answered your question${answeredQuestion.id ? ` [${answeredQuestion.id}]` : ''}:\n"${answeredQuestion.question}"` +
+      (opts.length ? `\nOptions you had offered:\n${opts.map((o, i) => `${i + 1}. ${o}`).join('\n')}` : '')
+    );
+  } else if (pendingQuestion?.question) {
     const opts = Array.isArray(pendingQuestion.options) ? pendingQuestion.options.filter(Boolean) : [];
     sections.push(
-      `You previously paused with a question for the user${pendingQuestion.taskId ? ` (task ${pendingQuestion.taskId})` : ''}${pendingQuestion.askedAt ? ` at ${pendingQuestion.askedAt}` : ''}:\n"${pendingQuestion.question}"` +
+      `You previously paused with a question for the user${pendingQuestion.id ? ` [${pendingQuestion.id}]` : ''}${pendingQuestion.taskId ? ` (task ${pendingQuestion.taskId})` : ''}${pendingQuestion.askedAt ? ` at ${pendingQuestion.askedAt}` : ''}:\n"${pendingQuestion.question}"` +
       (opts.length ? `\nOptions you offered:\n${opts.map((o, i) => `${i + 1}. ${o}`).join('\n')}\n(Empty options means you asked for free text.)` : '')
+    );
+  }
+  const remaining = Array.isArray(openQuestions) ? openQuestions.filter(Boolean) : [];
+  if (remaining.length) {
+    sections.push(
+      `Still-open questions awaiting the user (${remaining.length}):\n` +
+      remaining.map((q) => `- [${q.id || 'no-id'}] "${q.question}"` + (Array.isArray(q.options) && q.options.length ? ` (options: ${q.options.join(' | ')})` : ' (free text)')).join('\n')
     );
   }
   try {
@@ -127,7 +140,7 @@ router.post('/handleGetAgentStatus', (req, res) => {
 
 // Send message to agent
 router.post('/handleSendMessage', async (req, res) => {
-  const { agentId: requestedAgentId, projectId: requestedProjectId, message, harness = 'opencode' } = req.body;
+  const { agentId: requestedAgentId, projectId: requestedProjectId, message, harness = 'opencode', questionId } = req.body;
 
   if (!message || !message.trim()) {
     return res.status(400).json({ error: 'Message cannot be empty' });
@@ -135,7 +148,7 @@ router.post('/handleSendMessage', async (req, res) => {
 
   // Plan 01 routing honesty: unknown agentIds fail loudly instead of running
   // a turn as the wrong agent while the real one waits forever.
-  const hrSystem = loadHrSystem();
+  let hrSystem = loadHrSystem();
   const agentId = requestedAgentId || 'ceo-warlock';
   const agentRecord = hrSystem[agentId];
   if (!agentRecord) {
@@ -143,16 +156,35 @@ router.post('/handleSendMessage', async (req, res) => {
   }
   const projectId = requestedProjectId || agentRecord.project || 'project-alpha';
 
-  // Capture the pending question BEFORE clearing so it can enrich the resume.
-  const pendingQuestion = agentRecord.pendingUserQuestion || null;
+  // Per-question answering: a modal reply carries its questionId; a plain
+  // text reply answers the oldest open hold. The hold (and awaiting-user
+  // status) clears only when no open questions remain, so back-to-back
+  // questions stay individually answerable.
+  const pendingBefore = agentRecord.pendingUserQuestion || null;
+  let answeredQuestion = null;
+  let openQuestions = [];
+  if (agentRecord.status === 'awaiting-user' || agentRecord.pendingUserQuestion || Array.isArray(agentRecord.pendingUserQuestions)) {
+    try {
+      const outcome = answerUserQuestion({ agentId, questionId, answer: message });
+      answeredQuestion = outcome.answered;
+      openQuestions = outcome.openQuestions;
+    } catch {
+      /* answering is best-effort; the turn still runs */
+    }
+    hrSystem = loadHrSystem();
+  }
+  const pendingQuestion = pendingBefore;
+  const answeredId = answeredQuestion?.id || null;
 
-  // 1. Record user message (drawer projection)
+  // 1. Record user message (drawer projection), tagged with the answered
+  // question so the UI can flip that bubble to "Answered".
   appendAgentMessage(agentId, {
     from: 'User (Overseer)',
     role: 'user',
     project: projectId,
     request: message,
-    path: getProjectFolder(projectId)
+    path: getProjectFolder(projectId),
+    ...(answeredId ? { questionId: answeredId } : {})
   });
 
   appendToSharedLog(`User sent message to [${agentId}] in [${projectId}]: ${message.slice(0, 60)}...`);
@@ -172,20 +204,17 @@ router.post('/handleSendMessage', async (req, res) => {
       fromAgentId: 'user',
       toAgentId: agentId,
       projectId,
-      message: `User (Overseer) reply: ${message}`
+      message: answeredId ? `User (Overseer) reply to [${answeredId}]: ${message}` : `User (Overseer) reply: ${message}`
     });
     userMessageId = queued.message?.messageId || null;
   } catch {
     /* drawer projection above already recorded the reply */
   }
 
-  // 2. Update agent activity & token usage
+  // 2. Update agent activity & token usage (hold status was already settled
+  // by answerUserQuestion above; never touch it here).
   if (hrSystem[agentId]) {
     hrSystem[agentId].last_activity_ms = Date.now();
-    if (hrSystem[agentId].status === 'awaiting-user') {
-      hrSystem[agentId].status = 'working';
-      hrSystem[agentId].pendingUserQuestion = null;
-    }
     const tokenIncrement = Math.round(message.length * 1.5) + 350;
     hrSystem[agentId].context_used = (hrSystem[agentId].context_used || 5000) + tokenIncrement;
     saveHrSystem(hrSystem);
@@ -214,7 +243,7 @@ router.post('/handleSendMessage', async (req, res) => {
   }
 
   // 3. Dispatch to harness with the enriched resume prompt
-  const resumePrompt = buildResumePrompt({ agentId, projectId, userReply: message, pendingQuestion });
+  const resumePrompt = buildResumePrompt({ agentId, projectId, userReply: message, pendingQuestion, answeredQuestion, openQuestions });
   appendAgentThought(agentId, 'USER_INPUT', `Received prompt: "${message.slice(0, 80)}..."`);
   const effectiveHarness = hrSystem[agentId]?.harness || harness;
   let harnessResult;
@@ -260,6 +289,8 @@ router.post('/handleSendMessage', async (req, res) => {
     agentReply: harnessResult.output,
     harness: harnessResult.harness,
     agentId,
+    answeredQuestionId: answeredId,
+    remainingOpenQuestions: openQuestions.length,
     simulated: harnessResult.simulated === true,
     continuedTurns
   });

@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 export default function UserQuestionModal({ agentName, question, options = [], onSubmit, onClose, sending }) {
   const cleanOptions = Array.isArray(options) ? options.filter(Boolean) : [];
   const [selected, setSelected] = useState(cleanOptions.length ? 0 : 'custom');
   const [customText, setCustomText] = useState('');
+  const detailRef = useRef(null);
+
+  function growDetail(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }
 
   function submit() {
     let answer;
@@ -17,6 +24,8 @@ export default function UserQuestionModal({ agentName, question, options = [], o
     }
     onSubmit(answer);
   }
+
+  const needsDetail = selected === 'custom' || !cleanOptions.length;
 
   return (
     <div className="user-question-backdrop" onClick={(e) => {
@@ -58,35 +67,24 @@ export default function UserQuestionModal({ agentName, question, options = [], o
           ) : (
             <p className="user-question-hint">Speak freely, traveler — no preset answers.</p>
           )}
-          {(selected === 'custom' || !cleanOptions.length) ? (
-            <textarea
-              className="user-question-input"
-              rows={2}
-              autoFocus
-              placeholder="Type your answer… (Enter to send, Shift+Enter for new line)"
-              value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-            />
-          ) : (
-            <input
-              className="user-question-input"
-              placeholder="Add detail (optional)…"
-              value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-            />
-          )}
+          <textarea
+            ref={detailRef}
+            className="user-question-input"
+            rows={needsDetail ? 2 : 1}
+            autoFocus={needsDetail}
+            placeholder={needsDetail ? 'Type your answer… (Enter to send, Shift+Enter for new line)' : 'Add detail (optional)… (Enter to send, Shift+Enter for new line)'}
+            value={customText}
+            onChange={(e) => {
+              setCustomText(e.target.value);
+              growDetail(e.target);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+          />
         </div>
         <div className="user-question-footer">
           <button className="btn-secondary" onClick={onClose}>Later</button>
