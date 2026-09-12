@@ -57,7 +57,9 @@ import { askUser, informUser, answerUserQuestion } from '../../src/backend/servi
 import { loadAgentMessages } from '../../src/backend/services/messageService.js';
 import {
   enqueueDirectMessage,
-  getProjectMessageActivity
+  getProjectMessageActivity,
+  claimMessage,
+  completeMessage
 } from '../../src/backend/services/messageQueueService.js';
 
 function agent(name, role, project = 'auto-proj', status = 'active') {
@@ -230,6 +232,44 @@ describe('user communication: inform_user is chat-only', () => {
   });
 });
 
+describe('user communication: chat stays free of queue mechanics', () => {
+  beforeAll(() => resetWorkspace());
+  afterAll(() => fs.rmSync(testPaths.workingDir, { recursive: true, force: true }));
+  beforeEach(() => {
+    resetWorkspace();
+    saveHrSystem({
+      'auto-proj-manager-bard': agent('Manager', 'manager-bard'),
+      'auto-proj-dev': agent('Dev', 'backend-dev-cleric')
+    });
+    clearAgentEventQueue();
+  });
+
+  it('user reply echoes and [claimed]/[completed] markers never land in chat', () => {
+    askUser({ projectId: 'auto-proj', agentId: 'auto-proj-manager-bard', question: 'pick?', questionId: 'q1' });
+    const chatBefore = loadAgentMessages('auto-proj-manager-bard').messages.length;
+    // What handleSendMessage enqueues behind the "You (Overseer)" bubble…
+    const { message } = enqueueDirectMessage({ fromAgentId: 'user', toAgentId: 'auto-proj-manager-bard', projectId: 'auto-proj', message: 'User (Overseer) reply: hi' });
+    const claim = claimMessage({ messageId: message.messageId, agentId: 'auto-proj-manager-bard' });
+    completeMessage({ messageId: message.messageId, agentId: 'auto-proj-manager-bard', leaseToken: claim.leaseToken });
+    // …leaves the chat file untouched: only the question card is there.
+    const chat = loadAgentMessages('auto-proj-manager-bard').messages;
+    expect(chat.length).toBe(chatBefore);
+    expect(chat.some((m) => String(m.request).includes('[claimed]'))).toBe(false);
+    expect(chat.some((m) => String(m.request).includes('[completed]'))).toBe(false);
+    expect(chat.some((m) => String(m.request).includes('User (Overseer) reply'))).toBe(false);
+    // …while the traffic stays observable in message-activity.
+    expect(getProjectMessageActivity({ projectId: 'auto-proj' }).length).toBeGreaterThan(0);
+  });
+
+  it('agent-to-agent traffic never lands in either chat', () => {
+    const beforeManager = loadAgentMessages('auto-proj-manager-bard').messages.length;
+    const beforeDev = loadAgentMessages('auto-proj-dev').messages.length;
+    enqueueDirectMessage({ fromAgentId: 'auto-proj-manager-bard', toAgentId: 'auto-proj-dev', projectId: 'auto-proj', message: 'internal note' });
+    expect(loadAgentMessages('auto-proj-manager-bard').messages.length).toBe(beforeManager);
+    expect(loadAgentMessages('auto-proj-dev').messages.length).toBe(beforeDev);
+    expect(getProjectMessageActivity({ projectId: 'auto-proj' }).some((m) => String(m.summary).includes('internal note'))).toBe(true);
+  });
+});
 describe('user communication: message-activity is chronological', () => {
   beforeAll(() => resetWorkspace());
   afterAll(() => fs.rmSync(testPaths.workingDir, { recursive: true, force: true }));

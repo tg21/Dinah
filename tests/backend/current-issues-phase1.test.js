@@ -73,7 +73,8 @@ import {
 import {
   enqueueDirectMessage,
   claimMessage,
-  completeMessage
+  completeMessage,
+  getProjectMessageActivity
 } from '../../src/backend/services/messageQueueService.js';
 
 function agent(name, role, project = 'phase1-proj', status = 'active') {
@@ -111,16 +112,21 @@ describe('Phase 1: staffing visibility + HR drawer (plans 02+03)', () => {
     clearAgentEventQueue();
   });
 
-  it('staffing request appears in both requester and HR drawer files', () => {
+  it('staffing request stays out of chat drawers; visible in message-activity', () => {
     const { agentId } = requestAgentSummoning('backend-dev-cleric', 'phase1-proj', {
       name: 'Backend Cleric',
       requesterId: 'manager-bard'
     });
 
+    // Chat drawers are user-only: no staffing exchange leaks into them.
     const managerMsgs = loadAgentMessages('manager-bard').messages;
     const hrMsgs = loadAgentMessages('hr-mind-flayer').messages;
-    expect(managerMsgs.some((m) => String(m.request).includes(agentId))).toBe(true);
-    expect(hrMsgs.some((m) => String(m.request).includes(agentId))).toBe(true);
+    expect(managerMsgs.some((m) => String(m.request).includes(agentId))).toBe(false);
+    expect(hrMsgs.some((m) => String(m.request).includes(agentId))).toBe(false);
+
+    // Same exchange is observable where agent-to-agent traffic lives.
+    const activity = getProjectMessageActivity({ projectId: 'phase1-proj' });
+    expect(activity.some((m) => String(m.summary).includes(agentId))).toBe(true);
 
     const managerThoughts = loadAgentThoughts('manager-bard');
     const hrThoughts = loadAgentThoughts('hr-mind-flayer');
@@ -142,23 +148,27 @@ describe('Phase 1: staffing visibility + HR drawer (plans 02+03)', () => {
     }
   });
 
-  it('HR drawer contains a provision record after direct spawn with model/harness/effort', () => {
+  it('HR spawn notice lives in message-activity, not the HR chat drawer', () => {
     const { agentId } = spawnAgentViaHr('backend-dev-cleric', 'phase1-proj', 'Backend Cleric', {
       model: 'system-simulator/balanced-agent',
       harness: 'system-simulator',
       effortLevel: 'High'
     });
     const hrMsgs = loadAgentMessages('hr-mind-flayer').messages;
-    const record = hrMsgs.find((m) => String(m.request).includes(agentId));
+    expect(hrMsgs.some((m) => String(m.request).includes(agentId))).toBe(false);
+    const record = getProjectMessageActivity({ projectId: 'phase1-proj' })
+      .find((m) => String(m.summary).includes(`spawned into phase1-proj`) && m.senderAgentId === 'hr-mind-flayer');
     expect(record).toBeDefined();
-    expect(record.request).toMatch(/model=.*harness=.*effort=/i);
+    expect(record.summary).toMatch(/model=.*harness=.*effort=/i);
   });
 
-  it('HR drawer contains a confirmation record after confirm-summon', () => {
+  it('confirm notice lives in message-activity, not chat drawers', () => {
     const { agentId } = requestAgentSummoning('qa-engineer-rogue', 'phase1-proj', { requesterId: 'manager-bard' });
     confirmAgentSummoning(agentId, {});
     const hrMsgs = loadAgentMessages('hr-mind-flayer').messages;
-    expect(hrMsgs.some((m) => String(m.request).includes(agentId) && /confirm/i.test(String(m.request)))).toBe(true);
+    expect(hrMsgs.some((m) => String(m.request).includes(agentId) && /confirm/i.test(String(m.request)))).toBe(false);
+    const activity = getProjectMessageActivity({ projectId: 'phase1-proj' });
+    expect(activity.some((m) => String(m.summary).includes(agentId) && /confirm/i.test(String(m.summary)))).toBe(true);
   });
 
   it('ensure-manager reports created vs already-existed without spamming HR', () => {
@@ -188,7 +198,7 @@ describe('Phase 1: staffing visibility + HR drawer (plans 02+03)', () => {
     expect(docs.agent.role).toBe('tech-writer-scribe');
   });
 
-  it('queue claim/complete projection appears once (no duplicates on re-read)', () => {    saveHrSystem({
+  it('queue claim/complete never touch chat drawers; state still transitions', () => {    saveHrSystem({
       'phase1-proj-manager-bard': agent('Manager', 'manager-bard'),
       'phase1-proj-backend-dev-cleric': agent('Worker', 'backend-dev-cleric'),
       'hr-mind-flayer': agent('HR Mind Flayer', 'hr-mind-flayer', 'global')
@@ -201,12 +211,13 @@ describe('Phase 1: staffing visibility + HR drawer (plans 02+03)', () => {
     });
     const before = loadAgentMessages('phase1-proj-backend-dev-cleric').messages.length;
     const claim = claimMessage({ messageId: message.messageId, agentId: 'phase1-proj-backend-dev-cleric' });
-    const afterClaim = loadAgentMessages('phase1-proj-backend-dev-cleric').messages.length;
-    expect(afterClaim).toBeGreaterThanOrEqual(before);
+    // Chat-clean rule: queue mechanics leave no trace in the chat drawer.
+    expect(loadAgentMessages('phase1-proj-backend-dev-cleric').messages.length).toBe(before);
     completeMessage({ messageId: message.messageId, agentId: 'phase1-proj-backend-dev-cleric', leaseToken: claim.leaseToken });
-    const afterComplete = loadAgentMessages('phase1-proj-backend-dev-cleric').messages;
-    const deliveryIds = afterComplete.map((m) => m.deliveryId).filter(Boolean);
-    expect(new Set(deliveryIds).size).toBe(deliveryIds.length);
+    expect(loadAgentMessages('phase1-proj-backend-dev-cleric').messages.length).toBe(before);
+    // …while the durable state still transitions and stays observable.
+    const activity = getProjectMessageActivity({ projectId: 'phase1-proj' });
+    expect(activity.find((m) => m.messageId === message.messageId)?.status).toBe('completed');
   });
 });
 

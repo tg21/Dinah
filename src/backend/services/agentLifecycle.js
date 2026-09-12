@@ -193,10 +193,11 @@ export function requestAgentSummoning(role, projectId = 'project-alpha', customO
     `Model=${model} Harness=${harness} Effort=${effortLevel}` +
     (customOptions.promptOverride ? ` Specialization: ${String(customOptions.promptOverride).slice(0, 300)}` : '') +
     ` Awaiting Overseer confirmation for [${agentId}].`;
-  // Generic path: a durable DM from requester → HR. The queue projects into
-  // BOTH drawers, emits the courier event, and shows in message-activity, so
-  // no staffing-specific logging helper is needed. HR's harness turn consumes
-  // this inbox item; whatever HR then does is visible the same way.
+  // Generic path: a durable DM from requester → HR. The queue emits the
+  // courier event and shows in message-activity, so no staffing-specific
+  // logging helper is needed (chat drawers stay user-only). HR's harness
+  // turn consumes this inbox item; whatever HR then does is visible the
+  // same way.
   // Best-effort: staffing must never fail just because the queue write did.
   try {
     enqueueDirectMessage({
@@ -254,8 +255,8 @@ export function confirmAgentSummoning(agentId, updatedParams = {}) {
   if (providerChanged && agent.harnessSessions) delete agent.harnessSessions;
   saveHrSystem(hrSystem);
 
-  // Generic path: durable HR → agent confirmation. Queue projection handles
-  // both drawers + courier event; no HR-specific audit helper.
+  // Generic path: durable HR → agent confirmation. The queue emits the
+  // courier event and shows in message-activity; no HR-specific audit helper.
   appendAgentThought(agentId, 'SUMMONED', `Materialized into arena by Overseer confirmation.`);
   try {
     enqueueDirectMessage({
@@ -352,7 +353,7 @@ export function spawnAgentViaHr(role, projectId = 'global', customName = null, o
 
   appendAgentThought(agentId, 'INITIALIZE', `Spawned into project ${cleanProjectId} by HR Mind Flayer.`);
   // Generic path: durable HR → new-agent notice (model/harness/effort in body).
-  // Visible in both drawers via queue projection; no HR-specific helper.
+  // Visible via message-activity + courier event; no HR-specific helper.
   try {
     enqueueDirectMessage({
       fromAgentId: 'hr-mind-flayer',

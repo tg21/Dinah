@@ -134,9 +134,10 @@ describe('Phase 2/07: spawned specialists get an inbox seed (dispatcher wake)', 
     expect(seed.summary).toMatch(/login returns 200/);
     // Dispatcher wake eligibility: agent has queued deliveries.
     expect(getQueuedAgents()).toContain(agentId);
-    // Worker drawer projection carries the task content.
+    // Chat-clean rule: the inbox seed carries the task, the chat drawer stays
+    // user-only (no task/queue text leaks into it).
     const drawer = loadAgentMessages(agentId).messages;
-    expect(drawer.some((m) => String(m.request).includes(task.id))).toBe(true);
+    expect(drawer.some((m) => String(m.request).includes(task.id))).toBe(false);
     // Observability thought.
     expect(loadAgentThoughts(agentId).some((t) => t.step === 'SPAWN_WAKE')).toBe(true);
   });
