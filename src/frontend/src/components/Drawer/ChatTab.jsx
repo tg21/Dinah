@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useApp } from '../../store/AppContext.jsx';
 import { api } from '../../api/client.js';
 import { escapeHtml, splitLongText } from '../../utils/format.js';
@@ -30,6 +30,7 @@ export default function ChatTab({ engineRef }) {
   } = useApp();
   const [input, setInput] = useState('');
   const [optimistic, setOptimistic] = useState([]);
+  const inputRef = useRef(null);
 
   const agent = drawerAgent || allAgents[currentAgentId] || {};
   const messages = agent.messages || [];
@@ -40,6 +41,7 @@ export default function ChatTab({ engineRef }) {
     const msg = (text ?? input).trim();
     if (!msg) return;
     setInput('');
+    if (inputRef.current) inputRef.current.style.height = 'auto';
     setOptimistic((o) => [...o, { role: 'user', content: msg, timestamp: Date.now() }]);
     engineRef.current?.launchCourier('user', currentAgentId);
     engineRef.current?.say(currentAgentId, 'Processing directive...');
@@ -131,16 +133,24 @@ export default function ChatTab({ engineRef }) {
         ))}
       </div>
       <div className="chat-input-box">
-        <input
-          type="text"
-          placeholder="+ Type directive for this agent..."
+        <textarea
+          ref={inputRef}
+          rows={1}
+          placeholder="+ Type directive for this agent... (Enter to send, Shift+Enter for new line)"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+          }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') send();
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
           }}
         />
-        <button onClick={() => send()}>
+        <button onClick={() => send()} aria-label="Send directive">
           <i className="fa-solid fa-paper-plane" />
         </button>
       </div>

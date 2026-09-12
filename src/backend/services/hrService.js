@@ -112,6 +112,8 @@ export function loadHrSystem() {
       // Explicit enabled:false is preserved by ensureAgentMcpDefaults.
       const { applied } = ensureAgentMcpDefaults(agent);
       if (applied) modified = true;
+      // Backfill cosmetic appearance for pre-refactor records (stable by id).
+      if (ensureAppearance(agent, agentId)) modified = true;
     }
 
     if (modified) {

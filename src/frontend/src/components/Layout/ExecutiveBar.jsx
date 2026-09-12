@@ -1,6 +1,7 @@
-import { OVERSEER_IDS, roleConf } from '../../constants/roles.js';
+import { OVERSEER_IDS } from '../../constants/roles.js';
 import { shortRoleName } from '../../utils/format.js';
 import { useApp } from '../../store/AppContext.jsx';
+import AgentAvatar from '../Agents/AgentAvatar.jsx';
 
 export default function ExecutiveBar() {
   const { allAgents, agentThoughts, currentAgentId, selectAgent } = useApp();
@@ -13,7 +14,6 @@ export default function ExecutiveBar() {
       <div className="executive-roster">
         {OVERSEER_IDS.map((id) => {
           const agent = allAgents[id] || { name: id, role: id, stats: { level: 16 } };
-          const conf = roleConf(agent.role);
           const isSelected = currentAgentId === id;
           const thought =
             agentThoughts[id]?.currentThought || 'Overseeing enterprise system health...';
@@ -23,8 +23,8 @@ export default function ExecutiveBar() {
               className={`exec-agent-card ${isSelected ? 'selected' : ''}`}
               onClick={() => selectAgent(id)}
             >
-              <div className={`exec-avatar-token ${agent.status === 'awaiting-user' ? 'awaiting-user' : ''}`} style={{ borderColor: conf.color }}>
-                <span>{conf.icon}</span>
+              <div className={`exec-avatar-token ${agent.status === 'awaiting-user' ? 'awaiting-user' : ''}`}>
+                <AgentAvatar agent={agent} agentId={id} size={38} />
                 <div className="level-badge">{agent.stats?.level || 16}</div>
               </div>
               {agent.status === 'awaiting-user' && <span className="status-badge awaiting-user">User input</span>}

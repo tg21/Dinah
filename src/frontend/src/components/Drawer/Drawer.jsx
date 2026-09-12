@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../store/AppContext.jsx';
-import { roleConf } from '../../constants/roles.js';
+import AgentAvatar from '../Agents/AgentAvatar.jsx';
 import ChatTab from './ChatTab.jsx';
 import StatsTab from './StatsTab.jsx';
 import ThoughtsTab from './ThoughtsTab.jsx';
@@ -22,7 +22,7 @@ export default function Drawer({ engineRef }) {
     useApp();
 
   const agent = drawerAgent || allAgents[currentAgentId] || {};
-  const conf = roleConf(agent.role);
+  const avatarId = agent.id || currentAgentId;
 
   async function togglePause() {
     if (!agent.id && !currentAgentId) return;
@@ -39,7 +39,7 @@ export default function Drawer({ engineRef }) {
     <aside className="drawer">
       <div className="drawer-header">
         <div className="drawer-agent-info">
-          <div className="drawer-avatar-icon">{conf.icon}</div>
+          <div className="drawer-avatar-icon"><AgentAvatar agent={agent} agentId={avatarId} size={44} /></div>
           <div className="drawer-agent-meta">
             <h3>
               {agent.name || 'Manager Bard'}{' '}

@@ -5,9 +5,6 @@ export default function TopNav() {
     projects,
     currentProjectId,
     switchProject,
-    harnesses,
-    defaultHarness,
-    setDefaultHarness,
     setActiveModal
   } = useApp();
 
@@ -43,29 +40,6 @@ export default function TopNav() {
       </div>
 
       <div className="nav-actions">
-        <div className="harness-select-wrap">
-          <i className="fa-solid fa-bolt" />
-          <span>Default Harness:</span>
-          <select value={defaultHarness} onChange={(e) => setDefaultHarness(e.target.value)}>
-            {harnesses.length ? (
-              harnesses.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name}
-                  {h.modelCount ? ` (${h.modelCount} models)` : ''}
-                </option>
-              ))
-            ) : (
-              <>
-                <option value="antigravity">Antigravity CLI (agy)</option>
-                <option value="opencode">OpenCode CLI</option>
-                <option value="claude-code">Claude Code</option>
-                <option value="codex">Codex</option>
-                <option value="gemini">Gemini CLI</option>
-              </>
-            )}
-          </select>
-        </div>
-
         <div
           className="marshall-status"
           onClick={() => setActiveModal('marshallAudit')}

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { AppProvider, useApp } from './store/AppContext.jsx';
 import TopNav from './components/Layout/TopNav.jsx';
 import ExecutiveBar from './components/Layout/ExecutiveBar.jsx';
+import RosterRail from './components/Roster/RosterRail.jsx';
 import PlayArea from './components/PlayArea/PlayArea.jsx';
 import Drawer from './components/Drawer/Drawer.jsx';
 import StartupSetupModal from './components/Modals/StartupSetupModal.jsx';
@@ -63,6 +64,7 @@ function Shell() {
     <>
       <TopNav />
       <ExecutiveBar />
+      <RosterRail />
       <PlayArea engineRef={engineRef} />
       {!drawerCollapsed && <Drawer engineRef={engineRef} />}
 
