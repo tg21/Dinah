@@ -3,7 +3,7 @@ import { useApp } from '../../../store/AppContext.jsx';
 import { silhouetteForRole } from '../../Agents/roleSilhouettes.js';
 
 // Layer 2 — one AgentSprite per agent, always above WorldObjectsLayer.
-export default function AgentsLayer({ agents, positions, activities, selectedId, thoughts, bubbles, onPick }) {
+export default function AgentsLayer({ agents, positions, activities, popups, selectedId, thoughts, bubbles, onPick }) {
   const { roleSprites } = useApp();
   return (
     <div className="scene-layer agents">
@@ -19,6 +19,7 @@ export default function AgentsLayer({ agents, positions, activities, selectedId,
             activity={activities?.[id] || 'idle'}
             facing={pos.facing || 1}
             thought={thought}
+            popup={Boolean(bubbles[id] || popups?.[id])}
             selected={selectedId === id}
             onClick={() => onPick?.(id)}
             style={{ left: pos.x, top: pos.y }}

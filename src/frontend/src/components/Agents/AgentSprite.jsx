@@ -23,6 +23,7 @@ export default function AgentSprite({
   facing = 1,
   selected,
   thought,
+  popup = false,
   onClick,
   style
 }) {
@@ -36,7 +37,9 @@ export default function AgentSprite({
   const effectiveActivity = paused ? 'sleep' : activity;
   const ringColor = needsUser ? '#C9563C' : awaiting ? '#4E8D8B' : 'transparent';
   const shortThought = thought && thought.length > 90 ? `${thought.slice(0, 87)}…` : thought;
-  const hasThought = Boolean(shortThought) && !paused;
+  // Nameplates skip the trailing " (project)" suffix — the project badge
+  // already shows it. Full names stay everywhere else (drawer, rail).
+  const displayName = String(agent.name || agentId).replace(/\s*\([^)]*\)\s*$/, '');
   const delay = `${(hashId(agentId) % 12) / 10}s`;
 
   return (
@@ -109,15 +112,16 @@ export default function AgentSprite({
         </svg>
       </div>
       <div className="sprite-shadow" />
-      {hasThought && <span className="sprite-ping" title="Has something to say — hover to read" />}
       {effectiveActivity === 'sleep' && (
         <span className="sprite-zzz" aria-hidden="true"><i>z</i><i>z</i><i>z</i></span>
       )}
-      <div className="sprite-name">{agent.name || agentId}</div>
+      <div className="sprite-name">{displayName}</div>
       {(awaiting || needsUser || paused) && (
         <div className="sprite-status-line">{awaiting ? 'awaiting summons' : needsUser ? 'needs your answer' : 'sleeping'}</div>
       )}
-      {shortThought && !paused && <div className="sprite-bubble">{shortThought}</div>}
+      {shortThought && !paused && (
+        <div className={popup ? 'sprite-bubble popup' : 'sprite-bubble'}>{shortThought}</div>
+      )}
     </div>
   );
 }

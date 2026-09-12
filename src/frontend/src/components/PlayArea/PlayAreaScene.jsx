@@ -70,6 +70,39 @@ export default function PlayAreaScene({
   );
   const agentsRef = useRef(agents);
   agentsRef.current = agents;
+  const thoughtsRef = useRef(thoughts);
+  thoughtsRef.current = thoughts;
+  const bubblesRef = useRef(bubbles);
+  bubblesRef.current = bubbles;
+
+  // Thought windows: a fresh thought pops its bubble for 5s max; a newer
+  // thought replaces it and restarts the clock. Hover still reveals the
+  // latest thought via CSS. say() bubbles keep their own timers.
+  const thoughtWindows = useRef({});
+  const [popups, setPopups] = useState({});
+  useEffect(() => {
+    const update = () => {
+      const now = Date.now();
+      const th = thoughtsRef.current || {};
+      const bb = bubblesRef.current || {};
+      const next = {};
+      for (const id of Object.keys(agentsRef.current)) {
+        if (bb[id]) {
+          next[id] = true;
+          continue;
+        }
+        const text = th[id]?.currentThought;
+        if (!text) continue;
+        const w = thoughtWindows.current[id];
+        if (!w || w.text !== text) thoughtWindows.current[id] = { text, until: now + 5000 };
+        if (now < thoughtWindows.current[id].until) next[id] = true;
+      }
+      setPopups(next);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Track the real pixel box; layout changes (drawer/rail collapse,
   // window resize) re-fit the world automatically — and only then.
@@ -231,7 +264,7 @@ export default function PlayAreaScene({
     engineRef.current = {
       syncAgents: () => {},
       launchCourier: () => {},
-      say(agentId, text, duration = 4.5) {
+      say(agentId, text, duration = 5) {
         setBubbles((b) => ({ ...b, [agentId]: text }));
         if (timers.has(agentId)) clearTimeout(timers.get(agentId));
         timers.set(
@@ -301,6 +334,7 @@ export default function PlayAreaScene({
           agents={agents}
           positions={positions}
           activities={activities}
+          popups={popups}
           selectedId={selectedId}
           thoughts={thoughts}
           bubbles={bubbles}

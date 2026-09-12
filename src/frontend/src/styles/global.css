@@ -300,17 +300,9 @@ body.drawer-collapsed .drawer-toggle-btn { right: 0; }
   border: 1.5px solid var(--ink); border-radius: 6px; padding: 1px 6px; white-space: nowrap;
 }
 .sprite-status-line { position: absolute; left: 50%; bottom: -18px; transform: translateX(-50%); font-size: 8px; font-weight: 800; color: var(--ink-soft); white-space: nowrap; }
-/* Thought ping: soft glowing dot while the agent has something to say */
-.sprite-ping {
-  position: absolute; left: 50%; top: -8px; transform: translateX(-50%);
-  width: 10px; height: 10px; border-radius: 50%;
-  background: #E8845A; border: 1.5px solid var(--ink);
-  box-shadow: 0 0 8px 2px rgba(232, 132, 90, 0.65);
-  animation: ping-pulse 1.6s ease-in-out infinite; animation-delay: var(--anim-delay, 0s);
-  pointer-events: none;
-}
-@keyframes ping-pulse { 0%,100% { transform: translateX(-50%) scale(0.9); opacity: 0.85; } 50% { transform: translateX(-50%) scale(1.25); opacity: 1; } }
-/* Bubbles are hover-only */
+/* Thought ping: retired — fresh thoughts pop their bubble for 5s
+   (see .sprite-bubble.popup) and hover reveals the latest thought. */
+/* Bubbles are hover-only, except fresh thoughts (popup) */
 .sprite-bubble {
   display: none;
   position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%);
@@ -320,6 +312,7 @@ body.drawer-collapsed .drawer-toggle-btn { right: 0; }
   pointer-events: none;
 }
 .agent-sprite:hover .sprite-bubble { display: block; }
+.sprite-bubble.popup { display: block; }
 .sprite-bubble::after {
   content: ''; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px;
   background: #FFFDF4; border-right: 2px solid var(--ink); border-bottom: 2px solid var(--ink);
@@ -339,7 +332,7 @@ body.drawer-collapsed .drawer-toggle-btn { right: 0; }
 @media (prefers-reduced-motion: reduce) {
   .sprite-svg, .activity-walk .sprite-svg, .activity-walk .leg-a, .activity-walk .leg-b,
   .activity-cast .tool-arm, .activity-flourish .tool-arm, .hand-glow,
-  .sprite-ping, .sprite-zzz i, .snow-layer span { animation: none; }
+  .sprite-zzz i, .snow-layer span { animation: none; }
   .snow-layer { display: none; }
   .agent-sprite { transition: none; }
 }
