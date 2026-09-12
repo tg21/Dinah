@@ -64,7 +64,6 @@ export default function PlayAreaScene({
   const containerRef = useRef(null);
   const dragRef = useRef(null);
   const movedRef = useRef(false);
-  void backdrop;
 
   const agents = useMemo(
     () => ({ ...globalAgents, ...projectAgents }),
@@ -297,7 +296,7 @@ export default function PlayAreaScene({
         className="play-scene-inner"
         style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
       >
-        <BackdropLayer />
+        <BackdropLayer biome={backdrop} />
         <WorldObjectsLayer variant={objects} width={cw} height={ch} />
         <AgentsLayer
           agents={agents}

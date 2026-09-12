@@ -11,6 +11,7 @@ export function AppProvider({ children }) {
   const [agentThoughts, setAgentThoughts] = useState({});
   const [projectConfigs, setProjectConfigs] = useState({});
   const [projects, setProjects] = useState([]);
+  const [biomes, setBiomes] = useState([]);
   const [models, setModels] = useState([]);
   const [harnesses, setHarnesses] = useState([]);
   const [mcps, setMcps] = useState([]);
@@ -51,6 +52,7 @@ export function AppProvider({ children }) {
     if (!data) return;
     setProjectConfigs(data.config || {});
     setProjects(data.projects || []);
+    if (Array.isArray(data.biomes)) setBiomes(data.biomes);
   }, []);
 
   const loadAgents = useCallback(async () => {
@@ -188,6 +190,7 @@ export function AppProvider({ children }) {
       agentThoughts,
       projectConfigs,
       projects,
+      biomes,
       models,
       harnesses,
       mcps,
@@ -227,6 +230,7 @@ export function AppProvider({ children }) {
       agentThoughts,
       projectConfigs,
       projects,
+      biomes,
       models,
       harnesses,
       mcps,

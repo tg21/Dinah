@@ -1,5 +1,6 @@
 import { useApp } from '../../store/AppContext.jsx';
 import PlayAreaScene from './PlayAreaScene.jsx';
+import { biomeLabel } from './layers/biomes.js';
 
 // Layered adventure-map play area. Rendering lives in PlayAreaScene +
 // layers/* (backdrop / objects / agents / couriers); this shell keeps badges,
@@ -24,6 +25,7 @@ export default function PlayArea({ engineRef }) {
 
   const pCfg = projectConfigs[currentProjectId] || { budgetUsd: 50.0 };
   const count = Object.keys(projectAgents).length;
+  const biome = pCfg.biome || 'oasis';
 
   function openMail(mail) {
     const detail = messageActivity.find((item) => item.messageId === mail.messageId);
@@ -42,12 +44,13 @@ export default function PlayArea({ engineRef }) {
         allAgents={allAgents}
         onPickAgent={(id) => selectAgent(id)}
         onOpenMail={openMail}
+        backdrop={biome}
       />
 
       <div className="canvas-project-badge">
         <i className="fa-solid fa-layer-group" />
         <span>
-          {currentProjectId.toUpperCase()} Meadow ({count} adventurer{count === 1 ? '' : 's'})
+          {currentProjectId.toUpperCase()} · {biomeLabel(biome)} ({count} adventurer{count === 1 ? '' : 's'})
         </span>
         <span className="canvas-budget-pill">${(pCfg.budgetUsd || 50).toFixed(2)} Budget</span>
       </div>

@@ -41,10 +41,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ projectId, customPath, budgetUsd })
     }),
-  saveProjectConfig: ({ projectId, customPath, budgetUsd, maxTokens }) =>
+  saveProjectConfig: ({ projectId, customPath, budgetUsd, maxTokens, biome }) =>
     req('/api/projects/config', {
       method: 'POST',
-      body: JSON.stringify({ projectId, customPath, budgetUsd, maxTokens })
+      body: JSON.stringify({ projectId, customPath, budgetUsd, maxTokens, biome })
     }),
   getModels: () => req('/api/models'),
   getHarnesses: () => req('/api/harnesses'),

@@ -286,10 +286,21 @@ body.drawer-collapsed .drawer-toggle-btn { right: 0; }
   transform: translateX(-50%) rotate(45deg);
 }
 .agent-avatar-svg { display: block; border-radius: 50%; image-rendering: pixelated; }
+/* Snowfall overlay for the snowy biome (backdrop layer only) */
+.snow-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.snow-layer span {
+  position: absolute; top: -8px; border-radius: 50%; background: #FFFFFF;
+  opacity: 0.85; animation: snow-fall linear infinite;
+}
+@keyframes snow-fall {
+  0% { transform: translateY(-10px); }
+  100% { transform: translateY(110vh); }
+}
 @media (prefers-reduced-motion: reduce) {
   .sprite-svg, .activity-walk .sprite-svg, .activity-walk .leg-a, .activity-walk .leg-b,
   .activity-cast .tool-arm, .activity-flourish .tool-arm, .hand-glow,
-  .sprite-ping, .sprite-zzz i { animation: none; }
+  .sprite-ping, .sprite-zzz i, .snow-layer span { animation: none; }
+  .snow-layer { display: none; }
   .agent-sprite { transition: none; }
 }
 

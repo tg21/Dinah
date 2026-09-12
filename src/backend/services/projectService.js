@@ -19,7 +19,13 @@ export function loadProjectsConfig() {
     return defaultConfig;
   }
   try {
-    return JSON.parse(fs.readFileSync(PROJECTS_CONFIG_FILE, 'utf-8'));
+    const data = JSON.parse(fs.readFileSync(PROJECTS_CONFIG_FILE, 'utf-8'));
+    // Backfill cosmetic biome for pre-biome records (stable random per
+    // project, survives restarts like every other config field).
+    if (ensureBiomes(data)) {
+      fs.writeFileSync(PROJECTS_CONFIG_FILE, JSON.stringify(data, null, 2));
+    }
+    return data;
   } catch (e) {
     return {};
   }
@@ -27,6 +33,34 @@ export function loadProjectsConfig() {
 
 export function saveProjectsConfig(cfg) {
   fs.writeFileSync(PROJECTS_CONFIG_FILE, JSON.stringify(cfg, null, 2));
+}
+
+// Per-project backdrop biome. Cosmetic-only: picked once at creation so
+// every project has a unique look, persisted in projects-config.json.
+// Served to the UI via GET /api/projects (`biomes` lists valid ids).
+export const PROJECT_BIOMES = ['oasis', 'grassland', 'snowy', 'urban', 'ember', 'twilight'];
+
+export function isValidBiome(biome) {
+  return PROJECT_BIOMES.includes(biome);
+}
+
+export function randomBiome() {
+  return PROJECT_BIOMES[Math.floor(Math.random() * PROJECT_BIOMES.length)];
+}
+
+// Assigns a random biome to entries missing (or holding) an invalid one.
+// Returns true when anything changed so callers can persist.
+export function ensureBiomes(cfg) {
+  let modified = false;
+  for (const key of Object.keys(cfg || {})) {
+    const entry = cfg[key];
+    if (!entry || typeof entry !== 'object') continue;
+    if (!isValidBiome(entry.biome)) {
+      entry.biome = randomBiome();
+      modified = true;
+    }
+  }
+  return modified;
 }
 
 export function getProjectFolder(projectId) {
@@ -62,7 +96,8 @@ export function createProjectFolder(projectId, customPath = null) {
       spentUsd: 0.0,
       maxTokens: 1000000,
       tokensUsed: 0,
-      description: `Project ${slug}`
+      description: `Project ${slug}`,
+      biome: randomBiome()
     };
     saveProjectsConfig(cfg);
   }
