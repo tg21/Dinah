@@ -32,6 +32,7 @@ export default function ChatTab({ engineRef }) {
   const [input, setInput] = useState('');
   const [optimistic, setOptimistic] = useState([]);
   const [questionOpen, setQuestionOpen] = useState(false);
+  const [activeQuestion, setActiveQuestion] = useState(null);
   const [sending, setSending] = useState(false);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
@@ -78,7 +79,25 @@ export default function ChatTab({ engineRef }) {
 
   async function answerQuestion(answer) {
     setQuestionOpen(false);
+    setActiveQuestion(null);
     await send(answer);
+  }
+
+  function openQuestion(source) {
+    // Prefer the live pending question (has the freshest options); fall back
+    // to the clicked bubble's own content so old question cards stay openable
+    // even after the hold clears or drawer data goes stale.
+    const question = pendingQuestion?.question || source?.question || source?.request || '';
+    if (!question) return;
+    const options = (pendingQuestion?.options?.length ? pendingQuestion.options : source?.options) || [];
+    setActiveQuestion({ question, options });
+    setQuestionOpen(true);
+  }
+
+  function onQuestionBubbleClick(e, m) {
+    // Let text-expand toggles / links inside the bubble behave normally.
+    if (e.target?.closest?.('details, summary, a, button')) return;
+    openQuestion({ question: m.content || m.text || m.request || '', options: m.options });
   }
 
   async function confirmSummon() {
@@ -115,7 +134,7 @@ export default function ChatTab({ engineRef }) {
       )}
 
       {needsUser && (
-        <button className="user-question-banner" onClick={() => setQuestionOpen(true)}>
+        <button className="user-question-banner" onClick={() => openQuestion({ question: pendingQuestion.question, options: pendingQuestion.options })}>
           <strong><i className="fa-solid fa-circle-question" /> You have a question</strong>
           <div style={{ marginTop: 4, fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {pendingQuestion.question}
@@ -129,9 +148,13 @@ export default function ChatTab({ engineRef }) {
           const roleCls = m.role === 'user' ? 'user' : m.role === 'system' ? 'system' : 'agent';
           const kindCls = m.kind === 'user-question' ? ' agent-question' : m.kind === 'user-inform' ? ' agent-inform' : '';
           const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : '';
+          const isQuestion = m.kind === 'user-question';
           return (
-            <div key={i} className={`msg-bubble ${roleCls}${kindCls}`}>
-              <div className="msg-header">
+            <div
+              key={i}
+              className={`msg-bubble ${roleCls}${kindCls}${isQuestion ? ' clickable' : ''}`}
+              {...(isQuestion ? { onClick: (e) => onQuestionBubbleClick(e, m), title: 'Click to answer…', role: 'button', tabIndex: 0, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openQuestion({ question: m.content || m.text || m.request || '', options: m.options }); } } } : {})}
+            >  <div className="msg-header">
                 <strong>{m.role === 'user' ? 'You (Overseer)' : agent.name || 'Agent'}</strong>
                 <span>{time}</span>
                 {m.kind === 'user-question' && <span className="msg-kind-tag question">Question</span>}
@@ -149,6 +172,11 @@ export default function ChatTab({ engineRef }) {
             {m.kind === 'user-question' && Array.isArray(m.options) && m.options.length > 0 && (
               <div style={{ marginTop: 6, fontSize: 10, opacity: 0.8 }}>
                 Options: {m.options.join(' • ')}
+              </div>
+            )}
+            {isQuestion && (
+              <div style={{ marginTop: 6, fontSize: 10, fontWeight: 800, color: '#8f3d2b' }}>
+                <i className="fa-solid fa-circle-question" /> Click to answer…
               </div>
             )}
             </div>
@@ -193,13 +221,13 @@ export default function ChatTab({ engineRef }) {
           <i className="fa-solid fa-paper-plane" />
         </button>
       </div>
-      {questionOpen && needsUser && (
+      {questionOpen && activeQuestion?.question && (
         <UserQuestionModal
           agentName={agent.name}
-          question={pendingQuestion.question}
-          options={pendingQuestion.options || []}
+          question={activeQuestion.question}
+          options={activeQuestion.options || []}
           sending={sending}
-          onClose={() => setQuestionOpen(false)}
+          onClose={() => { setQuestionOpen(false); setActiveQuestion(null); }}
           onSubmit={answerQuestion}
         />
       )}

@@ -577,6 +577,8 @@ body.drawer-collapsed .drawer {
 .user-question-banner:hover { background: rgba(201, 90, 60, 0.2); }
 .user-question-banner strong { font-weight: 800; }
 .msg-bubble.agent-question { border-color: #C96A5A; box-shadow: 0 0 0 2px rgba(201,106,90,.25); }
+.msg-bubble.agent-question.clickable { cursor: pointer; }
+.msg-bubble.agent-question.clickable:hover { box-shadow: 0 0 0 3px rgba(201,106,90,.45); }
 .msg-bubble.agent-inform { border-left: 5px solid var(--sage); }
 .msg-kind-tag { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; margin-left: 6px; padding: 1px 6px; border-radius: 4px; }
 .msg-kind-tag.question { background: rgba(201,106,90,.18); color: #8f3d2b; }
