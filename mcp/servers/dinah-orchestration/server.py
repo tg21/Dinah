@@ -77,9 +77,15 @@ def request_help(neededRole: str, question: str, taskId: str = "", urgency: str 
 
 
 @mcp.tool()
-def ask_user(question: str, taskId: str = "") -> dict:
-    """Pause this agent and send a question to the user. Resume when the user replies."""
-    return call_backend("/api/internal/orchestration/ask-user", context({"question": question, "taskId": taskId or None}))
+def ask_user(question: str, options: list[str] | None = None, taskId: str = "") -> dict:
+    """Pause this agent and send a question to the user. Resume when the user replies. Pass options as a list of short multiple-choice answers; leave it empty/omitted for a free-text answer. The UI shows options as radio buttons plus a free-text choice."""
+    return call_backend("/api/internal/orchestration/ask-user", context({"question": question, "options": options or [], "taskId": taskId or None}))
+
+
+@mcp.tool()
+def inform_user(message: str, taskId: str = "") -> dict:
+    """Inform the user about something (e.g. work finished) without pausing. Shows in the agent's chat only, never in agent-to-agent traffic."""
+    return call_backend("/api/internal/orchestration/inform-user", context({"message": message, "taskId": taskId or None}))
 
 
 @mcp.tool()

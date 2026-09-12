@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../store/AppContext.jsx';
 import { api } from '../../api/client.js';
 import { escapeHtml, splitLongText } from '../../utils/format.js';
 import { QUICK_PROMPTS } from '../../constants/startup.js';
+import UserQuestionModal from '../Modals/UserQuestionModal.jsx';
 
 function LogText({ value }) {
   const [expanded, setExpanded] = useState(false);
@@ -30,18 +31,30 @@ export default function ChatTab({ engineRef }) {
   } = useApp();
   const [input, setInput] = useState('');
   const [optimistic, setOptimistic] = useState([]);
+  const [questionOpen, setQuestionOpen] = useState(false);
+  const [sending, setSending] = useState(false);
   const inputRef = useRef(null);
+  const scrollRef = useRef(null);
 
   const agent = drawerAgent || allAgents[currentAgentId] || {};
   const messages = agent.messages || [];
   const awaiting = agent.status === 'awaiting-confirmation';
+  const pendingQuestion = agent.pendingUserQuestion || null;
+  const needsUser = agent.status === 'awaiting-user' && pendingQuestion?.question;
   const cost = agent.costEstimation || { estCostUsd: 0.015, estTotalTokens: 4500 };
+
+  // Always settle on the latest message when this panel is (re)opened or grows.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, optimistic.length, currentAgentId]);
 
   async function send(text) {
     const msg = (text ?? input).trim();
-    if (!msg) return;
+    if (!msg || sending) return;
     setInput('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
+    setSending(true);
     setOptimistic((o) => [...o, { role: 'user', content: msg, timestamp: Date.now() }]);
     engineRef.current?.launchCourier('user', currentAgentId);
     engineRef.current?.say(currentAgentId, 'Processing directive...');
@@ -54,10 +67,18 @@ export default function ChatTab({ engineRef }) {
       });
       setOptimistic([]);
       await loadAgentDrawer(currentAgentId);
+      await loadAgents();
       engineRef.current?.say(currentAgentId, 'Task completed!');
     } catch (err) {
       engineRef.current?.say(currentAgentId, `Error: ${err.message}`);
+    } finally {
+      setSending(false);
     }
+  }
+
+  async function answerQuestion(answer) {
+    setQuestionOpen(false);
+    await send(answer);
   }
 
   async function confirmSummon() {
@@ -93,15 +114,28 @@ export default function ChatTab({ engineRef }) {
         </div>
       )}
 
-      <div className="chat-messages">
+      {needsUser && (
+        <button className="user-question-banner" onClick={() => setQuestionOpen(true)}>
+          <strong><i className="fa-solid fa-circle-question" /> You have a question</strong>
+          <div style={{ marginTop: 4, fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {pendingQuestion.question}
+          </div>
+          <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2 }}>Click to answer…</div>
+        </button>
+      )}
+
+      <div className="chat-messages" ref={scrollRef}>
         {messages.map((m, i) => {
           const roleCls = m.role === 'user' ? 'user' : m.role === 'system' ? 'system' : 'agent';
+          const kindCls = m.kind === 'user-question' ? ' agent-question' : m.kind === 'user-inform' ? ' agent-inform' : '';
           const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : '';
           return (
-            <div key={i} className={`msg-bubble ${roleCls}`}>
+            <div key={i} className={`msg-bubble ${roleCls}${kindCls}`}>
               <div className="msg-header">
                 <strong>{m.role === 'user' ? 'You (Overseer)' : agent.name || 'Agent'}</strong>
                 <span>{time}</span>
+                {m.kind === 'user-question' && <span className="msg-kind-tag question">Question</span>}
+                {m.kind === 'user-inform' && <span className="msg-kind-tag inform">Update</span>}
                 {m.simulated && (
                   <span
                     title="Produced by the fallback simulator, not a live harness run"
@@ -112,6 +146,11 @@ export default function ChatTab({ engineRef }) {
                 )}
               </div>
             <LogText value={m.content || m.text || m.request || ''} />
+            {m.kind === 'user-question' && Array.isArray(m.options) && m.options.length > 0 && (
+              <div style={{ marginTop: 6, fontSize: 10, opacity: 0.8 }}>
+                Options: {m.options.join(' • ')}
+              </div>
+            )}
             </div>
           );
         })}
@@ -154,6 +193,16 @@ export default function ChatTab({ engineRef }) {
           <i className="fa-solid fa-paper-plane" />
         </button>
       </div>
+      {questionOpen && needsUser && (
+        <UserQuestionModal
+          agentName={agent.name}
+          question={pendingQuestion.question}
+          options={pendingQuestion.options || []}
+          sending={sending}
+          onClose={() => setQuestionOpen(false)}
+          onSubmit={answerQuestion}
+        />
+      )}
     </>
   );
 }

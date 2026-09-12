@@ -28,8 +28,10 @@ import {
 export function buildResumePrompt({ agentId, projectId, userReply, pendingQuestion }) {
   const sections = [];
   if (pendingQuestion?.question) {
+    const opts = Array.isArray(pendingQuestion.options) ? pendingQuestion.options.filter(Boolean) : [];
     sections.push(
-      `You previously paused with a question for the user${pendingQuestion.taskId ? ` (task ${pendingQuestion.taskId})` : ''}${pendingQuestion.askedAt ? ` at ${pendingQuestion.askedAt}` : ''}:\n"${pendingQuestion.question}"`
+      `You previously paused with a question for the user${pendingQuestion.taskId ? ` (task ${pendingQuestion.taskId})` : ''}${pendingQuestion.askedAt ? ` at ${pendingQuestion.askedAt}` : ''}:\n"${pendingQuestion.question}"` +
+      (opts.length ? `\nOptions you offered:\n${opts.map((o, i) => `${i + 1}. ${o}`).join('\n')}\n(Empty options means you asked for free text.)` : '')
     );
   }
   try {

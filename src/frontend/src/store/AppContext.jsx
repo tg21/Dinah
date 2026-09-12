@@ -76,6 +76,8 @@ export function AppProvider({ children }) {
 
   const seenEvents = useRef(new Set());
   const lastRosterRefresh = useRef(0);
+  const drawerRef = useRef({ currentAgentId: currentAgentId, loadAgentDrawer: null });
+  drawerRef.current.currentAgentId = currentAgentId;
   useEffect(() => {
     loadMessageActivity();
     const activityTimer = window.setInterval(loadMessageActivity, 4000);
@@ -96,11 +98,18 @@ export function AppProvider({ children }) {
       // Roster-invalidating events: agent-driven staffing (request_staff /
       // provision_agent) has no modal to trigger loadAgents(), so the SSE
       // push is the only thing that makes awaiting-confirmation appear.
-      if (['summon_requested', 'summon_confirmed', 'agent_spawned', 'agent_updated', 'agent_status_changed'].includes(event.type)) {
+      if (['summon_requested', 'summon_confirmed', 'agent_spawned', 'agent_updated', 'agent_status_changed', 'agent_needs_user', 'agent_informs_user'].includes(event.type)) {
         const now = Date.now();
         if (now - lastRosterRefresh.current < 1000) return;
         lastRosterRefresh.current = now;
         loadAgents();
+        // User-directed traffic (ask_user / inform_user) is chat-only: refresh
+        // the open drawer so the question banner / update appears. The
+        // awaiting-user sprite ring + badge is the "animation" for questions;
+        // informs arrive as highlighted chat bubbles.
+        if (['agent_needs_user', 'agent_informs_user'].includes(event.type)) {
+          drawerRef.current.loadAgentDrawer?.(drawerRef.current.currentAgentId);
+        }
       }
     };
 
@@ -139,6 +148,7 @@ export function AppProvider({ children }) {
     },
     [currentAgentId, currentProjectId]
   );
+  drawerRef.current.loadAgentDrawer = loadAgentDrawer;
 
   const selectAgent = useCallback(
     async (agentId) => {

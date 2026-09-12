@@ -265,18 +265,40 @@ export function requestHelp({ projectId, agentId, taskId, neededRole, question, 
   return request;
 }
 
-export function askUser({ projectId, agentId, taskId, question }) {
+function normalizeOptions(value) {
+  if (value === undefined || value === null) return [];
+  const list = Array.isArray(value) ? value : [value];
+  return list
+    .filter((item) => typeof item === 'string' && item.trim())
+    .map((item) => item.trim().slice(0, 200))
+    .slice(0, 10);
+}
+
+export function askUser({ projectId, agentId, taskId, question, options }) {
   const textQuestion = requireText(question, 'question');
+  const cleanOptions = normalizeOptions(options);
   const hr = loadHrSystem();
   if (!hr[agentId]) throw new Error('Agent not found');
   hr[agentId].status = 'awaiting-user';
-  hr[agentId].pendingUserQuestion = { question: textQuestion, taskId: taskId || null, askedAt: new Date().toISOString() };
+  hr[agentId].pendingUserQuestion = { question: textQuestion, options: cleanOptions, taskId: taskId || null, askedAt: new Date().toISOString() };
   hr[agentId].last_activity_ms = Date.now();
   saveHrSystem(hr);
-  appendAgentMessage(agentId, { from: hr[agentId].name || agentId, project: projectId, request: textQuestion, role: 'agent' });
+  appendAgentMessage(agentId, { from: hr[agentId].name || agentId, project: projectId, request: textQuestion, role: 'agent', kind: 'user-question', options: cleanOptions });
   broadcastAgentEvent({ fromAgentId: agentId, toAgentId: 'user', projectId, type: 'agent_needs_user', snippet: textQuestion.slice(0, 80) });
   appendToSharedLog(`[${agentId}] is waiting for user input in [${projectId}].`);
-  return { id: `user-question-${Date.now()}`, agentId, projectId, question: textQuestion, status: 'awaiting-user' };
+  return { id: `user-question-${Date.now()}`, agentId, projectId, question: textQuestion, options: cleanOptions, status: 'awaiting-user' };
+}
+
+export function informUser({ projectId, agentId, taskId, message }) {
+  const textMessage = requireText(message, 'message');
+  const hr = loadHrSystem();
+  if (!hr[agentId]) throw new Error('Agent not found');
+  hr[agentId].last_activity_ms = Date.now();
+  saveHrSystem(hr);
+  appendAgentMessage(agentId, { from: hr[agentId].name || agentId, project: projectId, request: textMessage, role: 'agent', kind: 'user-inform' });
+  broadcastAgentEvent({ fromAgentId: agentId, toAgentId: 'user', projectId, type: 'agent_informs_user', snippet: textMessage.slice(0, 80) });
+  appendToSharedLog(`[${agentId}] informed the user in [${projectId}].`);
+  return { id: `user-inform-${Date.now()}`, agentId, projectId, message: textMessage, taskId: taskId || null, status: hr[agentId].status };
 }
 
 export function sendAgentMessage({ fromAgentId, toAgentId, projectId, message }) {

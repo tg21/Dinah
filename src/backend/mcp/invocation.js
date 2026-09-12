@@ -21,8 +21,9 @@ function orchestrationTools(agent) {
     // Every invoked agent needs the delivery protocol to consume a wake-up.
     'list_inbox', 'claim_message', 'acknowledge_message', 'complete_message',
     'fail_message', 'release_message', 'get_message_status',
-    ...(agent.role?.includes('ceo') ? ['create_project', 'ask_user'] : []),
-    ...(agent.role?.includes('manager') ? ['ask_user'] : [])
+    // Any agent may ask or inform the user (MCQ options or free text).
+    'ask_user', 'inform_user',
+    ...(agent.role?.includes('ceo') ? ['create_project'] : []),
   ])];
 }
 
@@ -164,5 +165,5 @@ export function mcpPromptContext(agent, invocation) {
   const tools = mcps.flatMap((mcp) =>
     (mcp.allowedTools || []).map((tool) => `${mcp.id}.${tool}`)
   );
-  return `\n\nAvailable MCP tools for this invocation: ${tools.join(', ')}. Use them as the authoritative coordination channel: publish progress after meaningful work, report blockers immediately, request help when blocked, and check project status before planning. Use only enabled tools. The harness has configured these tools; do not inspect or read MCP configuration files.`;
+  return `\n\nAvailable MCP tools for this invocation: ${tools.join(', ')}. Use them as the authoritative coordination channel: publish progress after meaningful work, report blockers immediately, request help when blocked, and check project status before planning. To reach the user: ask_user pauses for a decision (options=[] free text, options=[...] multiple choice), inform_user sends a chat-only notice without pausing. Use only enabled tools. The harness has configured these tools; do not inspect or read MCP configuration files.`;
 }

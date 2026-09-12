@@ -283,10 +283,10 @@ export function getMessageStatus({ messageId }) {
 export function getProjectMessageActivity({ projectId = 'global', limit = 100 }) {
   const state = loadState();
   if (recoverExpired(state)) saveState(state);
+  // Chronological (oldest first, newest at bottom) like a normal message view.
   const messages = state.messages
     .filter((message) => message.projectId === projectId || projectId === 'all')
-    .slice(-Math.max(1, Math.min(250, Number(limit) || 100)))
-    .reverse();
+    .slice(-Math.max(1, Math.min(250, Number(limit) || 100)));
   return messages.map((message) => ({
     ...message,
     deliveries: state.deliveries.filter((delivery) => delivery.messageId === message.messageId)
