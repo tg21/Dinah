@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { SHARED_STATE_DIR } from '../config.js';
-import { appendToSharedLog } from './messageService.js';
+import { appendAgentThought, appendToSharedLog } from './messageService.js';
 import { broadcastAgentEvent } from './eventBus.js';
 
 const QUEUE_FILE = path.join(SHARED_STATE_DIR, 'message-queue.json');
@@ -54,6 +54,12 @@ function recoverExpired(state, now = Date.now()) {
   return changed;
 }
 
+function queueThought(agentId, step, thought) {
+  try {
+    appendAgentThought(agentId, step, thought);
+  } catch { /* BTS trace must never break delivery */ }
+}
+
 function publicMessage(message, delivery) {
   return {
     ...message,
@@ -69,7 +75,9 @@ function publicMessage(message, delivery) {
 // inform_user notices, direct harness replies). Durable agent-to-agent
 // traffic is observable via message-activity, courier events, and the shared
 // log — never via drawer projections, so no queue mechanics ([claimed],
-// [completed], reply echoes) leak into the user's chat view.
+// [completed], reply echoes) leak into the user's chat view. Delivery
+// lifecycle instead leaves compact QUEUE_* thoughts on the recipient's BTS
+// panel (best-effort; must never break delivery).
 
 function createEnvelope({ projectId = 'global', senderAgentId, recipientAgentId = null, threadId = null, type = 'request', payload, summary, idempotencyKey }) {
   const sender = text(senderAgentId, 'senderAgentId');
@@ -207,6 +215,7 @@ export function claimMessage({ messageId, agentId, leaseMs = DEFAULT_LEASE_MS })
   const message = state.messages.find((item) => item.messageId === delivery.messageId);
   message.status = 'claimed'; message.attemptCount = delivery.attemptCount; message.claimedAt = delivery.claimedAt;
   saveState(state);
+  queueThought(delivery.recipientAgentId, 'QUEUE_CLAIM', `Claimed delivery [${delivery.deliveryId}] of [${message.messageId}] from [${message.senderAgentId}]: ${String(message.summary).slice(0, 160)}`);
   return { message: publicMessage(message, delivery), delivery, leaseToken: delivery.leaseToken };
 }
 
@@ -219,6 +228,7 @@ export function completeMessage({ messageId, agentId, leaseToken, result = null 
   delivery.completedAt = new Date().toISOString(); delivery.result = result;
   message.completedAt = delivery.completedAt; message.result = result; message.status = 'completed';
   saveState(state);
+  queueThought(agentId, 'QUEUE_DONE', `Completed delivery [${delivery.deliveryId}] of [${message.messageId}] from [${message.senderAgentId}].`);
   return { ...outcome, message: publicMessage(message, delivery) };
 }
 export function failMessage({ messageId, agentId, leaseToken, reason, retryable = true }) {
@@ -229,6 +239,7 @@ export function failMessage({ messageId, agentId, leaseToken, reason, retryable 
   delivery.status = retryable && delivery.attemptCount < MAX_ATTEMPTS ? 'queued' : 'dead-lettered';
   const message = state.messages.find((item) => item.messageId === delivery.messageId); message.status = delivery.status;
   saveState(state);
+  queueThought(agentId, 'QUEUE_FAIL', `Delivery [${delivery.deliveryId}] of [${message.messageId}] ${delivery.status === 'queued' ? 're-queued' : 'dead-lettered'}: ${String(reason).slice(0, 160)}`);
   return { message: publicMessage(message, delivery), retrying: delivery.status === 'queued' };
 }
 export function releaseMessage({ messageId, agentId, leaseToken, reason = 'released' }) { return failMessage({ messageId, agentId, leaseToken, reason, retryable: true }); }

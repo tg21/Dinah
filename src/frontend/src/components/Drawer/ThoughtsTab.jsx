@@ -1,15 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../store/AppContext.jsx';
-import { escapeHtml, splitLongText } from '../../utils/format.js';
+import { splitLongText } from '../../utils/format.js';
 
 export default function ThoughtsTab() {
   const { drawerAgent, allAgents, currentAgentId } = useApp();
   const [expanded, setExpanded] = useState({});
   const agent = drawerAgent || allAgents[currentAgentId] || {};
   const thoughts = agent.thoughts || [];
+  const bottomRef = useRef(null);
+
+  // BTS grows downward: settle on the latest entry when opened or extended.
+  useEffect(() => {
+    const panel = document.getElementById('tab-thoughts');
+    if (panel) panel.scrollTop = panel.scrollHeight;
+    bottomRef.current?.scrollIntoView({ block: 'end' });
+  }, [thoughts.length, currentAgentId]);
 
   if (!thoughts.length) {
-    return <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>No thoughts logged yet.</div>;
+    return <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>No behind-the-scenes activity yet.</div>;
   }
 
   return (
@@ -30,15 +38,16 @@ export default function ThoughtsTab() {
                   setExpanded((s) => ({ ...s, [i]: e.target.open }))
                 }
               >
-                <summary>{escapeHtml(preview)} [show {isOpen ? 'less' : 'more'}]</summary>
-                <div className="log-detail-content">{escapeHtml(text)}</div>
+                <summary>{preview} [show {isOpen ? 'less' : 'more'}]</summary>
+                <div className="log-detail-content">{text}</div>
               </details>
             ) : (
-              <div style={{ whiteSpace: 'pre-wrap' }}>{escapeHtml(text)}</div>
+              <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
             )}
           </div>
         );
       })}
+      <div ref={bottomRef} />
     </div>
   );
 }

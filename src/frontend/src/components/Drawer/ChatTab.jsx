@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../store/AppContext.jsx';
 import { api } from '../../api/client.js';
-import { escapeHtml, splitLongText } from '../../utils/format.js';
+import { splitLongText } from '../../utils/format.js';
 import { QUICK_PROMPTS } from '../../constants/startup.js';
 import UserQuestionModal from '../Modals/UserQuestionModal.jsx';
 
 function LogText({ value }) {
   const [expanded, setExpanded] = useState(false);
   const { collapsed, text, preview } = splitLongText(value);
-  if (!collapsed) return <div style={{ whiteSpace: 'pre-wrap' }}>{escapeHtml(text)}</div>;
+  // Raw strings as JSX children: React escapes markup itself. Pre-escaping
+  // (escapeHtml) would double-encode and render &quot; etc. literally.
+  if (!collapsed) return <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>;
   return (
     <details className="log-details" open={expanded} onToggle={(e) => setExpanded(e.target.open)}>
       <summary>
-        {escapeHtml(preview)} <strong>[show {expanded ? 'less' : 'more'}]</strong>
+        {preview} <strong>[show {expanded ? 'less' : 'more'}]</strong>
       </summary>
-      <div className="log-detail-content">{escapeHtml(text)}</div>
+      <div className="log-detail-content">{text}</div>
     </details>
   );
 }
@@ -219,7 +221,7 @@ export default function ChatTab({ engineRef }) {
               <strong>You (Overseer)</strong>
               <span>Just now</span>
             </div>
-            <div>{escapeHtml(m.content)}</div>
+            <div>{m.content}</div>
           </div>
         ))}
       </div>

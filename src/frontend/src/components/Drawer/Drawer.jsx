@@ -11,7 +11,7 @@ import { api } from '../../api/client.js';
 const TABS = [
   ['chat', 'fa-comment-dots', 'Chat'],
   ['stats', 'fa-shield-halved', 'Stats'],
-  ['thoughts', 'fa-brain', 'Thoughts'],
+  ['thoughts', 'fa-brain', 'BTS', 'Behind the scenes: agent reasoning + delivery mechanics'],
   ['context', 'fa-database', 'Context'],
   ['network', 'fa-envelope-open-text', 'Messages']
 ];
@@ -85,11 +85,12 @@ export default function Drawer({ engineRef }) {
       </div>
 
       <div className="drawer-tabs">
-        {TABS.map(([key, icon, label]) => (
+        {TABS.map(([key, icon, label, title]) => (
           <button
             key={key}
             className={`tab-btn ${tab === key ? 'active' : ''}`}
             onClick={() => setTab(key)}
+            {...(title ? { title } : {})}
           >
             <i className={`fa-solid ${icon}`} /> {label}
           </button>

@@ -54,7 +54,7 @@ import { buildResumePrompt } from '../../src/backend/routes/messages.js';
 import { saveHrSystem, loadHrSystem } from '../../src/backend/services/hrService.js';
 import { clearAgentEventQueue, getAgentEventQueue } from '../../src/backend/services/eventBus.js';
 import { askUser, informUser, answerUserQuestion } from '../../src/backend/services/coordinationService.js';
-import { loadAgentMessages } from '../../src/backend/services/messageService.js';
+import { loadAgentMessages, loadAgentThoughts } from '../../src/backend/services/messageService.js';
 import {
   enqueueDirectMessage,
   getProjectMessageActivity,
@@ -257,8 +257,12 @@ describe('user communication: chat stays free of queue mechanics', () => {
     expect(chat.some((m) => String(m.request).includes('[claimed]'))).toBe(false);
     expect(chat.some((m) => String(m.request).includes('[completed]'))).toBe(false);
     expect(chat.some((m) => String(m.request).includes('User (Overseer) reply'))).toBe(false);
-    // …while the traffic stays observable in message-activity.
+    // …while the traffic stays observable in message-activity…
     expect(getProjectMessageActivity({ projectId: 'auto-proj' }).length).toBeGreaterThan(0);
+    // …and the delivery lifecycle lands on the BTS (thoughts) panel instead.
+    const thoughts = loadAgentThoughts('auto-proj-manager-bard');
+    expect(thoughts.some((t) => t.step === 'QUEUE_CLAIM')).toBe(true);
+    expect(thoughts.some((t) => t.step === 'QUEUE_DONE')).toBe(true);
   });
 
   it('agent-to-agent traffic never lands in either chat', () => {

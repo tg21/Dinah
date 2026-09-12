@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { useApp } from '../../store/AppContext.jsx';
 import { api } from '../../api/client.js';
-import { escapeHtml, formatTokens } from '../../utils/format.js';
+import { formatTokens } from '../../utils/format.js';
 
 export default function MarshallAuditModal() {
   const { setActiveModal, loadAgents } = useApp();
@@ -56,7 +56,7 @@ export default function MarshallAuditModal() {
             >
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
-                  #{idx + 1} {escapeHtml(item.name)}{' '}
+                  #{idx + 1} {item.name}{' '}
                   <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>({item.project})</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
