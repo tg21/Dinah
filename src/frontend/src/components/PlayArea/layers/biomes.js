@@ -141,3 +141,81 @@ export function backdropFor(biome) {
 export function biomeLabel(biome) {
   return BIOME_META.find((b) => b.id === biome)?.label || 'Oasis Meadow';
 }
+
+// Per-biome artefact sets: which pieces stand on the meadow, where, and
+// how many. Anchors are fractions of the container; `s` is an optional
+// scale. Part names must exist in WorldObjectsLayer PARTS.
+export const OBJECT_SETS = {
+  oasis: [
+    { p: 'Tavern', fx: 500 / 1600, fy: 520 / 1000 },
+    { p: 'Tower', fx: 240 / 1600, fy: 360 / 1000 },
+    { p: 'Crystal', fx: 1360 / 1600, fy: 360 / 1000 },
+    { p: 'ArchTree', fx: 800 / 1600, fy: 470 / 1000, s: 1.15 },
+    { p: 'Forge', fx: 960 / 1600, fy: 760 / 1000 },
+    { p: 'Tent', fx: 610 / 1600, fy: 770 / 1000 },
+    { p: 'ArchTree', fx: 150 / 1600, fy: 820 / 1000, s: 0.9 },
+    { p: 'ArchTree', fx: 1450 / 1600, fy: 830 / 1000, s: 0.95 },
+    { p: 'Campfire', fx: 770 / 1600, fy: 690 / 1000 },
+    { p: 'Campfire', fx: 830 / 1600, fy: 700 / 1000 }
+  ],
+  grassland: [
+    { p: 'Tavern', fx: 480 / 1600, fy: 540 / 1000 },
+    { p: 'Tower', fx: 190 / 1600, fy: 340 / 1000 },
+    { p: 'ArchTree', fx: 800 / 1600, fy: 450 / 1000, s: 1.2 },
+    { p: 'ArchTree', fx: 320 / 1600, fy: 760 / 1000 },
+    { p: 'ArchTree', fx: 1280 / 1600, fy: 760 / 1000, s: 1.05 },
+    { p: 'ArchTree', fx: 1440 / 1600, fy: 420 / 1000, s: 0.85 },
+    { p: 'Tent', fx: 990 / 1600, fy: 790 / 1000 },
+    { p: 'Tent', fx: 1200 / 1600, fy: 620 / 1000, s: 0.9 },
+    { p: 'Campfire', fx: 720 / 1600, fy: 690 / 1000 },
+    { p: 'Campfire', fx: 1120 / 1600, fy: 710 / 1000 }
+  ],
+  snowy: [
+    { p: 'Tavern', fx: 510 / 1600, fy: 550 / 1000 },
+    { p: 'Tower', fx: 220 / 1600, fy: 360 / 1000 },
+    { p: 'FrostPine', fx: 880 / 1600, fy: 480 / 1000, s: 1.2 },
+    { p: 'FrostPine', fx: 1200 / 1600, fy: 740 / 1000 },
+    { p: 'FrostPine', fx: 320 / 1600, fy: 730 / 1000, s: 0.9 },
+    { p: 'FrostPine', fx: 1440 / 1600, fy: 450 / 1000, s: 0.95 },
+    { p: 'Tent', fx: 990 / 1600, fy: 790 / 1000 },
+    { p: 'Campfire', fx: 720 / 1600, fy: 690 / 1000 },
+    { p: 'Campfire', fx: 1090 / 1600, fy: 700 / 1000 }
+  ],
+  urban: [
+    { p: 'Tavern', fx: 480 / 1600, fy: 520 / 1000 },
+    { p: 'Tower', fx: 220 / 1600, fy: 350 / 1000 },
+    { p: 'Tower', fx: 1408 / 1600, fy: 350 / 1000, s: 0.95 },
+    { p: 'Forge', fx: 990 / 1600, fy: 770 / 1000 },
+    { p: 'Tent', fx: 720 / 1600, fy: 730 / 1000 },
+    { p: 'Tent', fx: 930 / 1600, fy: 620 / 1000, s: 0.9 },
+    { p: 'LanternPost', fx: 800 / 1600, fy: 450 / 1000 },
+    { p: 'LanternPost', fx: 1200 / 1600, fy: 690 / 1000 },
+    { p: 'LanternPost', fx: 400 / 1600, fy: 690 / 1000 }
+  ],
+  ember: [
+    { p: 'Forge', fx: 560 / 1600, fy: 600 / 1000 },
+    { p: 'Forge', fx: 1090 / 1600, fy: 720 / 1000, s: 0.95 },
+    { p: 'Tower', fx: 220 / 1600, fy: 360 / 1000 },
+    { p: 'Crystal', fx: 1360 / 1600, fy: 400 / 1000 },
+    { p: 'Tent', fx: 800 / 1600, fy: 790 / 1000 },
+    { p: 'Campfire', fx: 670 / 1600, fy: 690 / 1000 },
+    { p: 'Campfire', fx: 960 / 1600, fy: 660 / 1000 },
+    { p: 'LanternPost', fx: 1280 / 1600, fy: 620 / 1000 }
+  ],
+  twilight: [
+    { p: 'Crystal', fx: 480 / 1600, fy: 500 / 1000, s: 1.15 },
+    { p: 'Crystal', fx: 1120 / 1600, fy: 720 / 1000, s: 0.9 },
+    { p: 'ArchTree', fx: 800 / 1600, fy: 450 / 1000, s: 1.1 },
+    { p: 'ArchTree', fx: 1408 / 1600, fy: 800 / 1000, s: 0.9 },
+    { p: 'Tavern', fx: 510 / 1600, fy: 600 / 1000 },
+    { p: 'Tower', fx: 190 / 1600, fy: 350 / 1000 },
+    { p: 'Tent', fx: 990 / 1600, fy: 790 / 1000 },
+    { p: 'Campfire', fx: 720 / 1600, fy: 690 / 1000 },
+    { p: 'LanternPost', fx: 880 / 1600, fy: 520 / 1000 },
+    { p: 'LanternPost', fx: 1200 / 1600, fy: 640 / 1000 }
+  ]
+};
+
+export function objectsFor(biome) {
+  return OBJECT_SETS[biome] || OBJECT_SETS.oasis;
+}

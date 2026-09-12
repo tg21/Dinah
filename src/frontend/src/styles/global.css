@@ -34,8 +34,48 @@
   --text-muted: var(--ink-soft);
   --border: #D9C48F;
   --border-light: #C9B37E;
+  --chrome-hi: #FFF6C9;
+  --chrome-lo: #F7EBBE;
   --drawer-width: 480px;
   --rail-width: 92px;
+}
+
+/* Per-biome chrome: the whole site follows the active project's biome
+   (App sets body[data-biome]). Oasis is the default (no overrides). */
+body[data-biome="grassland"] {
+  --parchment: #F8F5DA; --cream: #F0EDC4; --cream-dim: #E4E1B4;
+  --peach-soft: #F4E9BE; --mint-soft: #D9ECC6; --sand: #E2DCAE; --tan: #C0BE8A;
+  --ink: #42502E; --ink-soft: #63714B; --ink-faint: #8A9370;
+  --border: #A8B47E; --border-light: #8A9A62;
+  --chrome-hi: #F2F0C8; --chrome-lo: #E2E4B2;
+}
+body[data-biome="snowy"] {
+  --parchment: #EDF2F8; --cream: #E1EAF4; --cream-dim: #CBD9EA;
+  --peach-soft: #E3EBF5; --mint-soft: #D7E5F4; --sand: #D3DFEC; --tan: #B4C2D6;
+  --ink: #354052; --ink-soft: #5A6A82; --ink-faint: #8B99AE;
+  --border: #A9BAD2; --border-light: #8B9EBD;
+  --chrome-hi: #E6EEF7; --chrome-lo: #D3DFED;
+}
+body[data-biome="urban"] {
+  --parchment: #F8EDD8; --cream: #F4E3C2; --cream-dim: #E8D3AC;
+  --peach-soft: #F5E2BE; --mint-soft: #EFE0C0; --sand: #E7D2A8; --tan: #C9AE7E;
+  --ink: #4E3C27; --ink-soft: #74634A; --ink-faint: #9A8A70;
+  --border: #BFA071; --border-light: #A5855A;
+  --chrome-hi: #F7E8C8; --chrome-lo: #EED9B4;
+}
+body[data-biome="ember"] {
+  --parchment: #F8E2D2; --cream: #F4D5BC; --cream-dim: #E9C2A2;
+  --peach-soft: #F3C8A4; --mint-soft: #F4D8BE; --sand: #EAC29E; --tan: #C08E6B;
+  --ink: #492F22; --ink-soft: #745348; --ink-faint: #9C7E6E;
+  --border: #B9835F; --border-light: #9E6B47;
+  --chrome-hi: #F7DCC8; --chrome-lo: #EFC9AC;
+}
+body[data-biome="twilight"] {
+  --parchment: #ECE5F5; --cream: #DFD4EF; --cream-dim: #CBBDE2;
+  --peach-soft: #E1D6F3; --mint-soft: #D4C8EB; --sand: #D2C4E6; --tan: #A893C9;
+  --ink: #3E3454; --ink-soft: #645A82; --ink-faint: #8E86A8;
+  --border: #9C86C2; --border-light: #7E68A8;
+  --chrome-hi: #E6DBF3; --chrome-lo: #D3C2E8;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -61,7 +101,7 @@ body {
    TOP NAVIGATION BAR
 ============================================================ */
 .top-nav {
-  background: linear-gradient(180deg, #FFF6C9 0%, #F7EBBE 100%);
+  background: linear-gradient(180deg, var(--chrome-hi) 0%, var(--chrome-lo) 100%);
   border-bottom: 3px double var(--ink);
   padding: 0 16px;
   display: flex; align-items: center;
@@ -98,7 +138,7 @@ body {
 ============================================================ */
 .executive-outer-layer {
   position: fixed; top: 52px; left: 0; right: var(--drawer-width); height: 74px;
-  background: linear-gradient(180deg, #FFF3CF 0%, #F7EBBE 100%);
+  background: linear-gradient(180deg, var(--chrome-hi) 0%, var(--chrome-lo) 100%);
   border-bottom: 3px double var(--ink);
   display: flex; align-items: center; padding: 0 16px; gap: 12px; z-index: 110;
   transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -137,7 +177,7 @@ body.drawer-collapsed .executive-outer-layer { right: 0; }
 ============================================================ */
 .roster-rail {
   position: fixed; top: 126px; left: 0; bottom: 0; width: var(--rail-width);
-  background: linear-gradient(180deg, #F7EBBE 0%, #EFDFB2 100%);
+  background: linear-gradient(180deg, var(--chrome-lo) 0%, var(--sand) 100%);
   border-right: 3px double var(--ink); z-index: 115;
   display: flex; flex-direction: column;
   transition: transform 0.25s ease, width 0.25s ease;
@@ -318,7 +358,7 @@ body.drawer-collapsed .drawer-toggle-btn { right: 0; }
 ============================================================ */
 .drawer {
   position: fixed; top: 52px; right: 0; bottom: 0; width: var(--drawer-width);
-  background: linear-gradient(180deg, #FFF6C9 0%, #FFF3CF 100%);
+  background: linear-gradient(180deg, var(--chrome-hi) 0%, var(--chrome-lo) 100%);
   border-left: 3px double var(--ink); z-index: 100; display: flex; flex-direction: column;
   visibility: visible;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s 0s;
@@ -463,7 +503,7 @@ body.drawer-collapsed .drawer {
 }
 @keyframes modalPop { 0% { transform: scale(0.96) translateY(6px); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 .modal-title {
-  padding: 12px 16px; background: linear-gradient(180deg, #FFF3CF, #F7EBBE);
+  padding: 12px 16px; background: linear-gradient(180deg, var(--chrome-hi), var(--chrome-lo));
   border-bottom: 2px solid var(--ink); display: flex; align-items: center; justify-content: space-between;
   font-size: 13px; font-weight: 800; color: var(--ink);
 }
@@ -476,7 +516,7 @@ body.drawer-collapsed .drawer {
 }
 .modal-form-group input:focus, .modal-form-group select:focus, .modal-form-group textarea:focus { box-shadow: 0 0 0 3px var(--mint-soft); }
 .modal-form-group select option, .modal-form-group select optgroup { background: #FFFDF4; color: var(--ink); }
-.modal-btn-row { padding: 12px 16px; background: #FFF3CF; border-top: 2px solid var(--ink); display: flex; justify-content: flex-end; gap: 8px; }
+.modal-btn-row { padding: 12px 16px; background: var(--chrome-lo); border-top: 2px solid var(--ink); display: flex; justify-content: flex-end; gap: 8px; }
 .startup-modal-box { max-width: 680px; }
 .startup-intro { color: var(--ink); font-size: 12px; line-height: 1.55; background: var(--mint-soft); border: 2px solid var(--ink); border-radius: 8px; padding: 10px 12px; }
 .startup-section-title { color: var(--ink); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }

@@ -53,8 +53,7 @@ export default function PlayAreaScene({
   allAgents,
   onPickAgent,
   onOpenMail,
-  backdrop = 'meadow',
-  objects = 'village'
+  backdrop = 'oasis'
 }) {
   const [zoom, setZoom] = useState(1.0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -297,7 +296,7 @@ export default function PlayAreaScene({
         style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
       >
         <BackdropLayer biome={backdrop} />
-        <WorldObjectsLayer variant={objects} width={cw} height={ch} />
+        <WorldObjectsLayer biome={backdrop} width={cw} height={ch} />
         <AgentsLayer
           agents={agents}
           positions={positions}

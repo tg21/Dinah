@@ -4,22 +4,11 @@
 //
 // Each object is anchored by FRACTIONS of the container and drawn at a
 // fixed pixel size (zero-size SVG + overflow visible), so a resize only
-// re-positions objects — shapes never squash or crop.
-const INK = '#4A3B32';
+// re-positions objects — shapes never squash or crop. Which pieces appear
+// (and how many) comes from biomes.js OBJECT_SETS per project biome.
+import { objectsFor } from './biomes.js';
 
-// Object anchors as fractions { fx, fy } of the container.
-const OBJECTS = [
-  { C: 'Tavern', fx: 500 / 1600, fy: 520 / 1000 },
-  { C: 'Tower', fx: 240 / 1600, fy: 360 / 1000 },
-  { C: 'Crystal', fx: 1360 / 1600, fy: 360 / 1000 },
-  { C: 'ArchTree', fx: 800 / 1600, fy: 470 / 1000, s: 1.15 },
-  { C: 'Forge', fx: 960 / 1600, fy: 760 / 1000 },
-  { C: 'Tent', fx: 610 / 1600, fy: 770 / 1000 },
-  { C: 'ArchTree', fx: 150 / 1600, fy: 820 / 1000, s: 0.9 },
-  { C: 'ArchTree', fx: 1450 / 1600, fy: 830 / 1000, s: 0.95 },
-  { C: 'Campfire', fx: 770 / 1600, fy: 690 / 1000 },
-  { C: 'Campfire', fx: 830 / 1600, fy: 700 / 1000 }
-];
+const INK = '#4A3B32';
 
 const PARTS = {
   Tavern() {
@@ -97,11 +86,40 @@ const PARTS = {
         <polygon points="-4,2 0,-9 4,2" fill="#F2C18D" />
       </g>
     );
+  },
+  FrostPine() {
+    return (
+      <g>
+        <ellipse cx="0" cy="4" rx="30" ry="8" fill="#4A3B32" opacity="0.12" />
+        <rect x="-4" y="-8" width="8" height="12" fill="#6B5D4F" stroke={INK} strokeWidth="1.5" />
+        <polygon points="0,-64 -26,-14 26,-14" fill="#6E9B8E" stroke={INK} strokeWidth="2" />
+        <polygon points="0,-64 -12,-40 12,-40" fill="#FFFFFF" opacity="0.9" />
+        <polygon points="0,-46 -32,2 32,2" fill="#7FAEA0" stroke={INK} strokeWidth="2" />
+        <polygon points="0,-46 -14,-22 14,-22" fill="#FFFFFF" opacity="0.9" />
+        <text x="0" y="20" textAnchor="middle" fontSize="11" fontWeight="800" fill={INK}>Frost Pine</text>
+      </g>
+    );
+  },
+  LanternPost() {
+    return (
+      <g>
+        <ellipse cx="0" cy="4" rx="16" ry="5" fill="#4A3B32" opacity="0.12" />
+        <rect x="-2" y="-52" width="4" height="56" fill="#6B5D4F" stroke={INK} strokeWidth="1.5" />
+        <rect x="-2" y="-56" width="18" height="4" fill="#6B5D4F" stroke={INK} strokeWidth="1.5" />
+        <circle cx="8" cy="-40" r="12" fill="#F2C879" opacity="0.3" />
+        <rect x="2" y="-48" width="12" height="16" fill="#F2C879" stroke={INK} strokeWidth="2" />
+        <rect x="2" y="-52" width="12" height="4" fill={INK} />
+        <text x="0" y="20" textAnchor="middle" fontSize="11" fontWeight="800" fill={INK}>Lantern</text>
+      </g>
+    );
   }
 };
 
-export default function WorldObjectsLayer({ variant = 'village', width, height }) {
+export const WORLD_PARTS = Object.keys(PARTS);
+
+export default function WorldObjectsLayer({ biome = 'oasis', variant, width, height }) {
   if (variant === 'none') return <div className="scene-layer objects" aria-hidden="true" />;
+  const objects = objectsFor(variant || biome);
   const w = width || 1600;
   const h = height || 1000;
   return (
@@ -121,15 +139,18 @@ export default function WorldObjectsLayer({ variant = 'village', width, height }
           <ellipse cx="420" cy="46" rx="420" ry="46" fill="none" stroke="#D9C48F" strokeWidth="4" strokeDasharray="10 8" />
         </svg>
       </div>
-      {OBJECTS.map(({ C, fx, fy, s }, i) => {
-        const Part = PARTS[C];
+      {objects.map(({ p, fx, fy, s }, i) => {
+        const Part = PARTS[p];
+        if (!Part) return null;
         return (
           <div
-            key={i}
+            key={`${p}-${i}`}
             style={{ position: 'absolute', left: fx * w, top: fy * h }}
           >
             <svg width="0" height="0" style={{ overflow: 'visible' }} aria-hidden="true">
-              <Part s={s} />
+              <g transform={s && s !== 1 ? `scale(${s})` : undefined}>
+                <Part />
+              </g>
             </svg>
           </div>
         );

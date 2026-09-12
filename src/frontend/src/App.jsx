@@ -21,6 +21,8 @@ function Shell() {
   const {
     drawerCollapsed,
     activeModal,
+    currentProjectId,
+    projectConfigs,
     setActiveModal,
     loadModelsHarnessesMcps,
     loadProjects,
@@ -59,6 +61,12 @@ function Shell() {
   useEffect(() => {
     document.body.classList.toggle('drawer-collapsed', drawerCollapsed);
   }, [drawerCollapsed]);
+
+  // The whole chrome follows the active project's biome.
+  const activeBiome = projectConfigs[currentProjectId]?.biome || 'oasis';
+  useEffect(() => {
+    document.body.dataset.biome = activeBiome;
+  }, [activeBiome]);
 
   return (
     <>
