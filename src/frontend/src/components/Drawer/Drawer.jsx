@@ -18,7 +18,7 @@ const TABS = [
 
 export default function Drawer({ engineRef }) {
   const [tab, setTab] = useState('chat');
-  const { drawerAgent, allAgents, currentAgentId, loadAgents, loadAgentDrawer, setActiveModal } =
+  const { drawerAgent, allAgents, currentAgentId, loadAgents, loadAgentDrawer, setActiveModal, setDrawerCollapsed } =
     useApp();
 
   const agent = drawerAgent || allAgents[currentAgentId] || {};
@@ -53,6 +53,13 @@ export default function Drawer({ engineRef }) {
           </div>
         </div>
         <div className="drawer-actions">
+          <button
+            className="action-btn"
+            onClick={() => setDrawerCollapsed(true)}
+            title="Collapse side panel"
+          >
+            <i className="fa-solid fa-chevron-right" />
+          </button>
           <button
             className="action-btn"
             onClick={togglePause}
