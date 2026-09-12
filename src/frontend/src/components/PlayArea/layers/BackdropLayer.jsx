@@ -1,8 +1,10 @@
 // Layer 0 — soft adventure-map backdrop (Image 1 feel). Pure SVG, no logic.
+// Sized 100%x100% with a stretched aspect: washes are organic blobs, so
+// the backdrop exactly fills any container on every resize with no crop.
 export default function BackdropLayer() {
   return (
     <div className="scene-layer backdrop" aria-hidden="true">
-      <svg width="1600" height="1000" viewBox="0 0 1600 1000" style={{ display: 'block', width: '100%', height: '100%' }}>
+      <svg width="100%" height="100%" viewBox="0 0 1600 1000" preserveAspectRatio="none" style={{ display: 'block' }}>
         <rect width="1600" height="1000" fill="#FFF8DC" />
         {/* soft peach wash left + mint wash bottom-right */}
         <ellipse cx="150" cy="620" rx="150" ry="330" fill="#F2C18D" opacity="0.45" />

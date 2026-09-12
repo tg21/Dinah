@@ -1,6 +1,7 @@
-// Deterministic meadow placement so agents don't reshuffle every render.
-// Overseers rest on the soft terrace (y~170); project parties camp around
-// the tavern green. Small per-id jitter keeps parties organic.
+// Deterministic meadow placement as FRACTIONS of the container (0..1).
+// The scene multiplies by the real pixel box on every resize, so the whole
+// meadow re-renders to exactly fill available space — nothing is ever
+// cropped (cover-zoom) or letterboxed, and sprites never distort.
 function hash(str) {
   let h = 2166136261;
   for (let i = 0; i < String(str).length; i++) {
@@ -11,11 +12,11 @@ function hash(str) {
 }
 
 const OVERSEER_SPOTS = [
-  { x: 560, y: 165 },
-  { x: 680, y: 170 },
-  { x: 800, y: 168 },
-  { x: 920, y: 170 },
-  { x: 1040, y: 165 }
+  { x: 560 / 1600, y: 165 / 1000 },
+  { x: 680 / 1600, y: 170 / 1000 },
+  { x: 800 / 1600, y: 168 / 1000 },
+  { x: 920 / 1600, y: 170 / 1000 },
+  { x: 1040 / 1600, y: 165 / 1000 }
 ];
 
 function overseerIndex(id) {
@@ -24,32 +25,35 @@ function overseerIndex(id) {
   return i === -1 ? hash(id) % OVERSEER_SPOTS.length : i;
 }
 
+function isOverseer(agentId, agent = {}) {
+  if (agent.project === 'global') return true;
+  return ['ceo-warlock', 'hr-mind-flayer', 'staff-engineer-paladin', 'senior-analyst-diviner', 'marshall-agent-system-inspector'].includes(agentId);
+}
+
+// Home-zone bounds as fractions { x0, x1, y0, y1 }.
+export function boundsFor(agentId, agent = {}) {
+  if (isOverseer(agentId, agent)) return { x0: 0.2, x1: 0.8, y0: 0.11, y1: 0.25 };
+  return { x0: 0.06, x1: 0.94, y0: 0.38, y1: 0.92 };
+}
+
 export function positionForAgent(agentId, agent = {}, index = 0) {
   const h = hash(agentId);
-  const isOverseer = agent.project === 'global' || overseerSpot(agentId, agent) !== null;
-  if (isOverseer) {
+  if (isOverseer(agentId, agent)) {
     const spot = OVERSEER_SPOTS[overseerIndex(agentId)];
-    return { x: spot.x + ((h % 40) - 20), y: spot.y + ((h % 16) - 8) };
+    return { x: spot.x + ((h % 40) - 20) / 1600, y: spot.y + ((h % 16) - 8) / 1000 };
   }
   const role = String(agent.role || '');
-  let base = { x: 770, y: 620 };
-  if (role.includes('manager')) base = { x: 770, y: 600 };
-  else if (role.includes('wizard')) base = { x: 520, y: 600 };
-  else if (role.includes('cleric')) base = { x: 800, y: 580 };
-  else if (role.includes('sorcerer')) base = { x: 1080, y: 600 };
-  else if (role.includes('rogue')) base = { x: 610, y: 720 };
-  else if (role.includes('warmage')) base = { x: 960, y: 710 };
+  let base = { x: 770 / 1600, y: 620 / 1000 };
+  if (role.includes('manager')) base = { x: 770 / 1600, y: 600 / 1000 };
+  else if (role.includes('wizard')) base = { x: 520 / 1600, y: 600 / 1000 };
+  else if (role.includes('cleric')) base = { x: 800 / 1600, y: 580 / 1000 };
+  else if (role.includes('sorcerer')) base = { x: 1080 / 1600, y: 600 / 1000 };
+  else if (role.includes('rogue')) base = { x: 610 / 1600, y: 720 / 1000 };
+  else if (role.includes('warmage')) base = { x: 960 / 1600, y: 710 / 1000 };
   const col = index % 4;
   const row = Math.floor(index / 4);
   return {
-    x: base.x + (col - 1.5) * 70 + ((h % 36) - 18),
-    y: base.y + row * 64 + ((h % 28) - 14)
+    x: base.x + ((col - 1.5) * 70 + ((h % 36) - 18)) / 1600,
+    y: base.y + (row * 64 + ((h % 28) - 14)) / 1000
   };
-}
-
-function overseerSpot(agentId, agent) {
-  if (agent.project === 'global') return true;
-  const known = ['ceo-warlock', 'hr-mind-flayer', 'staff-engineer-paladin', 'senior-analyst-diviner', 'marshall-agent-system-inspector'];
-  if (known.includes(agentId)) return true;
-  return null;
 }

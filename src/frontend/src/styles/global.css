@@ -174,8 +174,8 @@ body.rail-collapsed .play-area { left: 26px; }
   border-top: none;
 }
 body.drawer-collapsed .play-area { right: 0; }
-.play-scene { position: absolute; inset: 0; overflow: hidden; }
-.play-scene-inner { position: absolute; left: 0; top: 0; width: 1600px; height: 1000px; transform-origin: 0 0; }
+.play-scene { position: absolute; inset: 0; overflow: hidden; background: var(--parchment); }
+.play-scene-inner { position: absolute; inset: 0; transform-origin: 0 0; }
 .scene-layer { position: absolute; inset: 0; }
 .scene-layer.backdrop { z-index: 0; }
 .scene-layer.objects { z-index: 1; pointer-events: none; }
