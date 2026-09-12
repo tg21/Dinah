@@ -4,6 +4,36 @@ import { AGENT_TEMPLATES_DIR, APP_DIR, PORT, TOOL_DIR } from '../config.js';
 
 const REQUIRED_FIELDS = ['name', 'job', 'basePrompt'];
 
+// Optional cosmetic sprite block in agent-templates/<role>.json:
+// { hat, tool, ears }. Unknown values are ignored (frontend falls back),
+// so sprite edits can never break staffing validation or prompts.
+const SPRITE_VALUES = {
+  hat: ['crown', 'tentacles', 'helm', 'hood', 'visor', 'feather', 'pointed', 'halo', 'glow', 'horns', 'cap', 'beret', 'goggles', 'spectacles', 'beads', 'wreath', 'mask', 'mitre', 'skull', 'cape', 'none'],
+  tool: ['scepter', 'orb', 'sword', 'badge', 'lute', 'staff', 'hammer', 'daggers', 'bow', 'wrench', 'scroll', 'quill', 'flask', 'chalice', 'scythe', 'axe', 'brush'],
+  ears: ['round', 'pointy', 'fins', 'none']
+};
+
+export function sanitizeSprite(sprite) {
+  if (!sprite || typeof sprite !== 'object') return null;
+  const clean = {};
+  for (const key of Object.keys(SPRITE_VALUES)) {
+    clean[key] = SPRITE_VALUES[key].includes(sprite[key]) ? sprite[key] : null;
+  }
+  if (!clean.hat && !clean.tool && !clean.ears) return null;
+  return clean;
+}
+
+// Role → sanitized sprite map for the UI. Roles without a usable sprite
+// block are omitted; the frontend falls back to its default silhouette.
+export function getRoleSprites() {
+  const out = {};
+  for (const definition of listAgentDefinitions()) {
+    const sprite = sanitizeSprite(definition.sprite);
+    if (sprite) out[definition.name] = sprite;
+  }
+  return out;
+}
+
 function definitionPath(role) {
   if (!/^[a-z0-9-]+$/.test(role)) return null;
   return path.join(AGENT_TEMPLATES_DIR, `${role}.json`);

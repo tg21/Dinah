@@ -1,4 +1,5 @@
 export { default as projectRoutes } from './projects.js';
+export { default as roleRoutes } from './roles.js';
 export { default as modelRoutes } from './models.js';
 export { default as mcpRoutes } from './mcps.js';
 export { default as agentRoutes } from './agents.js';

@@ -48,6 +48,7 @@ export const api = {
     }),
   getModels: () => req('/api/models'),
   getHarnesses: () => req('/api/harnesses'),
+  getRoles: () => req('/api/roles'),
   getMcps: (agentId) => req(agentId ? `/api/mcps?agentId=${encodeURIComponent(agentId)}` : '/api/mcps'),
   getEvents: () => req('/api/events'),
   // Live event stream (SSE, same origin/port). Resolves roster/message

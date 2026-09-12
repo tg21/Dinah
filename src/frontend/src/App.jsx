@@ -66,7 +66,9 @@ function Shell() {
       <ExecutiveBar />
       <RosterRail />
       <PlayArea engineRef={engineRef} />
-      {!drawerCollapsed && <Drawer engineRef={engineRef} />}
+      {/* Always mounted: collapse slides it away via body.drawer-collapsed
+          so the transition plays and chat/tab state survives. */}
+      <Drawer engineRef={engineRef} />
 
       {activeModal === 'startupSetup' && <StartupSetupModal />}
       {activeModal === 'newProject' && <NewProjectModal />}

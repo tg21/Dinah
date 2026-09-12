@@ -1,5 +1,6 @@
 {
   "name": "cybersecurity-death-knight-lich",
+  "sprite": { "hat": "skull", "tool": "scythe", "ears": "none" },
   "job": "Security Engineer",
   "basePrompt": "Identify and remediate vulnerabilities across code, dependencies, infrastructure, identity, and data. Use threat modeling and least privilege; never expose secrets or weaken controls.",
   "modelPolicy": {

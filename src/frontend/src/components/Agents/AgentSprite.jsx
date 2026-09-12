@@ -4,70 +4,118 @@ import { appearanceForAgent } from './appearance.js';
 
 // Bitmap-style adventurer rendered as pixel SVG. All cosmetic choices come
 // from props (palette + silhouette) — no hardcoded colors here.
-export default function AgentSprite({ agent, agentId, selected, thought, onClick, style }) {
+// activity: 'idle' | 'walk' | 'cast' | 'flourish' | 'sleep' (driven by
+// AgentsLayer/PlayAreaScene from agent status + wander state).
+// Thought bubbles are hover-only; a soft ping dot marks agents with
+// something to say.
+function hashId(s) {
+  let h = 0;
+  const str = String(s || 'agent');
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+export default function AgentSprite({
+  agent,
+  agentId,
+  silhouette: silhouetteProp,
+  activity = 'idle',
+  facing = 1,
+  selected,
+  thought,
+  onClick,
+  style
+}) {
   const appearance = appearanceForAgent(agent, agentId);
   const palette = paletteById(appearance.paletteId);
-  const silhouette = silhouetteForRole(agent.role);
+  const silhouette = silhouetteProp || silhouetteForRole(agent.role);
   const status = agent.status || 'active';
   const awaiting = status === 'awaiting-confirmation';
   const needsUser = status === 'awaiting-user';
   const paused = status === 'paused';
+  const effectiveActivity = paused ? 'sleep' : activity;
   const ringColor = needsUser ? '#C9563C' : awaiting ? '#4E8D8B' : 'transparent';
   const shortThought = thought && thought.length > 90 ? `${thought.slice(0, 87)}…` : thought;
+  const hasThought = Boolean(shortThought) && !paused;
+  const delay = `${(hashId(agentId) % 12) / 10}s`;
 
   return (
     <div
-      className={`agent-sprite${selected ? ' selected' : ''}`}
-      style={style}
+      className={`agent-sprite${selected ? ' selected' : ''} activity-${effectiveActivity}`}
+      style={{ ...style, '--anim-delay': delay }}
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
       title={agent.name || agentId}
     >
       <div className="sprite-ring" style={ringColor !== 'transparent' ? { borderColor: ringColor } : undefined} />
-      <svg className="sprite-svg" viewBox="0 0 48 64" width="72" height="96" shapeRendering="crispEdges">
-        {/* legs */}
-        <rect x="18" y="46" width="5" height="10" fill={palette.pants} />
-        <rect x="25" y="46" width="5" height="10" fill={palette.pants} />
-        <rect x="17" y="54" width="7" height="3" fill="#4A3B32" />
-        <rect x="24" y="54" width="7" height="3" fill="#4A3B32" />
-        {/* tunic */}
-        <rect x="15" y="30" width="18" height="17" fill={palette.cloak} />
-        <rect x="15" y="30" width="18" height="3" fill={palette.trim} />
-        <rect x="15" y="44" width="18" height="3" fill={palette.trim} />
-        <rect x="23" y="33" width="2" height="11" fill={palette.trim} opacity="0.6" />
-        {/* arms */}
-        <rect x="11" y="32" width="4" height="11" fill={palette.cloak} />
-        <rect x="33" y="32" width="4" height="11" fill={palette.cloak} />
-        <rect x="11" y="41" width="4" height="3" fill={palette.skin} />
-        <rect x="33" y="41" width="4" height="3" fill={palette.skin} />
-        {/* head */}
-        <rect x="17" y="16" width="14" height="13" fill={palette.skin} />
-        {/* ears */}
-        {silhouette.ears === 'pointy' && (
-          <>
-            <rect x="14" y="20" width="3" height="3" fill={palette.skin} />
-            <rect x="31" y="20" width="3" height="3" fill={palette.skin} />
-          </>
-        )}
-        {silhouette.ears === 'fins' && (
-          <>
-            <rect x="14" y="18" width="3" height="6" fill={palette.trim} />
-            <rect x="31" y="18" width="3" height="6" fill={palette.trim} />
-          </>
-        )}
-        {/* eyes */}
-        <rect x="20" y="21" width="3" height="3" fill="#4A3B32" />
-        <rect x="26" y="21" width="3" height="3" fill="#4A3B32" />
-        {/* hair fringe variant */}
-        {appearance.variant === 1 && <rect x="17" y="16" width="14" height="3" fill={palette.hat} />}
-        {appearance.variant === 2 && (<><rect x="17" y="16" width="3" height="6" fill={palette.hat} /><rect x="28" y="16" width="3" height="6" fill={palette.hat} /></>)}
-        <Hat silhouette={silhouette} palette={palette} />
-        <Tool silhouette={silhouette} palette={palette} />
-        {paused && <rect x="15" y="16" width="18" height="30" fill="#4A3B32" opacity="0.25" />}
-      </svg>
+      <div className={`sprite-flip${facing < 0 ? ' flipped' : ''}`}>
+        <svg className="sprite-svg" viewBox="0 0 48 64" width="72" height="96" shapeRendering="crispEdges">
+          {/* legs (two-frame step when walking) */}
+          <g className="leg leg-a">
+            <rect x="18" y="46" width="5" height="10" fill={palette.pants} />
+            <rect x="17" y="54" width="7" height="3" fill="#4A3B32" />
+          </g>
+          <g className="leg leg-b">
+            <rect x="25" y="46" width="5" height="10" fill={palette.pants} />
+            <rect x="24" y="54" width="7" height="3" fill="#4A3B32" />
+          </g>
+          {/* tunic */}
+          <rect x="15" y="30" width="18" height="17" fill={palette.cloak} />
+          <rect x="15" y="30" width="18" height="3" fill={palette.trim} />
+          <rect x="15" y="44" width="18" height="3" fill={palette.trim} />
+          <rect x="23" y="33" width="2" height="11" fill={palette.trim} opacity="0.6" />
+          {/* idle arm */}
+          <rect x="11" y="32" width="4" height="11" fill={palette.cloak} />
+          <rect x="11" y="41" width="4" height="3" fill={palette.skin} />
+          {/* tool arm (swings on cast / flourish) */}
+          <g className="tool-arm">
+            <rect x="33" y="32" width="4" height="11" fill={palette.cloak} />
+            <rect x="33" y="41" width="4" height="3" fill={palette.skin} />
+            <Tool silhouette={silhouette} palette={palette} />
+            {(effectiveActivity === 'cast') && (
+              <circle className="hand-glow" cx="37" cy="30" r="6" fill={palette.trim} />
+            )}
+          </g>
+          {/* head */}
+          <rect x="17" y="16" width="14" height="13" fill={palette.skin} />
+          {/* ears */}
+          {silhouette.ears === 'pointy' && (
+            <>
+              <rect x="14" y="20" width="3" height="3" fill={palette.skin} />
+              <rect x="31" y="20" width="3" height="3" fill={palette.skin} />
+            </>
+          )}
+          {silhouette.ears === 'fins' && (
+            <>
+              <rect x="14" y="18" width="3" height="6" fill={palette.trim} />
+              <rect x="31" y="18" width="3" height="6" fill={palette.trim} />
+            </>
+          )}
+          {/* eyes (closed when sleeping) */}
+          {effectiveActivity === 'sleep' ? (
+            <>
+              <rect x="20" y="22" width="3" height="1.5" fill="#4A3B32" />
+              <rect x="26" y="22" width="3" height="1.5" fill="#4A3B32" />
+            </>
+          ) : (
+            <>
+              <rect x="20" y="21" width="3" height="3" fill="#4A3B32" />
+              <rect x="26" y="21" width="3" height="3" fill="#4A3B32" />
+            </>
+          )}
+          {/* hair fringe variant */}
+          {appearance.variant === 1 && <rect x="17" y="16" width="14" height="3" fill={palette.hat} />}
+          {appearance.variant === 2 && (<><rect x="17" y="16" width="3" height="6" fill={palette.hat} /><rect x="28" y="16" width="3" height="6" fill={palette.hat} /></>)}
+          <Hat silhouette={silhouette} palette={palette} />
+        </svg>
+      </div>
       <div className="sprite-shadow" />
+      {hasThought && <span className="sprite-ping" title="Has something to say — hover to read" />}
+      {effectiveActivity === 'sleep' && (
+        <span className="sprite-zzz" aria-hidden="true"><i>z</i><i>z</i><i>z</i></span>
+      )}
       <div className="sprite-name">{agent.name || agentId}</div>
       {(awaiting || needsUser || paused) && (
-        <div className="sprite-status-line">{awaiting ? 'awaiting summons' : needsUser ? 'needs your answer' : 'resting'}</div>
+        <div className="sprite-status-line">{awaiting ? 'awaiting summons' : needsUser ? 'needs your answer' : 'sleeping'}</div>
       )}
       {shortThought && !paused && <div className="sprite-bubble">{shortThought}</div>}
     </div>
@@ -138,7 +186,7 @@ function Tool({ silhouette, palette }) {
     case 'chalice': return (<><rect x="34" y="26" width="6" height="4" fill={palette.trim} /><rect x="36" y="30" width="2" height="6" fill="#9A7433" /></>);
     case 'scythe': return (<><rect x="36" y="16" width="2.5" height="30" fill="#4A3B32" /><rect x="30" y="14" width="9" height="3" fill="#B9C4C4" /></>);
     case 'scepter': return (<><rect x="36" y="18" width="2.5" height="28" fill="#9A7433" /><rect x="34" y="14" width="6.5" height="5" fill="#C9A227" /></>);
-    case 'badge': return (<rect x="12" y="34" width="5" height="5" fill="#C9A227" stroke="#4A3B32" strokeWidth="0.75" />);
+    case 'badge': return (<rect x="12" y="34" width="5" height="5" fill="#FFFDF0" stroke="#4A3B32" strokeWidth="0.75" />);
     default: return null;
   }
 }

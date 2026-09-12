@@ -21,17 +21,20 @@ export function AppProvider({ children }) {
   const [messageActivity, setMessageActivity] = useState([]);
   const [mailFlights, setMailFlights] = useState([]);
   const [selectedCommunication, setSelectedCommunication] = useState(null);
+  const [roleSprites, setRoleSprites] = useState({});
 
   const loadModelsHarnessesMcps = useCallback(async () => {
     try {
-      const [m, h, mc] = await Promise.all([
+      const [m, h, mc, rs] = await Promise.all([
         api.getModels().catch(() => ({ models: [] })),
         api.getHarnesses().catch(() => ({ harnesses: [] })),
-        api.getMcps().catch(() => ({ mcps: [] }))
+        api.getMcps().catch(() => ({ mcps: [] })),
+        api.getRoles().catch(() => ({ roles: {} }))
       ]);
       setModels(m.models || []);
       setHarnesses(h.harnesses || []);
       setMcps(mc.mcps || []);
+      setRoleSprites(rs.roles || {});
       // Keep the user's explicit choice when still detected; otherwise prefer
       // opencode, else the first detected harness — never a hardcoded vendor.
       const ids = (h.harnesses || []).map((x) => x.id);
@@ -195,6 +198,7 @@ export function AppProvider({ children }) {
       messageActivity,
       mailFlights,
       selectedCommunication,
+      roleSprites,
       setCurrentAgentId,
       setCurrentProjectId,
       setAllAgents,
@@ -233,6 +237,7 @@ export function AppProvider({ children }) {
       messageActivity,
       mailFlights,
       selectedCommunication,
+      roleSprites,
       loadModelsHarnessesMcps,
       loadProjects,
       loadAgents,

@@ -11,6 +11,7 @@ import {
   messageRoutes,
   modelRoutes,
   projectRoutes,
+  roleRoutes,
   systemRoutes,
   orchestrationRoutes
 } from './routes/index.js';
@@ -50,6 +51,7 @@ export function createApp() {
 
   // Mount domain routers (each router owns its own path prefixes)
   app.use(projectRoutes);
+  app.use(roleRoutes);
   app.use(modelRoutes);
   app.use(mcpRoutes);
   app.use(agentRoutes);
