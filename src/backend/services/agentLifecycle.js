@@ -227,6 +227,7 @@ export function confirmAgentSummoning(agentId, updatedParams = {}) {
 
   // Apply any final tweaks from confirmation dialog
   if (updatedParams.name) agent.name = updatedParams.name;
+  const providerChanged = Boolean(updatedParams.model || updatedParams.harness);
   if (updatedParams.model) {
     agent.model = updatedParams.model;
     const modelCap = getModelById(updatedParams.model);
@@ -248,6 +249,9 @@ export function confirmAgentSummoning(agentId, updatedParams = {}) {
 
   agent.status = 'active';
   agent.costEstimation = calculateAgentCostEstimation(agent.role, agent.model, agent.effortLevel);
+  // Awaiting records have no harness turns yet, but a confirm-time
+  // provider/model switch must still not inherit a stale session id.
+  if (providerChanged && agent.harnessSessions) delete agent.harnessSessions;
   saveHrSystem(hrSystem);
 
   // Generic path: durable HR → agent confirmation. Queue projection handles

@@ -6,8 +6,79 @@ import { loadHrSystem, saveHrSystem } from './hrService.js';
 import { appendAgentThought } from './messageService.js';
 import { broadcastAgentEvent } from './eventBus.js';
 import { createMcpInvocationConfig, mcpPromptContext, cleanupMcpInvocation } from '../mcp/index.js';
-import { buildAgentPrompt } from './agentDefinitions.js';
+import { buildAgentPrompt, buildContinuationPrompt } from './agentDefinitions.js';
 import { ensureProjectManager } from './agentLifecycle.js';
+
+// ------------------------------------------------------------
+// Harness session reuse (plan 01 follow-up).
+// Native sessions survive server restarts because the session id lives on
+// the HR record (`agent.harnessSessions.<key>`, persisted in
+// hr-system.json), not in process memory. Every follow-up message reuses
+// the same session via the harness's native resume flag (`opencode -s`,
+// `codex exec resume`, `agy --conversation`); only a missing/stale id (or
+// a harness/model switch, which clears the map) starts a new session.
+// CLIs are one-shot processes by design — "reuse" means resuming the
+// server-side session, not keeping a process alive.
+// ------------------------------------------------------------
+const SESSION_HARNESS_KEYS = {
+  opencode: 'opencode',
+  codex: 'codex',
+  agy: 'agy',
+  antigravity: 'agy'
+};
+
+export function sessionKeyForHarness(harness) {
+  return SESSION_HARNESS_KEYS[harness] || null;
+}
+
+export function getStoredSessionId(agentId, harness) {
+  const key = sessionKeyForHarness(harness);
+  if (!key) return null;
+  try {
+    return loadHrSystem()[agentId]?.harnessSessions?.[key] || null;
+  } catch {
+    return null;
+  }
+}
+
+export function persistHarnessSession(agentId, harness, sessionId) {
+  if (!sessionId) return;
+  const key = sessionKeyForHarness(harness);
+  if (!key) return;
+  try {
+    const hrSystem = loadHrSystem();
+    if (!hrSystem[agentId]) return;
+    hrSystem[agentId].harnessSessions = { ...(hrSystem[agentId].harnessSessions || {}), [key]: sessionId };
+    saveHrSystem(hrSystem);
+  } catch {
+    /* session tracking must never break a harness turn */
+  }
+}
+
+export function clearHarnessSession(agentId, harness) {
+  const key = sessionKeyForHarness(harness);
+  if (!key) return;
+  try {
+    const hr = loadHrSystem();
+    if (hr[agentId]?.harnessSessions?.[key]) {
+      delete hr[agentId].harnessSessions[key];
+      saveHrSystem(hr);
+    }
+  } catch { /* best effort */ }
+}
+
+// Switching provider/model orphans the old native session (a resumed
+// thread would run under the wrong model), so drop all stored ids. Called
+// from agent update/confirm paths.
+export function clearAllHarnessSessions(agentId) {
+  try {
+    const hr = loadHrSystem();
+    if (hr[agentId]?.harnessSessions) {
+      delete hr[agentId].harnessSessions;
+      saveHrSystem(hr);
+    }
+  } catch { /* best effort */ }
+}
 
 export function resolveProjectDir(projectId, workspaceDir) {
   const projectDir = workspaceDir || getProjectFolder(projectId);
@@ -88,6 +159,30 @@ export function cancelHarnessAgent(agentId, signal = 'SIGTERM') {
   return child.kill(signal);
 }
 
+// Parse `agy --output-format json -p=...` output: a single JSON envelope
+// carrying the conversation id plus the assistant text. Falls back to raw
+// stdout when the output isn't JSON (older CLI / text mode).
+export function parseAgyJsonOutput(stdout) {
+  const raw = (stdout || '').trim();
+  if (!raw) return { output: raw, sessionId: null };
+  // Envelope may be preceded by warning lines ("conversation ... not
+  // found"); scan for the first JSON object line with a conversation_id.
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+    try {
+      const event = JSON.parse(trimmed);
+      if (typeof event.conversation_id === 'string') {
+        const text = typeof event.response === 'string' ? event.response.trim() : raw;
+        return { output: text || raw, sessionId: event.conversation_id };
+      }
+    } catch {
+      /* not the envelope line; keep scanning */
+    }
+  }
+  return { output: raw, sessionId: null };
+}
+
 export async function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvocation, workspaceDir) {
   const projectDir = resolveProjectDir(projectId, workspaceDir);
   const harnessBin = findHarnessBinary('agy') || findHarnessBinary('antigravity');
@@ -96,31 +191,55 @@ export async function spawnAntigravityAgent(projectId, prompt, agentId, mcpInvoc
     return simulateHarnessExecution('antigravity', projectId, prompt, agentId);
   }
 
-  try {
+  // Native session continuation (verified live 2026-09-12): `--output-format
+  // json` returns `{conversation_id, response, ...}`; passing the id back via
+  // `--conversation` resumes it (nonce recall confirmed, num_turns 2). A
+  // stale id only warns and starts a fresh conversation, so no retry — just
+  // persist whatever id comes back.
+  const storedSessionId = getStoredSessionId(agentId, 'agy');
+
+  const runOnce = async (sessionId) => {
     const hrSystem = loadHrSystem();
     const agent = hrSystem[agentId];
-    appendAgentThought(
-      agentId,
-      'ANTIGRAVITY_INVOKE',
-      `Invoking Antigravity CLI (agy) [${agent?.model || 'default'}] in ${projectDir}`
-    );
-    const args = [];
+    const args = ['--output-format', 'json'];
+    if (sessionId) args.push('--conversation', sessionId);
     if (agent?.model) args.push('--model', agent.model);
-    args.push('--dangerously-skip-permissions', '-p', prompt);
-    const { stdout } = await runHarnessProcess(harnessBin, args, {
+    args.push('--dangerously-skip-permissions', `-p=${prompt}`);
+    const { stdout, stderr } = await runHarnessProcess(harnessBin, args, {
       cwd: projectDir,
       env: { ...process.env, DND_MCP_CONFIG: mcpInvocation?.file || '' },
       agentId,
       harness: 'antigravity',
       processKey: agentId
     });
+    return { parsed: parseAgyJsonOutput(stdout), stderr };
+  };
+
+  try {
+    const hrSystem = loadHrSystem();
+    const agent = hrSystem[agentId];
+    appendAgentThought(
+      agentId,
+      'ANTIGRAVITY_INVOKE',
+      `Invoking Antigravity CLI (agy) [${agent?.model || 'default'}] in ${projectDir}` +
+        (storedSessionId ? ` (resuming conversation ${storedSessionId})` : ' (new conversation)')
+    );
+    const { parsed, stderr } = await runOnce(storedSessionId);
+    if (storedSessionId && parsed.sessionId && parsed.sessionId !== storedSessionId) {
+      appendAgentThought(agentId, 'ANTIGRAVITY_SESSION_RESET', `Stored conversation ${storedSessionId} not found; started ${parsed.sessionId}.`);
+    }
+    if (/conversation .* not found/i.test(String(stderr || ''))) {
+      appendAgentThought(agentId, 'ANTIGRAVITY_SESSION_RESET', `Stored conversation ${storedSessionId} not found; started a new conversation.`);
+    }
+    persistHarnessSession(agentId, 'agy', parsed.sessionId);
     appendAgentThought(agentId, 'ANTIGRAVITY_SUCCESS', `Antigravity CLI (agy) execution completed.`);
     return {
       success: true,
-      output: (stdout || '').trim(),
+      output: parsed.output,
       agentId,
       harness: 'antigravity',
-      model: agent?.model
+      model: agent?.model,
+      ...(parsed.sessionId ? { sessionId: parsed.sessionId } : {})
     };
   } catch (error) {
     appendAgentThought(agentId, 'ANTIGRAVITY_FALLBACK', `Harness note: ${error.message.slice(0, 80)}`);
@@ -166,8 +285,9 @@ export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocati
   // `opencode run --format json` emits per-event sessionIDs; passing a known
   // id back via `-s` resumes that agent's session. `-s` with an unknown id
   // errors ("Session not found") instead of creating, so the first turn runs
-  // without `-s` and persists the returned id for later turns.
-  const storedSessionId = loadHrSystem()[agentId]?.harnessSessions?.opencode || null;
+  // without `-s` and persists the returned id for later turns. The id lives
+  // on the HR record, so reuse survives server restarts.
+  const storedSessionId = getStoredSessionId(agentId, 'opencode');
 
   const runOnce = async (sessionId) => {
     const hrSystem = loadHrSystem();
@@ -190,17 +310,7 @@ export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocati
     return parseOpencodeJsonOutput(stdout);
   };
 
-  const persistSessionId = (sessionId) => {
-    if (!sessionId) return;
-    try {
-      const hrSystem = loadHrSystem();
-      if (!hrSystem[agentId]) return;
-      hrSystem[agentId].harnessSessions = { ...(hrSystem[agentId].harnessSessions || {}), opencode: sessionId };
-      saveHrSystem(hrSystem);
-    } catch {
-      /* session tracking must never break a harness turn */
-    }
-  };
+  const persistSessionId = (sessionId) => persistHarnessSession(agentId, 'opencode', sessionId);
 
   try {
     const hrSystem = loadHrSystem();
@@ -226,13 +336,7 @@ export async function spawnOpencodeAgent(projectId, prompt, agentId, mcpInvocati
       // Stale session id (e.g. pruned server-side): retry once as a new session.
       if (storedSessionId && /session not found/i.test(String(error.message || '') + String(error.stderr || ''))) {
         appendAgentThought(agentId, 'OPENCODE_SESSION_RESET', `Stored session ${storedSessionId} not found; starting a new session.`);
-        try {
-          const hr = loadHrSystem();
-          if (hr[agentId]?.harnessSessions?.opencode) {
-            delete hr[agentId].harnessSessions.opencode;
-            saveHrSystem(hr);
-          }
-        } catch { /* best effort */ }
+        clearHarnessSession(agentId, 'opencode');
         parsed = await runOnce(null);
       } else {
         throw error;
@@ -324,8 +428,9 @@ export async function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation,
   // Native session continuation (verified live 2026-09-11): `codex exec
   // --json` emits `thread.started` with a thread_id; `codex exec resume
   // <thread-id> <prompt>` continues it (nonce recall confirmed). A stale id
-  // exits 1 with "no rollout found", so retry once as a new thread.
-  const storedSessionId = loadHrSystem()[agentId]?.harnessSessions?.codex || null;
+  // exits 1 with "no rollout found", so retry once as a new thread. The id
+  // lives on the HR record, so reuse survives server restarts.
+  const storedSessionId = getStoredSessionId(agentId, 'codex');
 
   const runOnce = async (sessionId) => {
     const hrSystem = loadHrSystem();
@@ -350,17 +455,7 @@ export async function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation,
     return parseCodexJsonOutput(stdout);
   };
 
-  const persistSessionId = (sessionId) => {
-    if (!sessionId) return;
-    try {
-      const hrSystem = loadHrSystem();
-      if (!hrSystem[agentId]) return;
-      hrSystem[agentId].harnessSessions = { ...(hrSystem[agentId].harnessSessions || {}), codex: sessionId };
-      saveHrSystem(hrSystem);
-    } catch {
-      /* session tracking must never break a harness turn */
-    }
-  };
+  const persistSessionId = (sessionId) => persistHarnessSession(agentId, 'codex', sessionId);
 
   try {
     const hrSystem = loadHrSystem();
@@ -378,13 +473,7 @@ export async function spawnCodexAgent(projectId, prompt, agentId, mcpInvocation,
       // Stale thread id (e.g. pruned server-side): retry once as a new thread.
       if (storedSessionId && /no rollout found|not found/i.test(String(error.message || '') + String(error.stderr || ''))) {
         appendAgentThought(agentId, 'CODEX_SESSION_RESET', `Stored thread ${storedSessionId} not found; starting a new thread.`);
-        try {
-          const hr = loadHrSystem();
-          if (hr[agentId]?.harnessSessions?.codex) {
-            delete hr[agentId].harnessSessions.codex;
-            saveHrSystem(hr);
-          }
-        } catch { /* best effort */ }
+        clearHarnessSession(agentId, 'codex');
         parsed = await runOnce(null);
       } else {
         throw error;
@@ -498,15 +587,24 @@ export function simulateHarnessExecution(harness, projectId, prompt, agentId) {
 export async function spawnHarnessAgent(harness = 'opencode', projectId, prompt, agentId, options = {}) {
   const agent = loadHrSystem()[agentId] || { role: agentId, name: agentId };
   const mcpInvocation = createMcpInvocationConfig(agent, agentId, projectId);
-  const effectivePrompt = buildAgentPrompt(
-    agent.role || agentId,
-    prompt,
-    { ...agent, project: projectId },
-    {
-      workspaceDir: options.workspaceDir,
-      includeToolRoot: options.includeToolRoot !== false
-    }
-  ) + mcpPromptContext(agent, mcpInvocation);
+  // Session reuse: the first turn bootstraps the native session with the full
+  // role prompt; follow-ups resume that session, so they send only the new
+  // task (the session already holds the bootstrap). The fresh per-turn MCP
+  // context is still appended in both cases because the manifest path is
+  // token-scoped per invocation.
+  const isResume = options.resume !== false && !!getStoredSessionId(agentId, harness);
+  const basePrompt = isResume
+    ? buildContinuationPrompt(prompt, { ...agent, project: projectId }, { workspaceDir: options.workspaceDir, project: projectId })
+    : buildAgentPrompt(
+      agent.role || agentId,
+      prompt,
+      { ...agent, project: projectId },
+      {
+        workspaceDir: options.workspaceDir,
+        includeToolRoot: options.includeToolRoot !== false
+      }
+    );
+  const effectivePrompt = basePrompt + mcpPromptContext(agent, mcpInvocation);
   try {
     switch (harness) {
       case 'antigravity':

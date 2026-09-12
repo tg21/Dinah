@@ -86,6 +86,22 @@ export function buildAgentPrompt(role, task, agent = {}, options = {}) {
   return `${basePrompt}\n\nRuntime context:\n${runtime}\n\nTask:\n${task}`;
 }
 
+// Continuation prompt for resumed harness sessions (plan 01 session reuse).
+// A resumed native session already holds the full base prompt, staffable
+// roster, and workspace context from its first turn, so re-injecting the
+// whole bootstrap on every follow-up only bloats context and risks
+// confusing the model with duplicate system instructions. Continuations send
+// just identity + the new task; the caller appends the fresh per-turn MCP
+// context (token-scoped manifest path) separately.
+export function buildContinuationPrompt(task, agent = {}, options = {}) {
+  const header = [
+    `Continuing as ${agent.role || 'specialist'} (${agent.name || 'agent'}) in ${agent.project || options.project || 'global'}.`,
+    agent.effortLevel ? `Effort level: ${agent.effortLevel}` : null,
+    agent.promptOverride ? `Active specialization override: ${agent.promptOverride}` : null
+  ].filter(Boolean).join(' ');
+  return `${header}\n\nTask:\n${task}`;
+}
+
 export function listAgentDefinitions() {
   if (!fs.existsSync(AGENT_TEMPLATES_DIR)) return [];
   return fs.readdirSync(AGENT_TEMPLATES_DIR)

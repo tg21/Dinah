@@ -1,23 +1,22 @@
-# TODO — harness session-resume limitations (plan 01 follow-up)
+# DONE — harness session-resume (plan 01 follow-up)
 
-Recorded 2026-09-11 after live probes. OpenCode (`-s`) and Codex
-(`exec resume`) have native resume wired in `src/backend/services/harnessRunner.js`
-and verified live (nonce recall). Everything below is still one-shot.
+Recorded 2026-09-11 after live probes; agy closed out 2026-09-12.
 
-## 1. `agy` (Antigravity) — blocked on quota, format unverified
-- Flags exist: `-c/--continue`, `--conversation <ID>`, `-p/--print`,
-  `--output-format json|stream-json`.
-- Live probe 2026-09-11 failed with `Individual quota reached … Resets in 23h`,
-  so the conversation-ID envelope was never observed.
-- TODO: when quota returns, run a print turn with `--output-format json`,
-  confirm where the conversation ID appears, mirror the
-  `parseOpencodeJsonOutput`/`parseCodexJsonOutput` pattern
-  (capture → persist on `agent.harnessSessions.agy` → `--conversation` on later
-  turns → stale-ID retry), add parser unit tests in
-  `tests/backend/current-issues-phase2-01.test.js`, and verify with a nonce
-  recall like the opencode/codex ones.
-- Rule: never wire the parser blind — an unverified envelope risks breaking the
-  currently working one-shot path.
+OpenCode (`-s`), Codex (`exec resume`), and `agy` (`--conversation`) all have
+native resume wired in `src/backend/services/harnessRunner.js` with ids
+persisted on `agent.harnessSessions` (survives restarts), stale-id recovery,
+provider-switch invalidation, and compact continuation prompts on resume
+(`buildContinuationPrompt` in `agentDefinitions.js`). Parser unit tests live
+in `tests/backend/harness-session-reuse.test.js` (agy) and
+`tests/backend/current-issues-phase2-01.test.js` (opencode/codex).
+
+## 1. `agy` (Antigravity) — DONE 2026-09-12
+- Envelope verified live: `agy --output-format json -p='...'` returns
+  `{conversation_id, status, response, ...}`; `--conversation <ID>` resumes
+  (nonce recall confirmed, `num_turns` 2, same id returned).
+- Stale id only warns (`conversation "..." not found`) and starts a fresh
+  conversation — no retry needed, just persist the returned id and log
+  `ANTIGRAVITY_SESSION_RESET`.
 
 ## 2. claude / gemini / ollama CLIs — binaries absent on this host
 - `which claude gemini ollama` all miss, so these adapters always take the
