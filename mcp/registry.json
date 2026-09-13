@@ -31,30 +31,6 @@
         {"name": "release_message", "description": "Release a delivery back to the queue."},
         {"name": "get_message_status", "description": "Inspect delivery status and attempts."}
       ]
-    },
-    {
-      "id": "io.github.arifulislamat-database-mcp-sqlite",
-      "name": "io.github.arifulislamat/database-mcp-sqlite",
-      "description": "MCP server for SQLite databases. Read-only by default, row caps, statement timeouts.",
-      "version": "0.4.2",
-      "source": "official-mcp-registry",
-      "serverName": "io.github.arifulislamat/database-mcp-sqlite",
-      "package": "@database-mcp/sqlite",
-      "repository": {
-        "url": "https://github.com/arifulislamat/database-mcp",
-        "source": "github"
-      },
-      "websiteUrl": null,
-      "command": "npx",
-      "args": [
-        "--prefix",
-        "servers/io.github.arifulislamat-database-mcp-sqlite",
-        "--no-install",
-        "@database-mcp/sqlite"
-      ],
-      "env": {},
-      "tools": [],
-      "installedAt": "2026-09-06T17:21:43.888Z"
     }
   ]
 }

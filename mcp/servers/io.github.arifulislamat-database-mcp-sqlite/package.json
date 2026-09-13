@@ -1,5 +1,0 @@
-{
-  "dependencies": {
-    "@database-mcp/sqlite": "^0.4.2"
-  }
-}
