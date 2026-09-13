@@ -1,5 +1,7 @@
 /**
  * Fallback simulation harness when no external AI harness is installed on host.
+ * If you see messages from this then something went wrong (e.g- you ran out of credit)
+ * TODO: Implement a feature for harness/model preference list in future, so that it works seamlessly
  */
 export function getSystemSimulatorModels() {
   return [

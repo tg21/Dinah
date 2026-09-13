@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import {
   createProjectFolder,
+  isValidBiome,
   listProjects,
   loadProjectsConfig,
+  PROJECT_BIOMES,
   saveProjectsConfig
 } from '../services/projectService.js';
 import { appendToSharedLog } from '../services/messageService.js';
@@ -14,7 +16,7 @@ const router = Router();
 router.get('/api/projects', (req, res) => {
   const projects = listProjects();
   const config = loadProjectsConfig();
-  res.json({ projects, config });
+  res.json({ projects, config, biomes: PROJECT_BIOMES });
 });
 
 // Project Configuration Endpoints
@@ -23,8 +25,9 @@ router.get('/api/projects/config', (req, res) => {
 });
 
 router.post('/api/projects/config', (req, res) => {
-  const { projectId, customPath, budgetUsd, maxTokens, description } = req.body;
+  const { projectId, customPath, budgetUsd, maxTokens, description, biome } = req.body;
   if (!projectId) return res.status(400).json({ error: 'projectId is required' });
+  const cleanBiome = isValidBiome(biome) ? biome : null;
 
   const cfg = loadProjectsConfig();
   const isNew = !cfg[projectId];
@@ -38,6 +41,7 @@ router.post('/api/projects/config', (req, res) => {
     if (budgetUsd !== undefined) fresh[projectId].budgetUsd = Number(budgetUsd);
     if (maxTokens !== undefined) fresh[projectId].maxTokens = Number(maxTokens);
     if (description) fresh[projectId].description = description;
+    if (cleanBiome) fresh[projectId].biome = cleanBiome;
     saveProjectsConfig(fresh);
     Object.assign(cfg, fresh);
   } else {
@@ -45,6 +49,7 @@ router.post('/api/projects/config', (req, res) => {
     if (budgetUsd !== undefined) cfg[projectId].budgetUsd = Number(budgetUsd);
     if (maxTokens !== undefined) cfg[projectId].maxTokens = Number(maxTokens);
     if (description) cfg[projectId].description = description;
+    if (cleanBiome) cfg[projectId].biome = cleanBiome;
     saveProjectsConfig(cfg);
   }
   const manager = ensureProjectManager(projectId);

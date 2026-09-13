@@ -3,7 +3,7 @@ import { authenticateOrchestrationToken } from '../services/orchestrationAuth.js
 import { loadHrSystem } from '../services/hrService.js';
 import { requestAgentSummoning, spawnAgentViaHr, ensureProjectManager, sendProjectBriefToManager } from '../services/agentLifecycle.js';
 import { createProjectFolder, loadProjectsConfig, saveProjectsConfig, slugifyProjectId } from '../services/projectService.js';
-import { askUser, canonicalAssignee } from '../services/coordinationService.js';
+import { askUser, informUser, canonicalAssignee } from '../services/coordinationService.js';
 import { spawnHarnessAgent } from '../services/harnessRunner.js';
 import { getProjectCoordination, recordTask, updateTaskProgress, reportBlocker, requestHelp, sendAgentMessage } from '../services/coordinationService.js';
 import {
@@ -104,7 +104,20 @@ router.post('/api/internal/orchestration/task', guard, async (req, res) => {
 router.post('/api/internal/orchestration/progress', guard, (req, res) => res.json({ task: updateTaskProgress(req.body) }));
 router.post('/api/internal/orchestration/blocker', guard, (req, res) => res.json({ blocker: reportBlocker(req.body) }));
 router.post('/api/internal/orchestration/help', guard, (req, res) => res.json({ request: requestHelp(req.body) }));
-router.post('/api/internal/orchestration/ask-user', guard, (req, res) => res.json({ request: askUser(req.body) }));
+router.post('/api/internal/orchestration/ask-user', guard, (req, res) => {
+  try {
+    res.json({ request: askUser(req.body) });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+router.post('/api/internal/orchestration/inform-user', guard, (req, res) => {
+  try {
+    res.json({ notice: informUser(req.body) });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 router.post('/api/internal/orchestration/message', guard, (req, res) => res.json(sendAgentMessage(req.body)));
 router.post('/api/internal/orchestration/project-message', guard, (req, res) => res.json(publishProjectMessage(req.body)));
 router.post('/api/internal/orchestration/subscribe', guard, (req, res) => res.json(subscribeToProject(req.body)));

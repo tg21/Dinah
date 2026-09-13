@@ -13,6 +13,18 @@ import { loadAgentDefinition, listAgentDefinitions } from './agentDefinitions.js
 import { enqueueDirectMessage } from './messageQueueService.js';
 import { getProjectCoordination } from './coordinationService.js';
 
+// Appearance is cosmetic-only: a soft-palette index + variant persisted on
+// the HR record so each agent looks unique and survives restarts. A
+// recreated agent gets a fresh look. Frontend resolves legacy records
+// without this field via a stable hash fallback.
+const APPEARANCE_PALETTE_COUNT = 8;
+export function randomAppearance() {
+  return {
+    paletteId: Math.floor(Math.random() * APPEARANCE_PALETTE_COUNT),
+    variant: Math.floor(Math.random() * 3)
+  };
+}
+
 // Plan 07: post-spawn wake. New agents start with an empty inbox, so the 5s
 // dispatcher (messageDispatcher.js, queued-inbox only) never wakes them even
 // when tasks sit `assigned`. Seed one inbox item — first assigned task, or a
@@ -156,6 +168,7 @@ export function requestAgentSummoning(role, projectId = 'project-alpha', customO
     role,
     project: cleanProjectId,
     status: 'awaiting-confirmation',
+    appearance: customOptions.appearance || randomAppearance(),
     harness,
     model,
     effortLevel,
@@ -180,10 +193,11 @@ export function requestAgentSummoning(role, projectId = 'project-alpha', customO
     `Model=${model} Harness=${harness} Effort=${effortLevel}` +
     (customOptions.promptOverride ? ` Specialization: ${String(customOptions.promptOverride).slice(0, 300)}` : '') +
     ` Awaiting Overseer confirmation for [${agentId}].`;
-  // Generic path: a durable DM from requester → HR. The queue projects into
-  // BOTH drawers, emits the courier event, and shows in message-activity, so
-  // no staffing-specific logging helper is needed. HR's harness turn consumes
-  // this inbox item; whatever HR then does is visible the same way.
+  // Generic path: a durable DM from requester → HR. The queue emits the
+  // courier event and shows in message-activity, so no staffing-specific
+  // logging helper is needed (chat drawers stay user-only). HR's harness
+  // turn consumes this inbox item; whatever HR then does is visible the
+  // same way.
   // Best-effort: staffing must never fail just because the queue write did.
   try {
     enqueueDirectMessage({
@@ -214,6 +228,7 @@ export function confirmAgentSummoning(agentId, updatedParams = {}) {
 
   // Apply any final tweaks from confirmation dialog
   if (updatedParams.name) agent.name = updatedParams.name;
+  const providerChanged = Boolean(updatedParams.model || updatedParams.harness);
   if (updatedParams.model) {
     agent.model = updatedParams.model;
     const modelCap = getModelById(updatedParams.model);
@@ -235,10 +250,13 @@ export function confirmAgentSummoning(agentId, updatedParams = {}) {
 
   agent.status = 'active';
   agent.costEstimation = calculateAgentCostEstimation(agent.role, agent.model, agent.effortLevel);
+  // Awaiting records have no harness turns yet, but a confirm-time
+  // provider/model switch must still not inherit a stale session id.
+  if (providerChanged && agent.harnessSessions) delete agent.harnessSessions;
   saveHrSystem(hrSystem);
 
-  // Generic path: durable HR → agent confirmation. Queue projection handles
-  // both drawers + courier event; no HR-specific audit helper.
+  // Generic path: durable HR → agent confirmation. The queue emits the
+  // courier event and shows in message-activity; no HR-specific audit helper.
   appendAgentThought(agentId, 'SUMMONED', `Materialized into arena by Overseer confirmation.`);
   try {
     enqueueDirectMessage({
@@ -315,6 +333,7 @@ export function spawnAgentViaHr(role, projectId = 'global', customName = null, o
     role,
     project: cleanProjectId,
     status: 'active',
+    appearance: options.appearance || randomAppearance(),
     harness,
     model,
     effortLevel,
@@ -334,7 +353,7 @@ export function spawnAgentViaHr(role, projectId = 'global', customName = null, o
 
   appendAgentThought(agentId, 'INITIALIZE', `Spawned into project ${cleanProjectId} by HR Mind Flayer.`);
   // Generic path: durable HR → new-agent notice (model/harness/effort in body).
-  // Visible in both drawers via queue projection; no HR-specific helper.
+  // Visible via message-activity + courier event; no HR-specific helper.
   try {
     enqueueDirectMessage({
       fromAgentId: 'hr-mind-flayer',

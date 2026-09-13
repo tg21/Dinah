@@ -30,10 +30,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ agentId, projectId })
     }),
-  sendMessage: ({ agentId, projectId, message, harness }) =>
+  sendMessage: ({ agentId, projectId, message, harness, questionId }) =>
     req('/handleSendMessage', {
       method: 'POST',
-      body: JSON.stringify({ agentId, projectId, message, harness })
+      body: JSON.stringify({ agentId, projectId, message, harness, questionId })
     }),
   getProjects: () => req('/api/projects'),
   startProject: ({ projectId, customPath, budgetUsd }) =>
@@ -41,13 +41,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ projectId, customPath, budgetUsd })
     }),
-  saveProjectConfig: ({ projectId, customPath, budgetUsd, maxTokens }) =>
+  saveProjectConfig: ({ projectId, customPath, budgetUsd, maxTokens, biome }) =>
     req('/api/projects/config', {
       method: 'POST',
-      body: JSON.stringify({ projectId, customPath, budgetUsd, maxTokens })
+      body: JSON.stringify({ projectId, customPath, budgetUsd, maxTokens, biome })
     }),
   getModels: () => req('/api/models'),
   getHarnesses: () => req('/api/harnesses'),
+  getRoles: () => req('/api/roles'),
   getMcps: (agentId) => req(agentId ? `/api/mcps?agentId=${encodeURIComponent(agentId)}` : '/api/mcps'),
   getEvents: () => req('/api/events'),
   // Live event stream (SSE, same origin/port). Resolves roster/message

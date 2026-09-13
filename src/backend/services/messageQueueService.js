@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { SHARED_STATE_DIR } from '../config.js';
-import { appendAgentMessage, appendToSharedLog } from './messageService.js';
+import { appendAgentThought, appendToSharedLog } from './messageService.js';
 import { broadcastAgentEvent } from './eventBus.js';
 
 const QUEUE_FILE = path.join(SHARED_STATE_DIR, 'message-queue.json');
@@ -54,6 +54,12 @@ function recoverExpired(state, now = Date.now()) {
   return changed;
 }
 
+function queueThought(agentId, step, thought) {
+  try {
+    appendAgentThought(agentId, step, thought);
+  } catch { /* BTS trace must never break delivery */ }
+}
+
 function publicMessage(message, delivery) {
   return {
     ...message,
@@ -65,25 +71,13 @@ function publicMessage(message, delivery) {
   };
 }
 
-function snippetBounded(text, len = 500) {
-  const s = String(text || '');
-  return s.length > len ? `${s.slice(0, len)}…` : s;
-}
-
-// Queue→projection (plan 02): mirror durable deliveries into the recipient's
-// msgs.json audit projection. Deduped by deliveryId; snippet-bounded.
-function projectDeliveryToDrawer(recipientAgentId, message, delivery, stage) {
-  try {
-    appendAgentMessage(recipientAgentId, {
-      from: message.senderAgentId,
-      project: message.projectId,
-      request: `[${stage}] ${snippetBounded(message.summary)}`,
-      role: 'agent',
-      deliveryId: `${delivery.deliveryId}#${stage}`,
-      messageId: message.messageId
-    });
-  } catch { /* projection must never break delivery */ }
-}
+// Chat boxes are user-interaction only (user messages, ask_user questions,
+// inform_user notices, direct harness replies). Durable agent-to-agent
+// traffic is observable via message-activity, courier events, and the shared
+// log — never via drawer projections, so no queue mechanics ([claimed],
+// [completed], reply echoes) leak into the user's chat view. Delivery
+// lifecycle instead leaves compact QUEUE_* thoughts on the recipient's BTS
+// panel (best-effort; must never break delivery).
 
 function createEnvelope({ projectId = 'global', senderAgentId, recipientAgentId = null, threadId = null, type = 'request', payload, summary, idempotencyKey }) {
   const sender = text(senderAgentId, 'senderAgentId');
@@ -130,28 +124,8 @@ function createEnvelope({ projectId = 'global', senderAgentId, recipientAgentId 
   saveState(state);
   const delivery = state.deliveries.find((item) => item.messageId === message.messageId && item.recipientAgentId === recipientAgentId);
   if (recipientAgentId) {
-    // Generic visibility rule: every durable DM projects into BOTH drawers.
-    // Recipient gets the inbox copy (durable deliveryId); sender gets a sent
-    // copy so any agent→agent exchange is visible from either side with no
-    // per-pair logging helpers.
-    appendAgentMessage(recipientAgentId, {
-      from: sender,
-      project: project,
-      request: snippetBounded(message.summary),
-      role: 'agent',
-      deliveryId: delivery?.deliveryId,
-      messageId: message.messageId
-    });
-    if (sender !== recipientAgentId) {
-      appendAgentMessage(sender, {
-        from: sender,
-        project: project,
-        request: snippetBounded(`To ${recipientAgentId}: ${message.summary}`),
-        role: 'agent',
-        deliveryId: delivery ? `${delivery.deliveryId}#sent` : `${message.messageId}#sent-${sender}`,
-        messageId: message.messageId
-      });
-    }
+    // Chat-clean rule: no drawer copies (inbox or sent). Agent-to-agent
+    // exchanges stay visible via courier event + message-activity + log.
     broadcastAgentEvent({
       fromAgentId: sender,
       toAgentId: recipientAgentId,
@@ -241,7 +215,7 @@ export function claimMessage({ messageId, agentId, leaseMs = DEFAULT_LEASE_MS })
   const message = state.messages.find((item) => item.messageId === delivery.messageId);
   message.status = 'claimed'; message.attemptCount = delivery.attemptCount; message.claimedAt = delivery.claimedAt;
   saveState(state);
-  projectDeliveryToDrawer(delivery.recipientAgentId, message, delivery, 'claimed');
+  queueThought(delivery.recipientAgentId, 'QUEUE_CLAIM', `Claimed delivery [${delivery.deliveryId}] of [${message.messageId}] from [${message.senderAgentId}]: ${String(message.summary).slice(0, 160)}`);
   return { message: publicMessage(message, delivery), delivery, leaseToken: delivery.leaseToken };
 }
 
@@ -254,7 +228,7 @@ export function completeMessage({ messageId, agentId, leaseToken, result = null 
   delivery.completedAt = new Date().toISOString(); delivery.result = result;
   message.completedAt = delivery.completedAt; message.result = result; message.status = 'completed';
   saveState(state);
-  projectDeliveryToDrawer(agentId, message, delivery, 'completed');
+  queueThought(agentId, 'QUEUE_DONE', `Completed delivery [${delivery.deliveryId}] of [${message.messageId}] from [${message.senderAgentId}].`);
   return { ...outcome, message: publicMessage(message, delivery) };
 }
 export function failMessage({ messageId, agentId, leaseToken, reason, retryable = true }) {
@@ -265,6 +239,7 @@ export function failMessage({ messageId, agentId, leaseToken, reason, retryable 
   delivery.status = retryable && delivery.attemptCount < MAX_ATTEMPTS ? 'queued' : 'dead-lettered';
   const message = state.messages.find((item) => item.messageId === delivery.messageId); message.status = delivery.status;
   saveState(state);
+  queueThought(agentId, 'QUEUE_FAIL', `Delivery [${delivery.deliveryId}] of [${message.messageId}] ${delivery.status === 'queued' ? 're-queued' : 'dead-lettered'}: ${String(reason).slice(0, 160)}`);
   return { message: publicMessage(message, delivery), retrying: delivery.status === 'queued' };
 }
 export function releaseMessage({ messageId, agentId, leaseToken, reason = 'released' }) { return failMessage({ messageId, agentId, leaseToken, reason, retryable: true }); }
@@ -283,10 +258,10 @@ export function getMessageStatus({ messageId }) {
 export function getProjectMessageActivity({ projectId = 'global', limit = 100 }) {
   const state = loadState();
   if (recoverExpired(state)) saveState(state);
+  // Chronological (oldest first, newest at bottom) like a normal message view.
   const messages = state.messages
     .filter((message) => message.projectId === projectId || projectId === 'all')
-    .slice(-Math.max(1, Math.min(250, Number(limit) || 100)))
-    .reverse();
+    .slice(-Math.max(1, Math.min(250, Number(limit) || 100)));
   return messages.map((message) => ({
     ...message,
     deliveries: state.deliveries.filter((delivery) => delivery.messageId === message.messageId)

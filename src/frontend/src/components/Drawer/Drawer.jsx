@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../store/AppContext.jsx';
-import { roleConf } from '../../constants/roles.js';
+import AgentAvatar from '../Agents/AgentAvatar.jsx';
 import ChatTab from './ChatTab.jsx';
 import StatsTab from './StatsTab.jsx';
 import ThoughtsTab from './ThoughtsTab.jsx';
@@ -11,18 +11,18 @@ import { api } from '../../api/client.js';
 const TABS = [
   ['chat', 'fa-comment-dots', 'Chat'],
   ['stats', 'fa-shield-halved', 'Stats'],
-  ['thoughts', 'fa-brain', 'Thoughts'],
+  ['thoughts', 'fa-brain', 'BTS', 'Behind the scenes: agent reasoning + delivery mechanics'],
   ['context', 'fa-database', 'Context'],
-  ['network', 'fa-envelope-open-text', 'Messages']
+  ['network', 'fa-envelope-open-text', 'A-to-A', 'Agent-to-agent communication only']
 ];
 
 export default function Drawer({ engineRef }) {
   const [tab, setTab] = useState('chat');
-  const { drawerAgent, allAgents, currentAgentId, loadAgents, loadAgentDrawer, setActiveModal } =
+  const { drawerAgent, allAgents, currentAgentId, loadAgents, loadAgentDrawer, setActiveModal, setDrawerCollapsed } =
     useApp();
 
   const agent = drawerAgent || allAgents[currentAgentId] || {};
-  const conf = roleConf(agent.role);
+  const avatarId = agent.id || currentAgentId;
 
   async function togglePause() {
     if (!agent.id && !currentAgentId) return;
@@ -39,7 +39,7 @@ export default function Drawer({ engineRef }) {
     <aside className="drawer">
       <div className="drawer-header">
         <div className="drawer-agent-info">
-          <div className="drawer-avatar-icon">{conf.icon}</div>
+          <div className="drawer-avatar-icon"><AgentAvatar agent={agent} agentId={avatarId} size={44} /></div>
           <div className="drawer-agent-meta">
             <h3>
               {agent.name || 'Manager Bard'}{' '}
@@ -53,6 +53,13 @@ export default function Drawer({ engineRef }) {
           </div>
         </div>
         <div className="drawer-actions">
+          <button
+            className="action-btn"
+            onClick={() => setDrawerCollapsed(true)}
+            title="Collapse side panel"
+          >
+            <i className="fa-solid fa-chevron-right" />
+          </button>
           <button
             className="action-btn"
             onClick={togglePause}
@@ -78,11 +85,12 @@ export default function Drawer({ engineRef }) {
       </div>
 
       <div className="drawer-tabs">
-        {TABS.map(([key, icon, label]) => (
+        {TABS.map(([key, icon, label, title]) => (
           <button
             key={key}
             className={`tab-btn ${tab === key ? 'active' : ''}`}
             onClick={() => setTab(key)}
+            {...(title ? { title } : {})}
           >
             <i className={`fa-solid ${icon}`} /> {label}
           </button>

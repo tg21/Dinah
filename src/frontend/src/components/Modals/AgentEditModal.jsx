@@ -4,7 +4,6 @@ import { useApp } from '../../store/AppContext.jsx';
 import { api } from '../../api/client.js';
 import { EFFORT_LEVELS } from '../../constants/startup.js';
 import { groupModelsByHarness, modelCapabilitiesLabel } from '../../utils/cost.js';
-import { escapeHtml } from '../../utils/format.js';
 
 export default function AgentEditModal() {
   const { drawerAgent, allAgents, currentAgentId, models, mcps, setActiveModal, loadAgents, loadAgentDrawer } = useApp();
@@ -113,8 +112,8 @@ export default function AgentEditModal() {
               <div key={mcp.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700, color: '#fff', cursor: 'pointer' }}>
                   <input type="checkbox" checked={!!perm.enabled} onChange={(e) => toggleServer(mcp.id, e.target.checked)} />
-                  <span>{escapeHtml(mcp.name || mcp.id)} <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({mcp.sourceType === 'shipped' ? 'included' : 'user-managed'} · {source})</small></span>
-                  <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{escapeHtml(mcp.description || '')}{mcp.id === 'dinah-orchestration' ? ' · Always enabled at invocation' : ''}</small>
+                  <span>{mcp.name || mcp.id} <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({mcp.sourceType === 'shipped' ? 'included' : 'user-managed'} · {source})</small></span>
+                  <small style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{mcp.description || ''}{mcp.id === 'dinah-orchestration' ? ' · Always enabled at invocation' : ''}</small>
                 </label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, margin: '6px 0 0 22px' }}>
                   {tools.length ? (
@@ -126,7 +125,7 @@ export default function AgentEditModal() {
                           disabled={!perm.enabled}
                           onChange={(e) => toggleTool(mcp.id, tool.name, e.target.checked)}
                         />{' '}
-                        {escapeHtml(tool.name)}
+                        {tool.name}
                       </label>
                     ))
                   ) : (

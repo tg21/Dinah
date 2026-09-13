@@ -11,6 +11,7 @@ export function AppProvider({ children }) {
   const [agentThoughts, setAgentThoughts] = useState({});
   const [projectConfigs, setProjectConfigs] = useState({});
   const [projects, setProjects] = useState([]);
+  const [biomes, setBiomes] = useState([]);
   const [models, setModels] = useState([]);
   const [harnesses, setHarnesses] = useState([]);
   const [mcps, setMcps] = useState([]);
@@ -21,17 +22,20 @@ export function AppProvider({ children }) {
   const [messageActivity, setMessageActivity] = useState([]);
   const [mailFlights, setMailFlights] = useState([]);
   const [selectedCommunication, setSelectedCommunication] = useState(null);
+  const [roleSprites, setRoleSprites] = useState({});
 
   const loadModelsHarnessesMcps = useCallback(async () => {
     try {
-      const [m, h, mc] = await Promise.all([
+      const [m, h, mc, rs] = await Promise.all([
         api.getModels().catch(() => ({ models: [] })),
         api.getHarnesses().catch(() => ({ harnesses: [] })),
-        api.getMcps().catch(() => ({ mcps: [] }))
+        api.getMcps().catch(() => ({ mcps: [] })),
+        api.getRoles().catch(() => ({ roles: {} }))
       ]);
       setModels(m.models || []);
       setHarnesses(h.harnesses || []);
       setMcps(mc.mcps || []);
+      setRoleSprites(rs.roles || {});
       // Keep the user's explicit choice when still detected; otherwise prefer
       // opencode, else the first detected harness — never a hardcoded vendor.
       const ids = (h.harnesses || []).map((x) => x.id);
@@ -48,6 +52,7 @@ export function AppProvider({ children }) {
     if (!data) return;
     setProjectConfigs(data.config || {});
     setProjects(data.projects || []);
+    if (Array.isArray(data.biomes)) setBiomes(data.biomes);
   }, []);
 
   const loadAgents = useCallback(async () => {
@@ -71,6 +76,8 @@ export function AppProvider({ children }) {
 
   const seenEvents = useRef(new Set());
   const lastRosterRefresh = useRef(0);
+  const drawerRef = useRef({ currentAgentId: currentAgentId, loadAgentDrawer: null });
+  drawerRef.current.currentAgentId = currentAgentId;
   useEffect(() => {
     loadMessageActivity();
     const activityTimer = window.setInterval(loadMessageActivity, 4000);
@@ -91,11 +98,18 @@ export function AppProvider({ children }) {
       // Roster-invalidating events: agent-driven staffing (request_staff /
       // provision_agent) has no modal to trigger loadAgents(), so the SSE
       // push is the only thing that makes awaiting-confirmation appear.
-      if (['summon_requested', 'summon_confirmed', 'agent_spawned', 'agent_updated', 'agent_status_changed'].includes(event.type)) {
+      if (['summon_requested', 'summon_confirmed', 'agent_spawned', 'agent_updated', 'agent_status_changed', 'agent_needs_user', 'agent_informs_user'].includes(event.type)) {
         const now = Date.now();
         if (now - lastRosterRefresh.current < 1000) return;
         lastRosterRefresh.current = now;
         loadAgents();
+        // User-directed traffic (ask_user / inform_user) is chat-only: refresh
+        // the open drawer so the question banner / update appears. The
+        // awaiting-user sprite ring + badge is the "animation" for questions;
+        // informs arrive as highlighted chat bubbles.
+        if (['agent_needs_user', 'agent_informs_user'].includes(event.type)) {
+          drawerRef.current.loadAgentDrawer?.(drawerRef.current.currentAgentId);
+        }
       }
     };
 
@@ -134,6 +148,7 @@ export function AppProvider({ children }) {
     },
     [currentAgentId, currentProjectId]
   );
+  drawerRef.current.loadAgentDrawer = loadAgentDrawer;
 
   const selectAgent = useCallback(
     async (agentId) => {
@@ -185,6 +200,7 @@ export function AppProvider({ children }) {
       agentThoughts,
       projectConfigs,
       projects,
+      biomes,
       models,
       harnesses,
       mcps,
@@ -195,6 +211,7 @@ export function AppProvider({ children }) {
       messageActivity,
       mailFlights,
       selectedCommunication,
+      roleSprites,
       setCurrentAgentId,
       setCurrentProjectId,
       setAllAgents,
@@ -223,6 +240,7 @@ export function AppProvider({ children }) {
       agentThoughts,
       projectConfigs,
       projects,
+      biomes,
       models,
       harnesses,
       mcps,
@@ -233,6 +251,7 @@ export function AppProvider({ children }) {
       messageActivity,
       mailFlights,
       selectedCommunication,
+      roleSprites,
       loadModelsHarnessesMcps,
       loadProjects,
       loadAgents,

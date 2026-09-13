@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../store/AppContext.jsx';
 
 function deliveryState(message, effectiveAgentId) {
@@ -27,24 +27,36 @@ function ticks(status) {
 export default function NetworkTab() {
   const { messageActivity, allAgents, currentAgentId, currentProjectId, drawerAgent } = useApp();
   const [expanded, setExpanded] = useState(null);
+  const scrollRef = useRef(null);
   const effectiveAgentId = drawerAgent?.id || currentAgentId;
-  // Every agent — overseers included — sees only traffic it participates in
-  // (sender / recipient / delivery-holder) plus project-channel broadcasts.
+  // Agent-to-agent traffic only: user⇄agent exchanges live in the Chat tab,
+  // never here. Chronological (oldest top, newest bottom).
   const messages = messageActivity
     .filter((message) => message.projectId === currentProjectId || message.projectId === 'global')
-    .filter((message) => isInvolved(message, effectiveAgentId));
+    .filter((message) => message.senderAgentId !== 'user')
+    .filter((message) => isInvolved(message, effectiveAgentId))
+    .slice()
+    .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+
+  // Settle on the latest message whenever this panel is (re)opened or grows.
+  useEffect(() => {
+    const panel = document.getElementById('tab-network');
+    if (panel) panel.scrollTop = panel.scrollHeight;
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, effectiveAgentId, currentProjectId]);
 
   return (
     <>
       <div className="section-title">
-        <i className="fa-solid fa-envelope-open-text" /> Agent Communications
+        <i className="fa-solid fa-envelope-open-text" /> Agent-to-Agent
         <span className="network-live-pill"><i className="fa-solid fa-circle" /> LIVE</span>
       </div>
-      <div className="network-subtitle">Durable inbox traffic · click a message to inspect delivery</div>
+      <div className="network-subtitle">Agent-to-agent traffic only · user chat stays in Chat</div>
       {!messages.length ? (
         <div className="network-empty"><i className="fa-regular fa-envelope" /> No agent messages yet.</div>
       ) : (
-        <div className="communication-list">
+        <div className="communication-list" ref={scrollRef} style={{ overflowY: 'auto' }}>
           {messages.map((message) => {
             const outgoing = message.senderAgentId === effectiveAgentId;
             const receiverId = message.recipientAgentId || message.deliveries?.[0]?.recipientAgentId;

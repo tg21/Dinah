@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { AppProvider, useApp } from './store/AppContext.jsx';
 import TopNav from './components/Layout/TopNav.jsx';
 import ExecutiveBar from './components/Layout/ExecutiveBar.jsx';
+import RosterRail from './components/Roster/RosterRail.jsx';
 import PlayArea from './components/PlayArea/PlayArea.jsx';
 import Drawer from './components/Drawer/Drawer.jsx';
 import StartupSetupModal from './components/Modals/StartupSetupModal.jsx';
@@ -20,6 +21,8 @@ function Shell() {
   const {
     drawerCollapsed,
     activeModal,
+    currentProjectId,
+    projectConfigs,
     setActiveModal,
     loadModelsHarnessesMcps,
     loadProjects,
@@ -59,12 +62,21 @@ function Shell() {
     document.body.classList.toggle('drawer-collapsed', drawerCollapsed);
   }, [drawerCollapsed]);
 
+  // The whole chrome follows the active project's biome.
+  const activeBiome = projectConfigs[currentProjectId]?.biome || 'oasis';
+  useEffect(() => {
+    document.body.dataset.biome = activeBiome;
+  }, [activeBiome]);
+
   return (
     <>
       <TopNav />
       <ExecutiveBar />
+      <RosterRail />
       <PlayArea engineRef={engineRef} />
-      {!drawerCollapsed && <Drawer engineRef={engineRef} />}
+      {/* Always mounted: collapse slides it away via body.drawer-collapsed
+          so the transition plays and chat/tab state survives. */}
+      <Drawer engineRef={engineRef} />
 
       {activeModal === 'startupSetup' && <StartupSetupModal />}
       {activeModal === 'newProject' && <NewProjectModal />}

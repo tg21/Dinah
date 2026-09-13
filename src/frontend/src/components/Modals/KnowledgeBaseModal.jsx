@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { useApp } from '../../store/AppContext.jsx';
 import { api } from '../../api/client.js';
-import { escapeHtml } from '../../utils/format.js';
 
 export default function KnowledgeBaseModal() {
   const { setActiveModal } = useApp();
@@ -63,14 +62,14 @@ export default function KnowledgeBaseModal() {
         {topics.map((t, i) => (
           <div key={i} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cyan)' }}>{escapeHtml(t.title)}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cyan)' }}>{t.title}</span>
               <span style={{ fontSize: 9, background: 'rgba(0,188,212,0.15)', color: 'var(--cyan)', padding: '2px 6px', borderRadius: 4 }}>
-                {escapeHtml(t.category)}
+                {t.category}
               </span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text)', marginTop: 4 }}>{escapeHtml(t.summary)}</div>
+            <div style={{ fontSize: 11, color: 'var(--text)', marginTop: 4 }}>{t.summary}</div>
             <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 6 }}>
-              <i className="fa-solid fa-feather" /> {escapeHtml(t.author)}
+              <i className="fa-solid fa-feather" /> {t.author}
             </div>
           </div>
         ))}

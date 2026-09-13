@@ -1,3 +1,6 @@
+// WARNING: only for dangerouslySetInnerHTML contexts. Rendering the result
+// as JSX children double-encodes (&quot; shows literally) because React
+// escapes text itself — pass raw strings to JSX instead.
 export function escapeHtml(text) {
   if (text === null || text === undefined) return '';
   const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };

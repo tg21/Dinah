@@ -8,6 +8,24 @@ import { AGENT_RPG_REGISTRY } from '../data/rpgRegistry.js';
 import { getModelById, selectBestModelForRole } from '../harness/index.js';
 import { ensureAgentMcpDefaults } from '../mcp/permissions.js';
 
+// Cosmetic-only appearance seed (mirrors agentLifecycle.randomAppearance
+// without importing it to avoid a cycle). Stable per overseer id so global
+// portraits don't reshuffle on every boot.
+function randomOverseerAppearance(ovId = '') {
+  let h = 0;
+  for (let i = 0; i < String(ovId).length; i++) h = (h * 31 + String(ovId).charCodeAt(i)) >>> 0;
+  return { paletteId: h % 8, variant: Math.floor(h / 7) % 3 };
+}
+
+function ensureAppearance(agent, seed = '') {
+  if (agent.appearance && typeof agent.appearance.paletteId === 'number') return false;
+  let h = 0;
+  const s = String(seed || agent.role || agent.name || 'agent');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  agent.appearance = { paletteId: h % 8, variant: Math.floor(h / 7) % 3 };
+  return true;
+}
+
 export function createOverseerAgent(ovId) {
   const rpgStats = AGENT_RPG_REGISTRY[ovId] || {};
   const bestModel = selectBestModelForRole(ovId);
@@ -16,6 +34,7 @@ export function createOverseerAgent(ovId) {
     role: ovId,
     project: 'global',
     status: 'active',
+    appearance: randomOverseerAppearance(ovId),
     harness: bestModel?.source?.harness || 'opencode',
     model: bestModel?.id || 'system-simulator/balanced-agent',
     effortLevel: rpgStats.effortLevel || (bestModel?.reasoning?.type === 'effort' ? 'High' : 'Medium'),
@@ -93,6 +112,8 @@ export function loadHrSystem() {
       // Explicit enabled:false is preserved by ensureAgentMcpDefaults.
       const { applied } = ensureAgentMcpDefaults(agent);
       if (applied) modified = true;
+      // Backfill cosmetic appearance for pre-refactor records (stable by id).
+      if (ensureAppearance(agent, agentId)) modified = true;
     }
 
     if (modified) {

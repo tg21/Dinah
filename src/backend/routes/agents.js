@@ -9,7 +9,7 @@ import {
 import { appendToSharedLog } from '../services/messageService.js';
 import { broadcastAgentEvent } from '../services/eventBus.js';
 import { sanitizeMcpPermissions } from '../mcp/index.js';
-import { cancelHarnessAgent } from '../services/harnessRunner.js';
+import { cancelHarnessAgent, clearAllHarnessSessions } from '../services/harnessRunner.js';
 
 const router = Router();
 
@@ -54,6 +54,7 @@ router.post('/api/agents/update', (req, res) => {
   if (!hrSystem[agentId]) return res.status(404).json({ error: `Agent ${agentId} not found` });
 
   const agent = hrSystem[agentId];
+  const providerChanged = Boolean(updates.model || updates.harness);
   if (updates.name) agent.name = updates.name;
   if (updates.model) {
     agent.model = updates.model;
@@ -72,6 +73,9 @@ router.post('/api/agents/update', (req, res) => {
   }
 
   saveHrSystem(hrSystem);
+  // A provider/model switch orphans the old native session; drop stored ids
+  // so the next turn bootstraps a fresh session instead of resuming stale one.
+  if (providerChanged) clearAllHarnessSessions(agentId);
   appendToSharedLog(`Configured agent [${agentId}] (${agent.name}) with updated parameters.`);
   broadcastAgentEvent({
     fromAgentId: 'system',

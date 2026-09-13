@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { useApp } from '../../store/AppContext.jsx';
 import { api } from '../../api/client.js';
-import { escapeHtml } from '../../utils/format.js';
 
 export default function McpManagementModal() {
   const { mcps, setMcps, allAgents, currentAgentId, setActiveModal, loadAgents, loadAgentDrawer } = useApp();
@@ -120,9 +119,9 @@ export default function McpManagementModal() {
             style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: 8 }}
           >
             <div>
-              <div style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>{escapeHtml(r.name)}</div>
+              <div style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>{r.name}</div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                {escapeHtml(r.description || 'No description')} · v{escapeHtml(r.version || 'latest')}
+                {r.description || 'No description'} · v{r.version || 'latest'}
               </div>
             </div>
             <div>
@@ -155,13 +154,13 @@ export default function McpManagementModal() {
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 8px' }}
             >
               <div>
-                <strong style={{ color: '#fff', fontSize: 11 }}>{escapeHtml(mcp.name || mcp.id)}</strong>{' '}
+                <strong style={{ color: '#fff', fontSize: 11 }}>{mcp.name || mcp.id}</strong>{' '}
                 {sourceLabel && (
                   <span style={{ fontSize: 9, color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px' }}>{sourceLabel}</span>
                 )}
                 <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                  {mcp.sourceType === 'shipped' ? 'Included with Dinah' : 'User-managed'} · {escapeHtml(mcp.description || 'MCP server')} · {mcp.tools?.length || 0} tools
-                  discovered{mcp.discoveryError ? ` · ${escapeHtml(mcp.discoveryError)}` : ''}
+                  {mcp.sourceType === 'shipped' ? 'Included with Dinah' : 'User-managed'} · {mcp.description || 'MCP server'} · {mcp.tools?.length || 0} tools
+                  discovered{mcp.discoveryError ? ` · ${mcp.discoveryError}` : ''}
                   {mcp.id === 'dinah-orchestration' && ' · Always enabled at invocation'}
                 </div>
               </div>

@@ -1,5 +1,6 @@
 {
   "name": "tech-writer-scribe",
+  "sprite": { "hat": "spectacles", "tool": "quill", "ears": "round" },
   "job": "Technical Writer",
   "basePrompt": "Document shipped code last, after implementation and QA pass. Write README/run instructions, file maps, trade-offs, and next steps. Docs must match the actual code; verify commands and paths before publishing.",
   "modelPolicy": {

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { SHARED_STATE_DIR, getTaskDedupeWindowMs } from '../config.js';
-import { appendToSharedLog, appendAgentMessage } from './messageService.js';
+import { appendToSharedLog, appendAgentMessage, tagLatestQuestionMessage } from './messageService.js';
 import { loadHrSystem, saveHrSystem } from './hrService.js';
 import { broadcastAgentEvent } from './eventBus.js';
 import { enqueueDirectMessage } from './messageQueueService.js';
@@ -265,18 +265,122 @@ export function requestHelp({ projectId, agentId, taskId, neededRole, question, 
   return request;
 }
 
-export function askUser({ projectId, agentId, taskId, question }) {
+function normalizeOptions(value) {
+  if (value === undefined || value === null) return [];
+  const list = Array.isArray(value) ? value : [value];
+  return list
+    .filter((item) => typeof item === 'string' && item.trim())
+    .map((item) => item.trim().slice(0, 200))
+    .slice(0, 10);
+}
+
+function normalizeQuestionId(value) {
+  if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 120);
+  return `q-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Per-question holds. Back-to-back questions must stay individually
+// answerable, so each ask_user mints (or reuses an agent-supplied) questionId
+// and is tracked in pendingUserQuestions[] as open → answered. The legacy
+// singular pendingUserQuestion stays synced to the latest OPEN question so
+// older readers (dispatcher, marshall, resume prompt) keep working.
+function openQuestionStore(agent) {
+  if (!Array.isArray(agent.pendingUserQuestions)) {
+    agent.pendingUserQuestions = [];
+    const legacy = agent.pendingUserQuestion;
+    if (legacy && typeof legacy === 'object' && typeof legacy.question === 'string' && legacy.question.trim()) {
+      agent.pendingUserQuestions.push({
+        id: normalizeQuestionId(legacy.id || legacy.questionId),
+        question: legacy.question,
+        options: Array.isArray(legacy.options) ? legacy.options : [],
+        taskId: legacy.taskId || null,
+        askedAt: legacy.askedAt || new Date().toISOString(),
+        status: 'open'
+      });
+    }
+  }
+  return agent.pendingUserQuestions;
+}
+
+function syncLegacyHold(agent, agentId) {
+  const open = openQuestionStore(agent).filter((q) => q.status === 'open');
+  agent.pendingUserQuestion = open.length
+    ? { id: open[open.length - 1].id, question: open[open.length - 1].question, options: open[open.length - 1].options, taskId: open[open.length - 1].taskId, askedAt: open[open.length - 1].askedAt }
+    : null;
+  if (agentId) {
+    for (const q of open) {
+      if (q.tagged) continue;
+      try {
+        if (tagLatestQuestionMessage(agentId, q.question, q.id)) q.tagged = true;
+      } catch { /* tagging is best-effort */ }
+    }
+  }
+}
+
+export function askUser({ projectId, agentId, taskId, question, options, questionId }) {
   const textQuestion = requireText(question, 'question');
+  const cleanOptions = normalizeOptions(options);
+  const id = normalizeQuestionId(questionId);
   const hr = loadHrSystem();
   if (!hr[agentId]) throw new Error('Agent not found');
+  const store = openQuestionStore(hr[agentId]);
+  const existing = store.find((q) => q.id === id && q.status === 'open');
+  if (existing) return { id: `user-question-${Date.now()}`, questionId: existing.id, agentId, projectId, question: existing.question, options: existing.options, status: 'awaiting-user', duplicate: true };
+  store.push({ id, question: textQuestion, options: cleanOptions, taskId: taskId || null, askedAt: new Date().toISOString(), status: 'open' });
+  // Bound the store: drop oldest ANSWERED first; open holds are never dropped.
+  const answered = store.filter((q) => q.status !== 'open');
+  if (store.length > 30 && answered.length) {
+    const drop = new Set(answered.slice(0, store.length - 30).map((q) => q.id));
+    hr[agentId].pendingUserQuestions = store.filter((q) => !drop.has(q.id));
+  }
   hr[agentId].status = 'awaiting-user';
-  hr[agentId].pendingUserQuestion = { question: textQuestion, taskId: taskId || null, askedAt: new Date().toISOString() };
+  syncLegacyHold(hr[agentId], agentId);
   hr[agentId].last_activity_ms = Date.now();
   saveHrSystem(hr);
-  appendAgentMessage(agentId, { from: hr[agentId].name || agentId, project: projectId, request: textQuestion, role: 'agent' });
-  broadcastAgentEvent({ fromAgentId: agentId, toAgentId: 'user', projectId, type: 'agent_needs_user', snippet: textQuestion.slice(0, 80) });
-  appendToSharedLog(`[${agentId}] is waiting for user input in [${projectId}].`);
-  return { id: `user-question-${Date.now()}`, agentId, projectId, question: textQuestion, status: 'awaiting-user' };
+  appendAgentMessage(agentId, { from: hr[agentId].name || agentId, project: projectId, request: textQuestion, role: 'agent', kind: 'user-question', options: cleanOptions, questionId: id });
+  broadcastAgentEvent({ fromAgentId: agentId, toAgentId: 'user', projectId, type: 'agent_needs_user', questionId: id, snippet: textQuestion.slice(0, 80) });
+  appendToSharedLog(`[${agentId}] is waiting for user input in [${projectId}] (question ${id}).`);
+  return { id: `user-question-${Date.now()}`, questionId: id, agentId, projectId, question: textQuestion, options: cleanOptions, status: 'awaiting-user' };
+}
+
+// Mark one hold answered. No questionId (plain-text reply) answers the
+// oldest open hold. Clears the awaiting-user status only when no open holds
+// remain — back-to-back questions stay individually answerable.
+export function answerUserQuestion({ agentId, questionId, answer }) {
+  const hr = loadHrSystem();
+  if (!hr[agentId]) throw new Error('Agent not found');
+  const store = openQuestionStore(hr[agentId]);
+  const cleanId = typeof questionId === 'string' && questionId.trim() ? questionId.trim() : null;
+  const target = cleanId
+    ? store.find((q) => q.id === cleanId && q.status === 'open')
+    : store.filter((q) => q.status === 'open').sort((a, b) => new Date(a.askedAt) - new Date(b.askedAt))[0];
+  if (!target) {
+    syncLegacyHold(hr[agentId], agentId);
+    saveHrSystem(hr);
+    return { answered: null, remainingOpen: store.filter((q) => q.status === 'open').length, openQuestions: store.filter((q) => q.status === 'open') };
+  }
+  target.status = 'answered';
+  target.answeredAt = new Date().toISOString();
+  target.answer = String(answer ?? '').slice(0, 2000);
+  const remaining = store.filter((q) => q.status === 'open');
+  if (!remaining.length && hr[agentId].status === 'awaiting-user') hr[agentId].status = 'working';
+  syncLegacyHold(hr[agentId], agentId);
+  hr[agentId].last_activity_ms = Date.now();
+  saveHrSystem(hr);
+  appendToSharedLog(`[${agentId}] received an answer to question ${target.id}; ${remaining.length} open hold(s) remain.`);
+  return { answered: { ...target }, remainingOpen: remaining.length, openQuestions: remaining.map((q) => ({ ...q })) };
+}
+
+export function informUser({ projectId, agentId, taskId, message }) {
+  const textMessage = requireText(message, 'message');
+  const hr = loadHrSystem();
+  if (!hr[agentId]) throw new Error('Agent not found');
+  hr[agentId].last_activity_ms = Date.now();
+  saveHrSystem(hr);
+  appendAgentMessage(agentId, { from: hr[agentId].name || agentId, project: projectId, request: textMessage, role: 'agent', kind: 'user-inform' });
+  broadcastAgentEvent({ fromAgentId: agentId, toAgentId: 'user', projectId, type: 'agent_informs_user', snippet: textMessage.slice(0, 80) });
+  appendToSharedLog(`[${agentId}] informed the user in [${projectId}].`);
+  return { id: `user-inform-${Date.now()}`, agentId, projectId, message: textMessage, taskId: taskId || null, status: hr[agentId].status };
 }
 
 export function sendAgentMessage({ fromAgentId, toAgentId, projectId, message }) {
