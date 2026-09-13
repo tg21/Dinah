@@ -6,11 +6,16 @@ Dinah is designed for supervised, multi-agent engineering work: a manager plans 
 
 It offers a pretty UI to manage your Multi Agent system, keeping the task of interacting with agents fun.
 
-
+### Dinah Default project screen
 ![Dinah-Agent-Customization](Assets/Dinah-default-project.png)
 
+### Dinah Agent-User chat screen
 ![Dinah-Chat-Demo](Assets/Dinah-chat-demo.png)
 
+### Dinah Agent to Agent Communication screen
+![Dinah-agent-to-agent-communication](Assets/Dinah-agent-to-agent-communication.png)
+
+### Dinah Agent Customization Dialog
 ![Dinah-Default-Project-Space](Assets/Dinah-agent-customization.png)
 
 It's supposed to be harness agnostic, I've tested it a little with Opencode, Agy and Codex.
