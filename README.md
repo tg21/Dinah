@@ -144,3 +144,5 @@ More endpoint examples are in [`docs/api.md`](docs/api.md). Operational behavior
  - Add more evals for agents
  - Refactor some grouped tests(e.g current-issues-phase1 tests) into their proper test files.
  - Test on Windows, I have only tested this on GNU/Linux so far.
+ - Change all the DND (older project name) references to DINAH
+ - Fix some font colors for better accessibility
